@@ -380,17 +380,17 @@ setup_interpreter() {
     log "$GREEN" "OK" "Interpreter ready"
 }
 
-# Build the compiler workspace in release mode.
+# Verify the flowlog-compiler binary is present. The compiler is a
+# fetched, pre-built input here (per AGENTS.md design principle 1:
+# "FlowLog is a fetched input, not a fork"). The Makefile wrapper
+# invokes tools/get_flowlog.sh first and sets FLOWLOG_BIN /
+# FLOWLOG_RESOLVED_SHA / FLOWLOG_SRC_DIR; this function just asserts
+# the binary exists, mirroring setup_souffle / setup_interpreter.
 setup_compiler() {
-    log "$BLUE" "SETUP" "Setting up compiler (current repo)"
-
-    pushd "$ROOT_DIR" >/dev/null
-    log "$YELLOW" "BUILD" "Building compiler workspace (release)"
-    cargo build --release 2>&1 | tail -5
-    popd >/dev/null
-
-    [[ -x "$COMPILER_BIN" ]] || die "Compiler binary not found: $COMPILER_BIN"
-    log "$GREEN" "OK" "Compiler ready"
+    [[ -x "$COMPILER_BIN" ]] \
+        || die "flowlog-compiler not found at $COMPILER_BIN — invoke via the Makefile (which calls tools/get_flowlog.sh first), or set FLOWLOG_BIN=<path> manually."
+    local sha="${FLOWLOG_RESOLVED_SHA:-unknown}"
+    log "$BLUE" "SETUP" "Compiler: $COMPILER_BIN (flowlog @ ${sha:0:12})"
 }
 
 # Download an interpreter .dl program file if it is not already cached.
