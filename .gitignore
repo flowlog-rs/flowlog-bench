@@ -1,0 +1,36 @@
+# --- gitignore for flowlog-bench -------------------------------------
+#
+# Per AGENTS.md (this repo + flowlog-rs/flowlog#AGENTS.md):
+#
+#   - flowlog/   gitignored. Populated by tools/get_flowlog.sh. Holds one
+#                or more <short_sha>/ build trees so regression runs can
+#                keep both base and head built side-by-side without
+#                rebuilding.
+#
+#   - facts/     gitignored. Populated by an external data handler
+#                (the existing /datasets symlink + fetcher pattern).
+#                Layout mirrors programs/ at the *suite* level
+#                (data is dialect-agnostic). Never committed; scripts
+#                only read.
+#
+#   - results/   gitignored. CSVs, plots, raw timing land here.
+#                Each CSV records the resolved flowlog SHA + corpus rev
+#                + host + worker count + wall-clock for reproducibility.
+# --------------------------------------------------------------------
+
+/flowlog/
+/facts/
+/results/
+
+# scratch / OS / editor noise
+.DS_Store
+*.swp
+*.swo
+*.tmp
+*.bak
+__pycache__/
+*.pyc
+.venv/
+venv/
+.idea/
+.vscode/
