@@ -3,13 +3,13 @@
 # tools/get_flowlog.sh — fetch + build flowlog at a given ref, idempotently.
 # =============================================================================
 #
-# Per AGENTS.md (flowlog-rs/flowlog#AGENTS.md, lines 186-188 + 246-248):
-#
-#   "fetch + build flowlog at a given ref. Honours FLOWLOG_REF=<sha|tag|branch>
-#    (default: main). Output: ./flowlog/<short_sha>/{src,target/release}.
-#    Each cached build lives at flowlog/<short_sha>/, so re-running the same
-#    ref is free. get_flowlog.sh is idempotent: if the ref is already built,
-#    it no-ops."
+# Per AGENTS.md ("Specifying which flowlog commit to bench" + design
+# principle 1, "Flowlog is a fetched input, not a fork"): this script
+# fetches and builds flowlog at a given ref. Honours
+# FLOWLOG_REF=<sha|tag|branch> (default: main). Output:
+# ./flowlog/<short_sha>/{src,target/release}. Each cached build lives at
+# flowlog/<short_sha>/, so re-running the same ref is free. This script
+# is idempotent: if the ref is already built, it no-ops.
 #
 # Standard call shape:
 #

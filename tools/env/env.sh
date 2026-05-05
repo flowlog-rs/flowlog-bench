@@ -3,16 +3,15 @@
 # tools/env/env.sh — one-time bootstrap for a fresh Linux/macOS box.
 # =============================================================================
 #
-# Per AGENTS.md (lines 189-193 + 274-276):
+# Per AGENTS.md design principles 7 ("Bench env is heavier than test env,
+# and that's fine — Soufflé, DuckDB, GNU time, larger dataset caches all
+# live with this repo's tools/env/; the flowlog repo's env stays
+# minimal") and 8 ("No env_check.sh — if a script needs deps, it fails
+# loudly at the first call"):
 #
-#   "one-time machine install (souffle, duckdb, GNU time, rustup). Same
-#    philosophy as flowlog repo: run env.sh once on a fresh box, you're done.
-#    No env_check.sh — if a script needs deps, it fails loudly at the first
-#    call."
-#
-#   "Bench env is heavier than test env, and that's fine. Soufflé, DuckDB,
-#    GNU time, larger dataset caches all live with the bench repo's
-#    tools/env/. The flowlog repo's env stays minimal."
+# This script is a one-time machine install (souffle, duckdb, GNU time,
+# rustup). Same philosophy as the flowlog repo: run env.sh once on a
+# fresh box, you're done.
 #
 # Usage:  bash tools/env/env.sh
 # Idempotent: safe to re-run; it skips anything already installed.

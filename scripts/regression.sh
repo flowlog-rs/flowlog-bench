@@ -39,7 +39,8 @@
 #   scripts/regression.sh <base_ref> <head_ref> <config_file>
 #   scripts/regression.sh --help
 #
-# Or via the AGENTS.md-canonical env-var form (line 243):
+# Or via the AGENTS.md-canonical env-var form (see "Specifying which
+# flowlog commit to bench"):
 #   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make regression CONFIG=config/default.txt
 #
 # Both refs are passed to tools/get_flowlog.sh (branch / tag / sha all OK).
@@ -106,7 +107,8 @@ log() { printf '%s[perf-compare]%s %s\n' "${BLUE}" "${NC}" "$*" >&2; }
 # Resolve shas via tools/get_flowlog.sh — both BASE and HEAD are *fetched*
 # inputs in the bench repo (no in-tree HEAD assumption like the original
 # in-flowlog version). FLOWLOG_BASE and FLOWLOG_HEAD env vars override
-# the positional args (matches the AGENTS.md call shape on line 243).
+# the positional args (matches the AGENTS.md "Specifying which flowlog
+# commit to bench" call shape).
 # ----------------------------------------------------------------------
 BASE_REF="${FLOWLOG_BASE:-$BASE_SHA}"
 HEAD_REF="${FLOWLOG_HEAD:-$HEAD_SHA}"

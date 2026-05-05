@@ -2,13 +2,12 @@
 # flowlog-bench/Makefile — single source of entry points for perf workflows.
 # =============================================================================
 #
-# Per AGENTS.md (lines 263-268):
-#
-#   "One Make target per task, no full-sweep orchestrator. Each script
-#    already iterates over its (program × dataset) pairs internally; a
-#    wrapper that calls all three would just be glue. If a consumer wants
-#    'run everything,' it chains the three targets itself — same script-
-#    library philosophy as the flowlog repo."
+# Per AGENTS.md design principle 4 ("One Make target per task, no full-
+# sweep orchestrator"): each script already iterates over its
+# (program × dataset) pairs internally, so a wrapper that calls all
+# three would just be glue. If a consumer wants "run everything," it
+# chains the three targets itself — same script-library philosophy as
+# the flowlog repo.
 #
 # Targets:
 #   help          — print this help block
@@ -22,7 +21,8 @@
 #   clean         — wipe results/ (keeps facts/ and flowlog/ caches)
 #   distclean     — also wipes flowlog/ build cache (forces re-fetch)
 #
-# Standard call shapes (lines 235-244 of AGENTS.md):
+# Standard call shapes (see AGENTS.md, "Specifying which flowlog commit
+# to bench"):
 #
 #   make cross-engine                                    # default ref = main
 #   FLOWLOG_REF=abc1234 make cross-engine                # specific commit

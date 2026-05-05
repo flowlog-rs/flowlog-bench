@@ -49,13 +49,25 @@ trim() {
 # Returns 1 (false) on everything else (including unset / empty).
 #
 # Used by the cleanup_dataset_should_clean guard below to interpret
-# FLOWLOG_KEEP_DATASETS and FLOWLOG_FORCE_CLEANUP. Mirrors the parser
-# in flowlog's tests/lib/shared.sh — keep them in sync.
+# FLOWLOG_KEEP_DATASETS and FLOWLOG_FORCE_CLEANUP. Same contract as
+# flowlog's tests/lib/shared.sh::flowlog_truthy — both repos share the
+# same set of truthy spellings on purpose, so users don't learn one
+# rule for tests and another for bench. If you change this set, change
+# both repos in the same PR.
+#
+# Implementation note: lowercases the input first, then matches against
+# the lowercase set. An earlier version enumerated mixed-case spellings
+# directly (`yes|YES|Yes|...`) and silently fell through on inputs like
+# `TrUe` or `oN` — meaning a user who set FLOWLOG_KEEP_DATASETS=Yes
+# could lose their dataset cache. tr-then-match is robust by
+# construction.
 ###############################################################################
 
 flowlog_truthy() {
-    case "${1:-}" in
-        1|y|Y|yes|YES|true|TRUE|True|on|ON|On) return 0 ;;
+    local v="${1:-}"
+    v=$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')
+    case "$v" in
+        1|y|yes|true|on) return 0 ;;
         *) return 1 ;;
     esac
 }

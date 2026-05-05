@@ -2,8 +2,9 @@
 # tools/env/env.ps1 — one-time Windows bootstrap.
 # =============================================================================
 #
-# Per AGENTS.md (lines 274-276): bench env is heavier than test env. This
-# installs souffle, duckdb, GNU time (via msys/git-bash), rustup, python.
+# Per AGENTS.md design principle 7 ("Bench env is heavier than test env,
+# and that's fine"): this installs souffle, duckdb, GNU time (via
+# msys/git-bash), rustup, python.
 #
 # Run elevated:
 #   PowerShell (Admin) > Set-ExecutionPolicy -Scope Process Bypass; .\tools\env\env.ps1
