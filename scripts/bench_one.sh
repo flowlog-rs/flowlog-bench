@@ -2,7 +2,7 @@
 #
 # Single-pair benchmark wrapper used by the agentic perf gate.
 #
-# Mirrors compare.sh's `run_lib`: builds the lib runner once for the given
+# Mirrors cross_engine.sh's `run_lib`: builds the lib runner once for the given
 # (program.dl, dataset) pair, runs it NUM_RUNS times, then prints two
 # lines on stdout for downstream extractors:
 #
@@ -46,7 +46,7 @@ set -euo pipefail
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 log() {
     [[ "${QUIET:-0}" = "1" ]] && return 0
-    # Signature compatible with compare.sh's `log <colour> <tag> <msg...>`,
+    # Signature compatible with cross_engine.sh's `log <colour> <tag> <msg...>`,
     # but colour-free and unconditional — these go to stderr.
     local _c="${1:-}" tag="${2:-LOG}"
     shift 2 || true
@@ -54,7 +54,7 @@ log() {
 }
 
 # ----------------------------------------------------------------------
-# Path / config setup (kept compatible with compare.sh's globals so the
+# Path / config setup (kept compatible with cross_engine.sh's globals so the
 # shared lib_runner.sh helpers see exactly the same environment).
 # ----------------------------------------------------------------------
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -75,12 +75,12 @@ LIB_BENCH_BIN="${LIB_BENCH_RUNNER_DIR}/target/release/flowlog_bench_lib"
 WORKERS="${WORKERS:-1}"
 NUM_RUNS="${NUM_RUNS:-3}"
 
-# Match compare.sh's run_lib: integer-typed programs, no SIP, no string
+# Match cross_engine.sh's run_lib: integer-typed programs, no SIP, no string
 # interning. crdt + galen are integer-typed in config.txt.
 LIB_BENCH_SIP=0
 LIB_BENCH_STR_INTERN=0
 
-# Source the shared synthesis helpers (also used by compare.sh).
+# Source the shared synthesis helpers (also used by cross_engine.sh).
 # shellcheck source=lib/runner.sh
 source "$(dirname "$0")/lib/runner.sh"
 
@@ -120,7 +120,7 @@ bench_lib_ensure_crate
 PAIRS_RAW="$(bench_lib_discover_csvs "$PROG_PATH" "$(realpath "$DATASET_PATH")")"
 [[ -n "$PAIRS_RAW" ]] || die "no CSVs discovered for $PROG_FILE under $DATASET_PATH"
 
-# Stage program.dl unchanged (matches compare.sh: no .printsize→.output
+# Stage program.dl unchanged (matches cross_engine.sh: no .printsize→.output
 # rewrite — would force materializing output Vecs and skew the timing).
 PREPARED_DL="${LIB_BENCH_RUNNER_DIR}/program.dl"
 cp "$PROG_PATH" "$PREPARED_DL"
@@ -178,7 +178,7 @@ for run in $(seq 1 "$NUM_RUNS"); do
 
     # Pull the "Dataflow executed in <Duration>" line and convert to seconds.
     # Duration formats: "12.345s", "621.15ms", "17.804µs". Mirrors
-    # compare.sh::_extract_time_for_pattern.
+    # cross_engine.sh::_extract_time_for_pattern.
     LINE="$(grep 'Dataflow executed' "$RUN_LOG" | tail -1 || true)"
     [[ -n "$LINE" ]] || { log "" "WARN" "run $run: no timing line"; continue; }
 

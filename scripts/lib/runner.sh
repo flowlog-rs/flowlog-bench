@@ -10,7 +10,7 @@
 #   - No output-file writes (nothing to diff against).
 #   - Fast, bulk CSV loading — parsed per-column into the typed Tuple
 #     directly, no intermediate `rel::Foo` construction where avoidable.
-#   - Emits a `Dataflow executed in <Duration>` line on stdout so compare.sh
+#   - Emits a `Dataflow executed in <Duration>` line on stdout so cross_engine.sh
 #     can reuse `extract_total_time` without a new extractor.
 #   - Load time is intentionally not reported (lib mode has no load API the
 #     benchmark is measuring — the user loads however they like).
@@ -251,13 +251,13 @@ fn main() {
 
     let mut engine = DatalogBatchEngine::new(workers);
 ${loaders}
-    // Time only the dataflow execution — matches compare.sh's
+    // Time only the dataflow execution — matches cross_engine.sh's
     // "exec = total - load" semantics on the compiler side.
     let start = std::time::Instant::now();
     let _results = engine.run();
     let dur = start.elapsed();
 
-    // Format compatible with extract_total_time in compare.sh.
+    // Format compatible with extract_total_time in cross_engine.sh.
     println!("Dataflow executed in {:?}", dur);
 }
 EOF

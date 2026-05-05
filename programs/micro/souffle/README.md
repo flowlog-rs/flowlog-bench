@@ -1,7 +1,7 @@
-# souffle-programs/
+# programs/micro/souffle/
 
 Canonical Souffle (`.dl`) implementations of every benchmark program in
-`tools/benchmark/config.txt`. Used by `compare.sh` when invoked with
+`config/default.txt`. Used by `scripts/cross_engine.sh` when invoked with
 `--baseline=souffle` (or `--baseline=interpreter,souffle`) — Souffle is
 treated as an external Datalog oracle, both for cross-validation
 (`Crosscheck_Souffle` column in the perf CSV) and as a perf baseline.
@@ -9,14 +9,15 @@ treated as an external Datalog oracle, both for cross-validation
 ## Naming
 
 Every file here is `<stem>.dl` where `<stem>` matches the filename in
-`config.txt` (without the `<subdir>/` prefix). When `compare.sh` runs
-the Souffle baseline for `program_analysis/eclipse.dl=eclipse`, it
-reaches for `souffle-programs/eclipse.dl`.
+`config/default.txt` (without the `<subdir>/` prefix). When
+`cross_engine.sh` runs the Souffle baseline for
+`program_analysis/eclipse.dl=eclipse`, it reaches for
+`programs/micro/souffle/eclipse.dl`.
 
 ## Programs without a Souffle counterpart
 
-A handful of `config.txt` entries deliberately have no canonical `.dl`
-here. They are tagged `[souffle:skip]` in `config.txt` so the Souffle
+A handful of `config/default.txt` entries deliberately have no canonical
+`.dl` here. They are tagged `[souffle:skip]` in the config so the Souffle
 baseline cleanly records `N/A` for those rows instead of warning on
 every sweep:
 
@@ -25,13 +26,13 @@ every sweep:
 | `cc` (graph)       | The reference connected-components implementation we benchmark uses a worklist pattern that doesn't translate cleanly to Souffle's stratified model. |
 | `sssp` (graph)     | Same — single-source shortest path with semi-naïve evaluation in FlowLog has no idiomatic Souffle equivalent.   |
 
-When you add a new entry to `config.txt`, either drop a matching `.dl`
-here or tag the row `[souffle:skip]` to keep sweep output clean.
+When you add a new entry to `config/default.txt`, either drop a matching
+`.dl` here or tag the row `[souffle:skip]` to keep sweep output clean.
 
-## Programs not yet referenced from `config.txt`
+## Programs not yet referenced from `config/default.txt`
 
-A few `.dl` files are present but unused by the current `config.txt`.
-They are kept for two reasons:
+A few `.dl` files are present but unused by the current
+`config/default.txt`. They are kept for two reasons:
 
 1. **Future config additions** — borrow-checker, points-to, and CRDT
    stress variants we may want to fold into the regular sweep once the
@@ -39,7 +40,7 @@ They are kept for two reasons:
 2. **Stress-testing the Souffle baseline harness itself** —
    `crdt_slow.dl` deliberately exercises a slower fixed-point pattern,
    which is useful when validating timing-sensitive changes to
-   `run_souffle()` in `compare.sh`.
+   `run_souffle()` in `scripts/cross_engine.sh`.
 
 | File             | Origin / purpose                                                              |
 |------------------|--------------------------------------------------------------------------------|

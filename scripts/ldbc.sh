@@ -7,8 +7,8 @@
 # one param row at a time, verifying all results match.
 #
 # Usage:
-#   bash tests/ldbc/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>]
-#   --config     config file (default: tests/ldbc/config.txt)
+#   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>]
+#   --config     config file (default: config/ldbc.txt)
 #   --param_num  max param rows per query, 0 = all (default: 0)
 #   --timeout    per-param timeout in seconds (default: 300)
 #
@@ -44,7 +44,7 @@ command -v tar >/dev/null 2>&1 || die "Required dependency 'tar' not found on PA
 command -v zstd >/dev/null 2>&1 || die "Required dependency 'zstd' not found on PATH; please install it."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG="${SCRIPT_DIR}/config.txt"
+CONFIG="${ROOT_DIR}/config/ldbc.txt"
 MAX_PARAMS=0
 TIMEOUT_SECS=300
 EXTRA_FL_FLAGS=""

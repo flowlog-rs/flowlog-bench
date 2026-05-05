@@ -5,9 +5,9 @@ set -euo pipefail
 # FlowLog Version Comparison Benchmark
 # ==========================================================================
 #
-# Times the FlowLog compiler (this repo) and library-mode runner against
-# zero or more baselines (legacy `vldb26-artifact` interpreter and/or
-# Soufflé). Each (program, dataset) pair is executed NUM_RUNS times per
+# Times the FlowLog compiler (fetched into flowlog/<short_sha>/ by
+# tools/get_flowlog.sh) and library-mode runner against zero or more
+# baselines (legacy `vldb26-artifact` interpreter and/or Soufflé). Each (program, dataset) pair is executed NUM_RUNS times per
 # engine; the median wall-time + median peak RSS are kept.
 #
 # Usage:
@@ -23,7 +23,7 @@ set -euo pipefail
 #                      e.g. --target=cspa:cspa-httpd. Useful when
 #                      iterating on a single program; resume / skip
 #                      semantics still apply.
-#   --fresh            wipe `result/benchmark/` before running
+#   --fresh            wipe `results/benchmark/` before running
 #                      (otherwise the script resumes — pairs already in
 #                      the CSV are skipped).
 #   -h, --help         print this header block and exit.
@@ -57,7 +57,7 @@ set -euo pipefail
 #   TIME_BIN=<path>    override GNU `time -v` location (default
 #                      `/usr/bin/time`).
 #
-# CSV (`result/benchmark/comparison_results.csv`, 26 columns):
+# CSV (`results/benchmark/comparison_results.csv`, 26 columns):
 #   Program, Dataset, *_{Load,Exec,Total}, *_PeakRss_MB,
 #   {Load,Exec,Total}_Speedup, Lib_vs_*_Exec, Lib_vs_Compiler_Mem,
 #   Souffle_*, Crosscheck_Souffle, *_RunsSucceeded.
@@ -159,7 +159,7 @@ CONFIG_FILE="${POSITIONAL_ARGS[0]:-${ROOT_DIR}/config/default.txt}"
 # `<category>/<name>.dl=<dataset>` (unchanged from the historical config).
 PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/micro/flowlog}"
 FACT_DIR="${ROOT_DIR}/facts"
-LOG_DIR="${ROOT_DIR}/result/benchmark"
+LOG_DIR="${ROOT_DIR}/results/benchmark"
 # ==========================================================================
 # Pre-flight dependency checks. Fail fast — *before* downloading datasets
 # or warming caches — when an external tool is missing. Cheap to run; the
@@ -202,7 +202,7 @@ flowlog_truthy() {
 #   - Auto-shrinks on smaller hardware so a 16-core laptop doesn't
 #     context-switch through a 64-thread storm.
 # Override (e.g. when co-running with an agent that needs cores):
-#   WORKERS=48 bash compare.sh
+#   WORKERS=48 bash cross_engine.sh
 # Just keep it the same value across runs you compare.
 _NPROC=$(nproc 2>/dev/null || echo 64)
 [[ "$_NPROC" =~ ^[0-9]+$ ]] && (( _NPROC > 0 )) || _NPROC=64
@@ -356,7 +356,7 @@ cleanup_dataset() {
     # NOTE: the literal "CACHE_PATCH_v2" prefix is consumed by
     # /datasets/lib/patch_repo.py as an idempotency marker on dev VMs.
     # Do not rename without updating that tool.
-    # Mirrors tests/oracle/common.sh and tests/ldbc/ldbc.sh so all
+    # Mirrors flowlog's tests/oracle/common.sh + scripts/ldbc.sh so all
     # three layers honour the same env-var contract.
     #   FLOWLOG_KEEP_DATASETS truthy  → never delete (highest priority).
     #                                   Truthy = 1/yes/true/on (any case).
@@ -888,14 +888,14 @@ run_lib() {
     done <<< "$pairs"
 
     # Stage program.dl as-is. We deliberately do NOT rewrite .printsize →
-    # .output: compare.sh's compiler path runs the program unchanged, so
+    # .output: cross_engine.sh's compiler path runs the program unchanged, so
     # rewriting here would force lib to materialize full output Vecs
     # (Tc, Reach, …) while the compiler only updates a size counter —
     # that's a huge dataflow workload difference, not a runtime gap.
     local prepared_dl="${LIB_BENCH_RUNNER_DIR}/program.dl"
     cp "$prog_path" "$prepared_dl"
 
-    # No string_intern / sip: matches how compare.sh runs the compiler
+    # No string_intern / sip: matches how cross_engine.sh runs the compiler
     # (all current benchmark programs are integer-typed — see config.txt).
     LIB_BENCH_SIP=0 LIB_BENCH_STR_INTERN=0 bench_lib_write_build_rs
 
@@ -1563,7 +1563,7 @@ main() {
     # bad pair (a 3-hour sweep shouldn't be aborted by one OOM).
     if (( ${ANY_PAIR_FAILED:-0} )); then
         log "$RED" "FINISH" \
-            "compare.sh completed with at least one pair-level failure (see PAIR-FAIL above). The CSV does not contain rows for failed pairs; rerun without --fresh to retry."
+            "cross_engine.sh completed with at least one pair-level failure (see PAIR-FAIL above). The CSV does not contain rows for failed pairs; rerun without --fresh to retry."
         return 1
     fi
 }

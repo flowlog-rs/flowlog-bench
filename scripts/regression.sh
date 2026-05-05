@@ -123,7 +123,7 @@ fi
 
 # ----------------------------------------------------------------------
 # Parse the config: one `<prog>=<dataset>` per line, blanks/comments
-# skipped, trailing `[tag]` markers (a compare.sh feature) stripped so
+# skipped, trailing `[tag]` markers (a cross_engine.sh feature) stripped so
 # the same files can be reused across both tools.
 # ----------------------------------------------------------------------
 PAIRS=()
