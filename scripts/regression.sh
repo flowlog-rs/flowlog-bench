@@ -156,6 +156,46 @@ log "tolerances         : time +${TIME_PCT}%, peak RSS +${RSS_PCT}%"
 log "bench knobs        : NUM_RUNS=$NUM_RUNS, WORKERS=$WORKERS"
 
 # ----------------------------------------------------------------------
+# Durable per-run output dir under results/regression/. Honours
+# AGENTS.md principle 3 (scripts only write to results/) and gives
+# principle 6 something to anchor the run_info.txt manifest to.
+#
+# Wipe-and-recreate: regression.sh has no resume model — every
+# invocation is fresh, so back-to-back invocations with the same
+# BASE+HEAD pair (rare, but possible) do not accumulate stale rows.
+# ----------------------------------------------------------------------
+OUT_DIR="${ROOT_DIR}/results/regression/${BASE_SHORT}_vs_${HEAD_SHORT}"
+rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR"
+SUMMARY_TSV="${OUT_DIR}/summary.tsv"
+
+# Write the run_info.txt manifest now (before benching). The manifest
+# captures BOTH refs, so a year from now you can reproduce the exact
+# A/B even if both refs have moved or been rewritten.
+RUN_INFO_BENCH_ROOT="$ROOT_DIR"
+RUN_INFO_RUNNER="regression.sh"
+RUN_INFO_CONFIG_PATH="$CONFIG_FILE"
+# regression resolves two SHAs via get_flowlog.sh; we record both
+# explicitly. The single FLOWLOG_RESOLVED_SHA slot in run_info.sh
+# becomes "n/a (see base_sha + head_sha)".
+FLOWLOG_RESOLVED_SHA="n/a (A/B run — see base_sha + head_sha)"
+FLOWLOG_BIN="(varies — base + head trees benched separately)"
+FLOWLOG_REF="(see base_ref + head_ref)"
+export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH \
+       FLOWLOG_RESOLVED_SHA FLOWLOG_BIN FLOWLOG_REF WORKERS NUM_RUNS
+source "${ROOT_DIR}/scripts/lib/run_info.sh"
+write_run_info "$OUT_DIR" \
+    "base_ref=${BASE_REF}" \
+    "base_sha=${BASE_FULL}" \
+    "base_short=${BASE_SHORT}" \
+    "head_ref=${HEAD_REF}" \
+    "head_sha=${HEAD_FULL}" \
+    "head_short=${HEAD_SHORT}" \
+    "time_pct=${TIME_PCT}" \
+    "rss_pct=${RSS_PCT}"
+log "output dir         : $OUT_DIR"
+
+# ----------------------------------------------------------------------
 # Bench one pair against a given fetched flowlog tree. Returns
 # "<sec> <kb>" on stdout (both medians, per bench_one's stable contract);
 # empty on failure. We invoke bench_one.sh from THIS repo's scripts/
@@ -252,10 +292,23 @@ done
 SINK=1
 [[ "$FAILED" = "1" ]] && SINK=2
 
+# Persist summary as TSV alongside the run_info.txt manifest. This is
+# the durable artifact that makes regression runs reconstructable
+# (principle 6) without having to scroll back through stdout.
+{
+    printf 'pair\tbase_sec\thead_sec\ttime_pct\tbase_kb\thead_kb\trss_pct\tverdict\n'
+    for row in "${ROWS[@]}"; do
+        IFS='|' read -r pair bs hs tp bk hk rp v <<< "$row"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+            "$pair" "$bs" "$hs" "$tp" "$bk" "$hk" "$rp" "$v"
+    done
+} > "$SUMMARY_TSV"
+
 {
     printf '\n=== perf-compare: base=%s head=%s ===\n' "${BASE_FULL:0:12}" "${HEAD_FULL:0:12}"
-    printf '    workers=%s  runs/sha=%s  thresholds: time +%s%%  rss +%s%%\n\n' \
+    printf '    workers=%s  runs/sha=%s  thresholds: time +%s%%  rss +%s%%\n' \
         "$WORKERS" "$NUM_RUNS" "$TIME_PCT" "$RSS_PCT"
+    printf '    artifacts: %s\n\n' "$OUT_DIR"
     printf '%-46s %12s %12s %9s %12s %12s %9s  %s\n' \
         pair base_time head_time time% base_rss head_rss rss% verdict
     printf '%-46s %12s %12s %9s %12s %12s %9s  %s\n' \

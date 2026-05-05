@@ -45,9 +45,22 @@ gate owned by **this repo**.
    Each script already iterates over its (program × dataset) pairs internally.
 5. **Comparisons are pluggable.** Adding another engine (DuckDB beyond LDBC,
    etc.) is a new file under `scripts/`, not a rewrite of `cross_engine.sh`.
-6. **Reproducibility over cleverness.** Each result CSV records the flowlog
-   commit (resolved to a full SHA, not `main`), corpus revision, host, worker
-   count, and wall-clock time. A run from a year ago must be reconstructable.
+6. **Reproducibility over cleverness.** Every per-run output directory under
+   `results/` ships a `run_info.txt` sidecar via `scripts/lib/run_info.sh`.
+   The manifest records the flowlog commit (resolved to a full SHA via the
+   fallback chain `FLOWLOG_RESOLVED_SHA` → `git rev-parse` of `FLOWLOG_SRC_DIR`
+   → `flowlog/<short>/…` cache-path match → `unknown`), the bench-repo corpus
+   sha + dirty flag, config file path + sha256, host, OS, worker count,
+   num-runs, runner-specific knobs (baselines, target filter, tolerances, A/B
+   refs, …), and a UTC timestamp. The CSV/TSV is the data; the sidecar is the
+   provenance.
+
+   **Resume safety is enforced.** Before `cross_engine.sh` re-uses an existing
+   `results/benchmark/` dir, it rebuilds the would-be-current manifest, diffs
+   it against the on-disk one, and hard-fails on any mismatch (different
+   workers, baseline list, flowlog SHA, config file, etc.). Mixed-parameter
+   rows in a single CSV would otherwise be a silent footgun. Pass `--fresh`
+   to start over.
 7. **Bench env is heavier than test env, and that's fine.** Soufflé, DuckDB,
    GNU time, larger dataset caches all live with this repo's `tools/env/`.
    The flowlog repo's env stays minimal.
@@ -63,7 +76,7 @@ gate owned by **this repo**.
 flowlog-bench/
 ├── README.md              — purpose, quickstart
 ├── AGENTS.md              — this file
-├── Makefile               — single source of entry points (six targets)
+├── Makefile               — single source of entry points (task targets + housekeeping)
 ├── tools/
 │   ├── get_flowlog.sh     — fetch + build flowlog at FLOWLOG_REF
 │   └── env/               — one-time machine bootstrap (env.sh, env.ps1)
@@ -77,7 +90,7 @@ flowlog-bench/
 │   ├── cross_engine.sh    — flowlog vs. {soufflé, interpreter, …} at one ref
 │   ├── regression.sh      — flowlog@base vs. flowlog@head (A/B over commits)
 │   ├── ldbc.sh            — LDBC timing / scaling
-│   └── lib/               — shared bash helpers (logging, runner crate synth)
+│   └── lib/               — shared bash helpers (logging, runner crate synth, run_info manifest)
 ├── programs/              — programs only (in git). Grouped by suite, then dialect.
 │   ├── micro/             — single-program micro-benchmarks
 │   │   ├── flowlog/       — graph_analysis/, knowledge_reasoning/, program_analysis/
@@ -92,7 +105,10 @@ flowlog-bench/
 │   ├── default.txt        — micro suite (program × dataset pairs)
 │   └── ldbc.txt           — LDBC suite (query × dataset pairs)
 ├── docs/historical/       — frozen perf snapshots from before the split
-└── results/               — gitignored; CSVs, plots, raw timing land here
+└── results/               — gitignored; per-run dirs, each with run_info.txt + CSV/TSV
+    ├── benchmark/         — cross_engine.sh: comparison_results.csv + run_info.txt + per-pair logs
+    ├── regression/        — regression.sh: <base_short>_vs_<head_short>/{summary.tsv, run_info.txt}
+    └── ldbc/              — ldbc.sh: <UTC_timestamp>-<pid>/{summary.csv, run_info.txt, work/}
 ```
 
 ### Note on the `programs/ldbc/duckdb/` slot

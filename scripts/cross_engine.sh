@@ -258,6 +258,19 @@ CSV_FILE="${LOG_DIR}/comparison_results.csv"
 # intentionally does not share code with tests/lib/runner_synth.sh.
 source "$(dirname "$0")/lib/runner.sh"
 
+# Reproducibility manifest helpers (write_run_info / verify_run_info).
+# RUN_INFO_BENCH_ROOT + RUN_INFO_RUNNER + RUN_INFO_CONFIG_PATH are the
+# inputs the helpers read out of the environment. We also export
+# FLOWLOG_BIN so it reflects the actually-used compiler (the script's
+# COMPILER_BIN may have been resolved from the default cache when
+# FLOWLOG_BIN was unset by the caller).
+RUN_INFO_BENCH_ROOT="$ROOT_DIR"
+RUN_INFO_RUNNER="cross_engine.sh"
+RUN_INFO_CONFIG_PATH="$CONFIG_FILE"
+FLOWLOG_BIN="${FLOWLOG_BIN:-$COMPILER_BIN}"
+export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH FLOWLOG_BIN
+source "$(dirname "$0")/lib/run_info.sh"
+
 ############################################################
 # STRING HELPERS
 ############################################################
@@ -1446,6 +1459,20 @@ main() {
         log "$YELLOW" "FRESH" "Wiped $LOG_DIR (--fresh)"
     fi
     mkdir -p "$LOG_DIR"
+
+    # Resume safety (AGENTS.md principle 6). If the LOG_DIR already
+    # contains a run_info.txt from a previous invocation, verify that
+    # this invocation's identity (flowlog SHA, workers, num_runs,
+    # baseline list, target filter, config) matches it. Otherwise the
+    # CSV's resume semantics would silently mix incompatible rows.
+    if ! verify_run_info "$LOG_DIR" \
+            "baseline=${BASELINES}" \
+            "target=${TARGET_FILTER:-(none)}"; then
+        die "resume blocked — see diff above. Use --fresh to start over."
+    fi
+    write_run_info "$LOG_DIR" \
+        "baseline=${BASELINES}" \
+        "target=${TARGET_FILTER:-(none)}"
 
     # Initialise CSV (no-op if it already has rows from a prior run).
     init_csv

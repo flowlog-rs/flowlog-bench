@@ -42,6 +42,9 @@ FLOWLOG_REF ?= main
 
 # Default config file for cross_engine.sh / regression.sh.
 CONFIG ?= $(CONFIG_DIR)/default.txt
+# Separate config slot for the ldbc target so it can't accidentally
+# inherit the default.txt micro-bench config.
+LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
 
 .PHONY: help env get-flowlog bench-one cross-engine regression ldbc plot clean distclean
 
@@ -54,6 +57,14 @@ env:
 # -----------------------------------------------------------------------
 # get-flowlog: fetch + build the engine at the chosen ref. Idempotent.
 # Prints "<full_sha> <short_sha> <build_dir>" on the last stdout line.
+#
+# The bench-one / cross-engine / ldbc targets call this script
+# in-recipe (not via a `make` dep) — the dep would be redundant since
+# the recipe already has to read the script's output (FULL / SHORT /
+# BUILD) to set FLOWLOG_BIN + FLOWLOG_RESOLVED_SHA + FLOWLOG_SRC_DIR.
+#
+# Standalone use is for cache-warming a ref before kicking off a long
+# sweep:   FLOWLOG_REF=v0.5.0 make get-flowlog
 # -----------------------------------------------------------------------
 get-flowlog:
 	@FLOWLOG_REF=$(FLOWLOG_REF) bash $(TOOLS)/get_flowlog.sh
@@ -63,7 +74,7 @@ get-flowlog:
 #
 # Usage:  make bench-one PROG=program_analysis/cspa.dl DATASET=cspa-httpd
 # -----------------------------------------------------------------------
-bench-one: get-flowlog
+bench-one:
 	@if [[ -z "$(PROG)" || -z "$(DATASET)" ]]; then \
 		echo "ERROR: PROG and DATASET are required."; \
 		echo "       e.g.  make bench-one PROG=program_analysis/cspa.dl DATASET=cspa-httpd"; \
@@ -72,6 +83,7 @@ bench-one: get-flowlog
 	@read FULL SHORT BUILD < <(FLOWLOG_REF=$(FLOWLOG_REF) bash $(TOOLS)/get_flowlog.sh | tail -1); \
 	 FLOWLOG_BIN="$$BUILD/target/release/flowlog-compiler" \
 	 FLOWLOG_SRC_DIR="$$BUILD/src" \
+	 FLOWLOG_RESOLVED_SHA="$$FULL" \
 	 bash $(SCRIPTS)/bench_one.sh "$(PROG)" "$(DATASET)"
 
 # -----------------------------------------------------------------------
@@ -83,10 +95,11 @@ bench-one: get-flowlog
 # -----------------------------------------------------------------------
 BASELINE ?= souffle
 
-cross-engine: get-flowlog
+cross-engine:
 	@read FULL SHORT BUILD < <(FLOWLOG_REF=$(FLOWLOG_REF) bash $(TOOLS)/get_flowlog.sh | tail -1); \
 	 FLOWLOG_BIN="$$BUILD/target/release/flowlog-compiler" \
 	 FLOWLOG_SRC_DIR="$$BUILD/src" \
+	 FLOWLOG_RESOLVED_SHA="$$FULL" \
 	 bash $(SCRIPTS)/cross_engine.sh --baseline=$(BASELINE) $(CONFIG)
 
 # -----------------------------------------------------------------------
@@ -104,15 +117,19 @@ regression:
 	@bash $(SCRIPTS)/regression.sh "$(FLOWLOG_BASE)" "$(FLOWLOG_HEAD)" "$(CONFIG)"
 
 # -----------------------------------------------------------------------
-# ldbc: LDBC SNB timing / scaling at one ref.
+# ldbc: LDBC SNB timing / scaling at one ref. Uses LDBC_CONFIG (NOT
+# the generic CONFIG slot) so the same Make session can drive
+# cross-engine + ldbc with their respective configs.
 #
-# Usage:  make ldbc                                    # default ref = main
-#         FLOWLOG_REF=v0.5.0 make ldbc CONFIG=config/ldbc.txt
+# Usage:  make ldbc                                       # default ref = main
+#         FLOWLOG_REF=v0.5.0 make ldbc                    # at a specific commit
+#         make ldbc LDBC_CONFIG=path/to/custom.txt        # custom config
 # -----------------------------------------------------------------------
-ldbc: get-flowlog
+ldbc:
 	@read FULL SHORT BUILD < <(FLOWLOG_REF=$(FLOWLOG_REF) bash $(TOOLS)/get_flowlog.sh | tail -1); \
 	 FLOWLOG_BIN="$$BUILD/target/release/flowlog-compiler" \
-	 bash $(SCRIPTS)/ldbc.sh --config $(CONFIG_DIR)/ldbc.txt
+	 FLOWLOG_RESOLVED_SHA="$$FULL" \
+	 bash $(SCRIPTS)/ldbc.sh --config $(LDBC_CONFIG)
 
 # -----------------------------------------------------------------------
 # plot: render the speedup chart from the most recent cross-engine CSV.

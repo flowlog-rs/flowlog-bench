@@ -68,8 +68,7 @@ DUCKDB_BIN="${DUCKDB_BIN:-$(command -v duckdb 2>/dev/null || die "duckdb not fou
 DL_DIR="${DL_DIR:-${ROOT_DIR}/programs/ldbc/flowlog}"
 SQL_DIR="${SQL_DIR:-${ROOT_DIR}/programs/ldbc/duckdb}"
 
-WORK_DIR="/tmp/ldbc_compare"
-mkdir -p "$WORK_DIR" "$FACT_DIR"
+# WORK_DIR is set later, alongside the run's results/ldbc/<tag>/ dir.
 
 fmt_ms() {
     local ms=${1:-0}
@@ -94,6 +93,39 @@ trim() {
 [[ -x "$FLOWLOG_BIN" ]] || die "flowlog-compiler not built: $FLOWLOG_BIN"
 
 WORKERS="${WORKERS:-64}"
+
+# Durable per-run output dir under results/ldbc/. Honours AGENTS.md
+# principle 3 (scripts only write to results/) and gives principle 6
+# something to anchor run_info.txt to. Tag by date+pid so back-to-back
+# invocations don't trample each other (no resume model — each ldbc
+# run is fresh).
+LDBC_RUN_TAG="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+LDBC_OUT_DIR="${ROOT_DIR}/results/ldbc/${LDBC_RUN_TAG}"
+mkdir -p "$LDBC_OUT_DIR" "$FACT_DIR"
+
+# Per-run scratch lives under the same out-dir so the entire run is
+# self-contained and `make clean` (results/ wipe) reclaims it. Replaces
+# the old /tmp/ldbc_compare which (a) violated principle 3 and (b)
+# could collide between concurrent invocations.
+WORK_DIR="${LDBC_OUT_DIR}/work"
+mkdir -p "$WORK_DIR"
+
+# Reproducibility manifest. Captures duckdb binary as an "extra" since
+# ldbc cross-validates against duckdb (not souffle).
+RUN_INFO_BENCH_ROOT="$ROOT_DIR"
+RUN_INFO_RUNNER="ldbc.sh"
+RUN_INFO_CONFIG_PATH="$CONFIG"
+NUM_RUNS="1"     # ldbc runs each (query, params) row once
+export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH \
+       FLOWLOG_BIN WORKERS NUM_RUNS
+source "${ROOT_DIR}/scripts/lib/run_info.sh"
+write_run_info "$LDBC_OUT_DIR" \
+    "duckdb_bin=${DUCKDB_BIN}" \
+    "param_num=${MAX_PARAMS}" \
+    "timeout_secs=${TIMEOUT_SECS}" \
+    "extra_fl_flags=${EXTRA_FL_FLAGS:-(none)}" \
+    "fact_dir=${FACT_DIR}"
+log "Output dir: $LDBC_OUT_DIR"
 
 # ── Dataset management ────────────────────────────────────────────────────────
 setup_dataset() {

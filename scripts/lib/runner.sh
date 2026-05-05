@@ -2,10 +2,11 @@
 #
 # Library-mode runner crate synthesis for the benchmark comparison.
 #
-# Shares the small leaf helpers in `tests/lib/synth_common.sh` (lives in
-# the flowlog source tree, fetched via tools/get_flowlog.sh — not vendored
-# here) with the unit / complex test synthesizer, but keeps its own crate-
-# management + main.rs synthesis because the benchmark has different needs:
+# The small leaf helpers (`.input` filename resolver, CSV finder, DL →
+# Rust type, PascalCase) live in `scripts/lib/synth_common.sh`,
+# vendored alongside this file. We deliberately keep our own crate-
+# management + main.rs synthesis instead of sharing with flowlog's
+# unit-test synthesizer because the benchmark has different needs:
 #
 #   - No output-file writes (nothing to diff against).
 #   - Fast, bulk CSV loading — parsed per-column into the typed Tuple
