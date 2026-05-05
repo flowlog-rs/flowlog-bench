@@ -28,11 +28,18 @@
 # in-flowlog usage).
 #
 # Environment overrides:
-#     WORKERS    -- worker thread count   (default: 1; matches the agentic
-#                   "smallest perf signal" goal — single-thread is the most
-#                   stable measurement, parallel runs add noise)
-#     NUM_RUNS   -- timed runs per call   (default: 3)
-#     QUIET      -- if 1, suppress per-run progress lines on stderr
+#     WORKERS         worker thread count   (default: 1; matches the agentic
+#                     "smallest perf signal" goal — single-thread is the most
+#                     stable measurement, parallel runs add noise)
+#     NUM_RUNS        timed runs per call   (default: 3)
+#     QUIET           if 1, suppress per-run progress lines on stderr
+#     PROG_DIR        directory holding the .dl programs
+#                     (default: ROOT_DIR/programs/micro/flowlog)
+#     FLOWLOG_SRC_DIR flowlog source tree for the lib runner's Cargo
+#                     path-dep on crates/flowlog-build
+#                     (default: ROOT_DIR/flowlog/main/src; the Makefile
+#                     target sets it from get_flowlog.sh's output)
+#     TIME_BIN        GNU /usr/bin/time location (default: /usr/bin/time)
 #
 # All log/build output is sent to stderr so stdout stays clean for
 # extractors. Failures exit non-zero (so the perf gate fails closed).

@@ -57,6 +57,10 @@ set -euo pipefail
 #                      to delete through the symlink.
 #   SOUFFLE_BIN=<path> override the Soufflé binary location (default
 #                      `/usr/bin/souffle`).
+#   SOUFFLE_PROG_DIR=<path>
+#                      override the Soufflé `.dl` corpus directory
+#                      (default: `programs/micro/souffle/` — the
+#                      bench-owned dialect port).
 #   TIME_BIN=<path>    override GNU `time -v` location (default
 #                      `/usr/bin/time`).
 #
