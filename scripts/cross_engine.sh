@@ -16,7 +16,10 @@ set -euo pipefail
 #
 # Flags:
 #   --baseline=<list>  comma-separated, any of {interpreter, souffle}.
-#                      Default: interpreter.    Examples:
+#                      Script default: interpreter.
+#                      `make cross-engine` default: souffle (set in
+#                      Makefile via `BASELINE ?= souffle`; pass
+#                      `BASELINE=interpreter` to override). Examples:
 #                        --baseline=souffle
 #                        --baseline=interpreter,souffle
 #   --target=<prog:ds> Run only one pair, matched by basename stem,

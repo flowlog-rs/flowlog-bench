@@ -91,8 +91,11 @@ source "$(dirname "$0")/lib/runner.sh"
 PROG_ARG="$1"
 DATASET_ARG="$2"
 
-# Accept either `example/foo.dl` or `foo.dl` (repo-relative). Strip a
-# leading `example/` so we can reuse PROG_DIR.
+# Accept either a fully-qualified bench-relative path
+# (`programs/micro/flowlog/foo.dl`), the legacy `example/foo.dl`
+# spelling carried over from the pre-bench-split layout, or a bare
+# PROG_DIR-relative path (`foo.dl`). Strip the known prefixes so the
+# remainder resolves directly under PROG_DIR.
 PROG_REL="${PROG_ARG#programs/micro/flowlog/}"
 PROG_REL="${PROG_REL#example/}"
 PROG_PATH="${PROG_DIR}/${PROG_REL}"

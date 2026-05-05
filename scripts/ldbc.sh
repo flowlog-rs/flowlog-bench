@@ -7,14 +7,19 @@
 # one param row at a time, verifying all results match.
 #
 # Usage:
-#   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>]
+#   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>] [--sip]
 #   --config     config file (default: config/ldbc.txt)
 #   --param_num  max param rows per query, 0 = all (default: 0)
 #   --timeout    per-param timeout in seconds (default: 300)
+#   --sip        forward --sip to flowlog-compiler (sideways info passing)
 #
 # Environment variables:
+#   FLOWLOG_BIN - path to flowlog-compiler binary
+#                 (default: ROOT_DIR/flowlog/main/target/release/flowlog-compiler;
+#                  the Makefile target sets this from get_flowlog.sh's output)
 #   DUCKDB_BIN  - path to duckdb binary (default: duckdb on PATH)
 #   WORKERS     - parallelism for both engines (default: 64)
+#   FACT_DIR    - dataset cache directory (default: ROOT_DIR/facts/ldbc)
 # =============================================================================
 set -euo pipefail
 
