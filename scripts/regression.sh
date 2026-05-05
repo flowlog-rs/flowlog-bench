@@ -85,6 +85,10 @@ CONFIG_FILE="$3"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Shared helpers (ANSI colors). log() stays local so the [perf-compare]
+# brand prefix is preserved.
+source "${ROOT_DIR}/scripts/lib/common.sh"
+
 TIME_PCT="${PERF_COMPARE_TIME_PCT:-10}"
 RSS_PCT="${PERF_COMPARE_RSS_PCT:-20}"
 NUM_RUNS="${PERF_COMPARE_NUM_RUNS:-3}"
@@ -96,7 +100,6 @@ for var in TIME_PCT RSS_PCT NUM_RUNS WORKERS; do
         || { echo "ERROR: PERF_COMPARE_$var must be a non-negative integer (got: $val)" >&2; exit 2; }
 done
 
-RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; BLUE=$'\033[0;34m'; NC=$'\033[0m'
 log() { printf '%s[perf-compare]%s %s\n' "${BLUE}" "${NC}" "$*" >&2; }
 
 # ----------------------------------------------------------------------

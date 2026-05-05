@@ -227,14 +227,18 @@ verify_run_info() {
     ' "$existing")"
 
     if [[ "$now_id" != "$prev_id" ]]; then
-        local RED=$'\033[0;31m'; local YELLOW=$'\033[0;33m'; local NC=$'\033[0m'
+        # Use colors from common.sh if loaded, else fall back to inline
+        # ansi-c-quoted defaults so this helper works standalone.
+        local _r="${RED:-$'\033[0;31m'}"
+        local _y="${YELLOW:-$'\033[0;33m'}"
+        local _n="${NC:-$'\033[0m'}"
         {
-            printf '%s[ERROR]%s resume blocked — run identity has changed.\n' "$RED" "$NC"
-            printf '%sExisting %s/run_info.txt was produced under:%s\n' "$YELLOW" "$outdir" "$NC"
+            printf '%s[ERROR]%s resume blocked — run identity has changed.\n' "$_r" "$_n"
+            printf '%sExisting %s/run_info.txt was produced under:%s\n' "$_y" "$outdir" "$_n"
             printf '%s\n' "$prev_id"
-            printf '\n%sCurrent invocation would record:%s\n' "$YELLOW" "$NC"
+            printf '\n%sCurrent invocation would record:%s\n' "$_y" "$_n"
             printf '%s\n' "$now_id"
-            printf '\n%sFix:%s either revert the changed parameters, OR pass --fresh to start a new run.\n' "$YELLOW" "$NC"
+            printf '\n%sFix:%s either revert the changed parameters, OR pass --fresh to start a new run.\n' "$_y" "$_n"
         } >&2
         return 1
     fi

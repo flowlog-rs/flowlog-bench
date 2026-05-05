@@ -20,22 +20,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+# Shared bench helpers: ANSI colors, flowlog_truthy, trim,
+# cleanup_dataset_should_clean (CACHE_PATCH_v2 contract).
+source "$(dirname "$0")/lib/common.sh"
+
+# log/die kept local with this script's own [CHECK]/[ERROR] branding.
 log()  { echo -e "${CYAN}[CHECK]${NC} $*"; }
 pass() { echo -e "${GREEN}[PASS]${NC}  $*"; }
 fail() { echo -e "${RED}[FAIL]${NC}  $*"; }
 die()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
-
-# flowlog_truthy <value>: returns 0 (true) on 1/yes/true/on (any case),
-# 1 otherwise. Mirrors tests/lib/shared.sh::flowlog_truthy (kept inline here
-# because ldbc.sh has its own minimal log/die helpers and does not source
-# shared.sh).
-flowlog_truthy() {
-    case "${1:-}" in
-        1|y|Y|yes|YES|true|TRUE|True|on|ON|On) return 0 ;;
-        *) return 1 ;;
-    esac
-}
 
 # Verify required external commands are available early, before doing any work.
 command -v timeout >/dev/null 2>&1 || die "Required dependency 'timeout' not found on PATH; please install it."
@@ -81,12 +74,7 @@ fmt_ms() {
     fi
 }
 
-trim() {
-    local s="$1"
-    s="${s#"${s%%[![:space:]]*}"}"
-    s="${s%"${s##*[![:space:]]}"}"
-    printf '%s' "$s"
-}
+# trim() lives in scripts/lib/common.sh.
 
 [[ -f "$CONFIG" ]]     || die "Config not found: $CONFIG"
 [[ -x "$DUCKDB_BIN" ]] || die "duckdb not found: $DUCKDB_BIN"
@@ -151,33 +139,17 @@ setup_dataset() {
     log "Dataset $dataset_name ready at $extract_path"
 }
 
+# Safety policy + symlink check live in scripts/lib/common.sh
+# (cleanup_dataset_should_clean) so cross_engine.sh, ldbc.sh, and any
+# future runner share one implementation of the CACHE_PATCH_v2 contract.
 cleanup_dataset() {
     local dataset_name="$1"
-    local extract_path="${FACT_DIR}/${dataset_name}"
-    # CACHE_PATCH_v2: dataset cache safety guard (symlink-aware).
-    # The "CACHE_PATCH_v2" prefix is consumed by /datasets/lib/patch_repo.py
-    # as an idempotency marker on dev VMs — do not rename without updating
-    # that tool. See scripts/cross_engine.sh for full contract notes.
-    #   FLOWLOG_KEEP_DATASETS truthy → never delete (highest priority).
-    #                                  Truthy = 1/yes/true/on (any case).
-    #   FACT_DIR is a symlink        → never delete unless
-    #                                  FLOWLOG_FORCE_CLEANUP is truthy.
-    if flowlog_truthy "${FLOWLOG_KEEP_DATASETS:-}"; then
-        log "Cleaning up dataset $dataset_name (kept; FLOWLOG_KEEP_DATASETS=${FLOWLOG_KEEP_DATASETS})"
-        return
+    if cleanup_dataset_should_clean "$dataset_name"; then
+        log "Cleaning up dataset $dataset_name"
+        rm -rf -- "${FACT_DIR}/${dataset_name}"
+    else
+        log "Cleaning up dataset $dataset_name (${CLEANUP_SKIP_REASON})"
     fi
-    [[ -n "${extract_path:-}" ]] \
-        || die "cleanup_dataset: extract_path is empty (refusing to rm -rf)"
-    # Portable symlink check: `cd <dir> && pwd -P` resolves symlinks on
-    # both GNU (Linux) and BSD (macOS) without depending on `readlink -f`.
-    local _fd_real
-    _fd_real="$(cd "${FACT_DIR}" 2>/dev/null && pwd -P || echo "${FACT_DIR}")"
-    if [[ "${_fd_real}" != "${FACT_DIR}" ]] && ! flowlog_truthy "${FLOWLOG_FORCE_CLEANUP:-}"; then
-        log "Cleaning up dataset $dataset_name (kept; ${FACT_DIR} → ${_fd_real}; set FLOWLOG_FORCE_CLEANUP=1 to override)"
-        return
-    fi
-    log "Cleaning up dataset $dataset_name"
-    rm -rf -- "${extract_path}"
 }
 
 # ── Per-param runner ──────────────────────────────────────────────────────────

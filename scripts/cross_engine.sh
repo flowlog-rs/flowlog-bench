@@ -66,15 +66,10 @@ set -euo pipefail
 # ==========================================================================
 
 ############################################################
-# COLOURS
+# SHARED HELPERS (colors, trim, flowlog_truthy, cleanup safety)
 ############################################################
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+source "$(dirname "$0")/lib/common.sh"
 
 # Print a coloured log message:  log <colour> <tag> <message...>
 log() {
@@ -182,17 +177,6 @@ TIME_BIN="${TIME_BIN:-/usr/bin/time}"
 [[ -x "$TIME_BIN" ]] \
     || die "GNU /usr/bin/time not found at $TIME_BIN — apt install time, or set TIME_BIN=<path>"
 
-# Truthy-value parsing for FLOWLOG_KEEP_DATASETS / FLOWLOG_FORCE_CLEANUP.
-# Returns 0 (true) on `1`, `yes`, `true`, `on` (any case). Returns 1
-# (false) on `0`, `no`, `false`, `off`, empty, or unset. Used by the
-# three cleanup_dataset implementations (L2/L3/L4) — keep them in sync.
-flowlog_truthy() {
-    case "${1:-}" in
-        1|y|Y|yes|YES|true|TRUE|True|on|ON|On) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 # WORKERS is the thread count passed to EVERY engine in this run
 # (interpreter --workers, compiler -w, library WORKERS env, souffle -j).
 # Default = min(64, nproc):
@@ -272,16 +256,9 @@ export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH FLOWLOG_BIN
 source "$(dirname "$0")/lib/run_info.sh"
 
 ############################################################
-# STRING HELPERS
+# CONFIG-LINE PARSING
 ############################################################
-
-# Strip leading and trailing whitespace from a string.
-trim() {
-    local s="$1"
-    s="${s#"${s%%[![:space:]]*}"}"
-    s="${s%"${s##*[![:space:]]}"}"
-    printf '%s' "$s"
-}
+# trim() and other string utilities live in scripts/lib/common.sh.
 
 # Parse a config line "prog = dataset [tag tag ...]" and set
 # PROG_NAME / DATASET_NAME / PAIR_TAGS. Returns 1 when the line should
@@ -363,38 +340,18 @@ setup_dataset() {
 }
 
 # Remove dataset files to reclaim disk space after a benchmark pair.
+# Safety policy + symlink check live in scripts/lib/common.sh
+# (cleanup_dataset_should_clean) so cross_engine.sh, ldbc.sh, and any
+# future runner share one implementation of the CACHE_PATCH_v2 contract.
 cleanup_dataset() {
     local name="$1"
-    # CACHE_PATCH_v2: dataset cache safety guard (symlink-aware).
-    # NOTE: the literal "CACHE_PATCH_v2" prefix is consumed by
-    # /datasets/lib/patch_repo.py as an idempotency marker on dev VMs.
-    # Do not rename without updating that tool.
-    # Mirrors flowlog's tests/oracle/common.sh + scripts/ldbc.sh so all
-    # three layers honour the same env-var contract.
-    #   FLOWLOG_KEEP_DATASETS truthy  → never delete (highest priority).
-    #                                   Truthy = 1/yes/true/on (any case).
-    #   FACT_DIR is a symlink         → never delete unless
-    #                                   FLOWLOG_FORCE_CLEANUP is truthy
-    #                                   (protects a persistent /datasets
-    #                                   cache from being rm -rf'd through
-    #                                   the symlink).
-    if flowlog_truthy "${FLOWLOG_KEEP_DATASETS:-}"; then
-        log "$YELLOW" "CLEANUP" "$name (kept; FLOWLOG_KEEP_DATASETS=${FLOWLOG_KEEP_DATASETS})"
-        return
+    if cleanup_dataset_should_clean "$name"; then
+        log "$YELLOW" "CLEANUP" "$name"
+        # shellcheck disable=SC2115  # safety enforced by cleanup_dataset_should_clean
+        rm -rf -- "${FACT_DIR}/${name}"
+    else
+        log "$YELLOW" "CLEANUP" "$name (${CLEANUP_SKIP_REASON})"
     fi
-    [[ -n "${FACT_DIR:-}" && -n "${name:-}" ]] \
-        || die "cleanup_dataset: FACT_DIR or dataset name is empty (refusing to rm -rf)"
-    # Portable symlink check: `cd <dir> && pwd -P` resolves symlinks on
-    # both GNU (Linux) and BSD (macOS) without depending on `readlink -f`.
-    local _fd_real
-    _fd_real="$(cd "${FACT_DIR}" 2>/dev/null && pwd -P || echo "${FACT_DIR}")"
-    if [[ "${_fd_real}" != "${FACT_DIR}" ]] && ! flowlog_truthy "${FLOWLOG_FORCE_CLEANUP:-}"; then
-        log "$YELLOW" "CLEANUP" "$name (kept; ${FACT_DIR} → ${_fd_real}; set FLOWLOG_FORCE_CLEANUP=1 to override)"
-        return
-    fi
-    log "$YELLOW" "CLEANUP" "$name"
-    # shellcheck disable=SC2115  # explicit empty-arg check above + symlink guard make the path safe
-    rm -rf -- "${FACT_DIR}/${name}"
 }
 
 ############################################################
