@@ -19,7 +19,7 @@
 # --------------------------------------------------------------------
 
 /flowlog/
-/facts/
+/facts
 /results/
 
 # scratch / OS / editor noise
