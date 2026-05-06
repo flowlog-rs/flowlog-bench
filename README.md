@@ -40,6 +40,23 @@ make plot
 `tools/get_flowlog.sh` (idempotent: re-running with the same ref is free).
 `facts/` and `results/` are gitignored too.
 
+### Re-running and cleanup
+
+`cross_engine.sh` and `regression.sh` write a `run_info.txt` provenance
+manifest next to every output CSV. On re-run, they verify that the
+identity-defining parameters (workers, num-runs, baselines, flowlog SHA,
+config file) match — same params **resume cleanly** (already-benched
+pairs are skipped); changed params **hard-fail** with a diff of what
+moved, so a single CSV never ends up with rows produced under different
+settings. Pass `--fresh` to `cross_engine.sh` (or wipe `results/` with
+`make clean`) to start over. See [`AGENTS.md`](./AGENTS.md) §Design
+principle 6 for the full contract.
+
+```bash
+make clean        # wipe results/ (keeps flowlog/ build cache + facts/)
+make distclean    # also wipe flowlog/<short_sha>/ build trees
+```
+
 ---
 
 ## Layout (high-level)
