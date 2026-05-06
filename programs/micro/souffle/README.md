@@ -40,7 +40,7 @@ A few `.dl` files are present but unused by the current
 2. **Stress-testing the Souffle baseline harness itself** —
    `crdt_slow.dl` deliberately exercises a slower fixed-point pattern,
    which is useful when validating timing-sensitive changes to
-   `run_souffle()` in `scripts/cross_engine.sh`.
+   `engine_souffle_run()` in `scripts/engines/souffle.sh`.
 
 | File             | Origin / purpose                                                              |
 |------------------|--------------------------------------------------------------------------------|

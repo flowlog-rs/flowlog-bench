@@ -11,8 +11,9 @@
 #   - No output-file writes (nothing to diff against).
 #   - Fast, bulk CSV loading — parsed per-column into the typed Tuple
 #     directly, no intermediate `rel::Foo` construction where avoidable.
-#   - Emits a `Dataflow executed in <Duration>` line on stdout so cross_engine.sh
-#     can reuse `extract_total_time` without a new extractor.
+#   - Emits a `Dataflow executed in <Duration>` line on stdout so the
+#     same log-line extractor (`extract_total_seconds` in lib/measure.sh)
+#     works for both this lib-mode runner and the compiler binary.
 #   - Load time is intentionally not reported (lib mode has no load API the
 #     benchmark is measuring — the user loads however they like).
 #
@@ -258,7 +259,7 @@ ${loaders}
     let _results = engine.run();
     let dur = start.elapsed();
 
-    // Format compatible with extract_total_time in cross_engine.sh.
+    // Format consumed by extract_total_seconds in scripts/lib/measure.sh.
     println!("Dataflow executed in {:?}", dur);
 }
 EOF

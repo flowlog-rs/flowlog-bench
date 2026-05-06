@@ -93,7 +93,7 @@ flowlog-bench/
 │   ├── ldbc.sh            — LDBC timing / scaling
 │   ├── engines/           — one comparison-engine adapter per file
 │   │   ├── compiler.sh    — flowlog-compiler → standalone C++-equivalent binary
-│   │   ├── lib.sh         — flowlog library mode (per-pair Cargo build)
+│   │   ├── libmode.sh     — flowlog library mode (per-pair Cargo build)
 │   │   ├── interpreter.sh — vldb26-artifact interpreter
 │   │   └── souffle.sh     — Soufflé (compile-once cache, libgomp check)
 │   └── lib/               — engine-neutral shared helpers
