@@ -499,21 +499,47 @@ run_per_param() {
             row_verdict="DB_ERROR"
         else
             # Both succeeded — set-equality compare row sets.
+            #
+            # Whitespace normalization (rstrip per field, both sides):
+            # FlowLog's CSV input parser strips trailing whitespace from
+            # string fields on load; DuckDB preserves it. The raw LDBC
+            # data (e.g. comment.txt) does contain rows whose content
+            # field ends in a trailing space — DuckDB emits them with
+            # the space, FlowLog never sees the space. Without
+            # normalization, every such row appears in both only_db and
+            # only_fl with otherwise identical content, masking a clean
+            # semantic agreement as a 6%+ row mismatch on q2 / q13.
+            #
+            # We rstrip each field on both sides before set-equality so
+            # the comparator measures the engines' computational
+            # agreement, not their CSV-parser cosmetics. Leading
+            # whitespace is preserved on both engines, so we don't strip
+            # it. If a future query needs strict trailing-whitespace
+            # semantics, the raw row sets are still in qwork until the
+            # rm at the end of run_per_param.
             local cmp
             cmp=$(python3 - "$db_param_out" "$fl_param_out" <<'PYEOF'
 import sys, csv
+
+def _norm(row):
+    # rstrip each field — see ldbc.sh comment for rationale.
+    return tuple(s.rstrip() for s in row)
+
 def load_csv(p):
     rows = set()
     with open(p, newline='') as f:
         for r in csv.reader(f):
-            if r: rows.add(tuple(r))
+            if r: rows.add(_norm(r))
     return rows
 def load_fl(p):
     rows = set()
     with open(p) as f:
         for line in f:
-            line = line.strip()
-            if line: rows.add(tuple(line.split('|')))
+            # rstrip the whole line first to drop the line terminator
+            # without losing meaningful inner whitespace; then split on
+            # the field delimiter and rstrip each field.
+            line = line.rstrip('\n\r')
+            if line: rows.add(_norm(line.split('|')))
     return rows
 db = load_csv(sys.argv[1]); fl = load_fl(sys.argv[2])
 od, of = db - fl, fl - db
