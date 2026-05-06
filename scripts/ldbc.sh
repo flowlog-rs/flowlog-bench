@@ -20,6 +20,8 @@
 #   DUCKDB_BIN  - path to duckdb binary (default: duckdb on PATH)
 #   WORKERS     - parallelism for both engines (default: 64)
 #   FACT_DIR    - dataset cache directory (default: ROOT_DIR/facts/ldbc)
+#   TIME_BIN    - GNU /usr/bin/time binary, required for both wall-clock
+#                 and peak-RSS measurement (default: /usr/bin/time)
 # =============================================================================
 set -euo pipefail
 
