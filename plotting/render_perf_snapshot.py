@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Render docs/perf-snapshot.svg from docs/perf-snapshot.csv.
+"""Render docs/historical/perf-snapshot.svg from docs/historical/perf-snapshot.csv.
 
 The snapshot lives in-tree so the README can show real numbers without
 re-running benchmarks on every doc edit. Re-run this script after a
-fresh sweep when you want to refresh the figure.
-
-Note: the y-axis labels say "median of 5" because perf-snapshot.csv was
-captured under the old `NUM_RUNS=5` default. If you regenerate the CSV
-with the current default (`NUM_RUNS=3`), update both labels accordingly.
+fresh sweep when you want to refresh the figure; pass an alternate CSV
+path on the command line to render off a fresh sweep without touching
+the committed snapshot.
 
 Usage:
-    python3 docs/render_perf_snapshot.py
+    python3 plotting/render_perf_snapshot.py
+    python3 plotting/render_perf_snapshot.py results/benchmark/comparison_results.csv
 """
 from __future__ import annotations
 
@@ -21,9 +20,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-HERE = Path(__file__).parent
-DEFAULT_CSV = HERE / "perf-snapshot.csv"
-OUT = HERE / "perf-snapshot.svg"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+HISTORICAL = REPO_ROOT / "docs" / "historical"
+DEFAULT_CSV = HISTORICAL / "perf-snapshot.csv"
+OUT = HISTORICAL / "perf-snapshot.svg"
 
 
 def _pick(row, *names):

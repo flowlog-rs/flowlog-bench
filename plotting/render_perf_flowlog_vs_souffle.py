@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Render the FlowLog-vs-Souffle workload bar chart.
 
-Default input: `docs/perf-snapshot.csv` (the curated, committed snapshot).
+Default input: `docs/historical/perf-snapshot.csv` (the curated, committed
+snapshot).
 Override:      pass a path on the command line, e.g. the raw 26-column
-               `result/sweep/<ts>/comparison_results.csv` straight from a
+               `results/benchmark/comparison_results.csv` straight from a
                fresh sweep — both schemas are accepted.
 
-Output: docs/perf-flowlog-vs-souffle.svg (also embedded in tests/README.md
-and the top-level README.md).
+Output: docs/historical/perf-flowlog-vs-souffle.svg (also embedded in the
+top-level README.md).
 
-Re-render after a fresh L3 sweep:
-    python3 docs/render_perf_flowlog_vs_souffle.py \\
-        result/sweep/<UTC-ts>/comparison_results.csv
+Re-render after a fresh sweep:
+    python3 plotting/render_perf_flowlog_vs_souffle.py \\
+        results/benchmark/comparison_results.csv
 
 Design goals:
   * High signal-to-ink: log-scale time, sorted by speedup, no redundant labels.
@@ -39,9 +40,10 @@ import numpy as np
 from matplotlib import font_manager
 from matplotlib.ticker import LogLocator, NullLocator
 
-ROOT = pathlib.Path(__file__).resolve().parent
-DEFAULT_SRC = ROOT / "perf-snapshot.csv"
-OUT = ROOT / "perf-flowlog-vs-souffle.svg"
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+HISTORICAL = REPO_ROOT / "docs" / "historical"
+DEFAULT_SRC = HISTORICAL / "perf-snapshot.csv"
+OUT = HISTORICAL / "perf-flowlog-vs-souffle.svg"
 
 # Restrained, high-contrast palette.
 FLOWLOG_BLUE = "#1F6FEB"   # GitHub primer accent — calm, professional
@@ -175,7 +177,7 @@ def main() -> int:
 
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(OUT, bbox_inches="tight", pad_inches=0.25)
-    print(f"wrote {OUT.relative_to(ROOT.parent)} ({n} workloads, geomean {geomean:.2f}×) "
+    print(f"wrote {OUT.relative_to(REPO_ROOT)} ({n} workloads, geomean {geomean:.2f}×) "
           f"from {src}")
     return 0
 
