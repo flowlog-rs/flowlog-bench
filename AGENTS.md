@@ -10,9 +10,10 @@ making any change. Section anchors mirror the parent spec.
 
 ## Why two repos?
 
-The parent spec (flowlog `AGENTS.md` lines 1-22) split the project so that
-correctness signals are cheap to run on every PR and perf signals can take as
-long as they need with their own deps and dataset cache.
+The parent spec ([`flowlog/AGENTS.md`](https://github.com/flowlog-rs/flowlog/blob/main/AGENTS.md))
+split the project so that correctness signals are cheap to run on every
+PR and perf signals can take as long as they need with their own deps
+and dataset cache.
 
 | Stage           | Repo             | Output                                    |
 | --------------- | ---------------- | ----------------------------------------- |
@@ -24,7 +25,7 @@ gate owned by **this repo**.
 
 ---
 
-## Design principles (mirrors flowlog `AGENTS.md` lines 250-276)
+## Design principles (mirrors [`flowlog/AGENTS.md`](https://github.com/flowlog-rs/flowlog/blob/main/AGENTS.md))
 
 1. **Flowlog is a fetched input, not a fork.** This repo never patches engine
    code; if it needs an engine change, that's a PR against `flowlog-rs/flowlog`
@@ -113,7 +114,8 @@ flowlog-bench/
 
 ### Note on the `programs/ldbc/duckdb/` slot
 
-The parent spec (flowlog AGENTS.md line 211) prescribes
+The parent spec ([`flowlog/AGENTS.md`](https://github.com/flowlog-rs/flowlog/blob/main/AGENTS.md))
+prescribes
 `programs/ldbc/{flowlog,souffle}/`. We use `duckdb/` instead because the
 historical LDBC pipeline cross-validates flowlog against DuckDB, not Soufflé.
 Per principle 5 (comparisons are pluggable), the slot is "engine of comparison"
