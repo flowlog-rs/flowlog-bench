@@ -224,7 +224,7 @@ from a perf repo that doesn't carry an engine source tree.
 
 Post-split, the four `run_*` engine functions originally inside
 `cross_engine.sh` were extracted into `scripts/engines/{compiler,
-interpreter,lib,souffle}.sh`, and the per-runner duplicated helpers
+interpreter,libmode,souffle}.sh`, and the per-runner duplicated helpers
 (RSS / wall-time extractors, median pickers, dataset download/extract)
 were consolidated into `scripts/lib/measure.sh` and `scripts/lib/datasets.sh`.
 See `scripts/lib/README.md`.
