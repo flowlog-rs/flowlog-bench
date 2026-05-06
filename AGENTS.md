@@ -91,7 +91,18 @@ flowlog-bench/
 │   ├── cross_engine.sh    — flowlog vs. {soufflé, interpreter, …} at one ref
 │   ├── regression.sh      — flowlog@base vs. flowlog@head (A/B over commits)
 │   ├── ldbc.sh            — LDBC timing / scaling
-│   └── lib/               — shared bash helpers (logging, runner crate synth, run_info manifest)
+│   ├── engines/           — one comparison-engine adapter per file
+│   │   ├── compiler.sh    — flowlog-compiler → standalone C++-equivalent binary
+│   │   ├── lib.sh         — flowlog library mode (per-pair Cargo build)
+│   │   ├── interpreter.sh — vldb26-artifact interpreter
+│   │   └── souffle.sh     — Soufflé (compile-once cache, libgomp check)
+│   └── lib/               — engine-neutral shared helpers
+│       ├── common.sh      — colors, trim, flowlog_truthy, cache-safety guard
+│       ├── measure.sh     — /usr/bin/time wrap, extractors, median, sidecar writer
+│       ├── datasets.sh    — dataset cache (zip + tar.zst download/extract)
+│       ├── run_info.sh    — reproducibility manifest helpers
+│       ├── runner.sh      — lib-mode runner crate synthesis
+│       └── synth_common.sh — DL-syntax helpers (vendored from flowlog)
 ├── programs/              — programs only (in git). Grouped by suite, then dialect.
 │   ├── micro/             — single-program micro-benchmarks
 │   │   ├── flowlog/       — graph_analysis/, knowledge_reasoning/, program_analysis/
@@ -162,9 +173,13 @@ no-ops.
 3. **Adding a benchmark suite** (e.g. tpc-h) = a new sibling under `programs/`
    + a new `scripts/<suite>.sh` runner + a new `config/<suite>.txt` + a new
    Makefile target. Don't fold it into an existing runner.
-4. **Adding a comparison engine** = a new helper file under `scripts/`, not a
-   rewrite of `cross_engine.sh`. The pattern is "one engine = one helper that
-   knows how to compile + run + extract timing".
+4. **Adding a comparison engine** = a new file under `scripts/engines/`, not
+   a rewrite of `cross_engine.sh`. Each engine exposes
+   `engine_<name>_setup` (optional) + `engine_<name>_run "$prog" "$dataset"`,
+   uses the shared `lib/measure.sh` helpers for timing / RSS / sidecar
+   writes, and is sourced from `cross_engine.sh`. Adding columns to the
+   CSV is a separate step in `cross_engine.sh::CSV_HEADER` /
+   `append_csv_row`. See `scripts/lib/README.md` for the contract.
 5. **Adding a result column** = update both the CSV writer in
    `cross_engine.sh` (or `regression.sh`) and any downstream plot in
    `plotting/`. The reproducibility principle (6) means the column header
@@ -206,3 +221,10 @@ change: `regression.sh` now fetches both BASE and HEAD via
 `tools/get_flowlog.sh` (was: in-tree git worktree of the active flowlog
 checkout). This is what makes principle 2 ("any commit is benchable") work
 from a perf repo that doesn't carry an engine source tree.
+
+Post-split, the four `run_*` engine functions originally inside
+`cross_engine.sh` were extracted into `scripts/engines/{compiler,
+interpreter,lib,souffle}.sh`, and the per-runner duplicated helpers
+(RSS / wall-time extractors, median pickers, dataset download/extract)
+were consolidated into `scripts/lib/measure.sh` and `scripts/lib/datasets.sh`.
+See `scripts/lib/README.md`.

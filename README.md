@@ -1,96 +1,95 @@
 # flowlog-bench
 
-Performance + cross-engine benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog)
-Datalog compiler/engine.
-
-> **Why this is a separate repo.** [`flowlog-rs/flowlog`](https://github.com/flowlog-rs/flowlog)
-> is correctness-only — its `make test` is fast, has minimal deps, and runs on
-> every PR. This repo is the heavy side: Soufflé + DuckDB + GNU time, large
-> dataset cache, A/B regression bisects, and full LDBC sweeps.
-> See [`AGENTS.md`](./AGENTS.md) for the full split rationale.
-
----
+Performance benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog)
+Datalog engine. Sibling to the main repo, which is correctness-only;
+this one carries the heavy deps (Soufflé, DuckDB, GNU time) and the
+dataset cache.
 
 ## Quickstart
 
 ```bash
-# 1. One-time host bootstrap (rust + souffle + duckdb + …)
-make env
+make env                                     # one-time host bootstrap
+make cross-engine                            # FlowLog vs. Soufflé on the micro suite
+make bench-one PROG=program_analysis/cspa.dl DATASET=cspa-httpd  # smallest signal
 
-# 2. Bench `main` against Soufflé on the micro suite
-make cross-engine
-
-# 3. Bench a specific commit instead
-FLOWLOG_REF=v0.5.0 make cross-engine
-
-# 4. A/B perf+memory between two commits
-FLOWLOG_BASE=v0.5.0 FLOWLOG_HEAD=main make regression
-
-# 5. Single program (smallest possible signal)
-make bench-one PROG=program_analysis/cspa.dl DATASET=cspa-httpd
-
-# 6. LDBC SNB timing
-make ldbc
-
-# 7. Render the speedup chart
-make plot
+FLOWLOG_REF=v0.5.0 make cross-engine                              # bench a specific commit
+FLOWLOG_BASE=v0.5.0 FLOWLOG_HEAD=main make regression             # A/B between commits
+make ldbc                                                         # LDBC SNB sweep
+make plot                                                         # render speedup chart
 ```
 
-`flowlog/<short_sha>/` is gitignored and is populated lazily by
-`tools/get_flowlog.sh` (idempotent: re-running with the same ref is free).
-`facts/` and `results/` are gitignored too.
+`flowlog/<short_sha>/`, `facts/`, and `results/` are gitignored.
+`tools/get_flowlog.sh` populates the build cache lazily; re-running with
+the same ref is a no-op.
 
-### Re-running and cleanup
+## Architecture
 
-`cross_engine.sh` and `regression.sh` write a `run_info.txt` provenance
-manifest next to every output CSV. On re-run, they verify that the
-identity-defining parameters (workers, num-runs, baselines, flowlog SHA,
-config file) match — same params **resume cleanly** (already-benched
-pairs are skipped); changed params **hard-fail** with a diff of what
-moved, so a single CSV never ends up with rows produced under different
-settings. Pass `--fresh` to `cross_engine.sh` (or wipe `results/` with
-`make clean`) to start over. See [`AGENTS.md`](./AGENTS.md) §Design
-principle 6 for the full contract.
+Three layers; each `make` target invokes one orchestrator.
 
-```bash
-make clean        # wipe results/ (keeps flowlog/ build cache + facts/)
-make distclean    # also wipe flowlog/<short_sha>/ build trees
+```
+scripts/
+├── bench_one.sh        ─┐  orchestrators
+├── cross_engine.sh      │   - own argv parsing, the config-file loop,
+├── regression.sh        │     CSV writing, and resume-safety;
+├── ldbc.sh             ─┘   - source from engines/ + lib/ for the work.
+│
+├── engines/            ──── one file per comparison engine
+│   ├── compiler.sh           (flowlog-compiler → standalone binary)
+│   ├── libmode.sh            (flowlog embedded library API)
+│   ├── interpreter.sh        (vldb26-artifact interpreter)
+│   └── souffle.sh            (Soufflé compiled C++)
+│   Each exposes engine_<name>_run "$prog" "$dataset", owns its own
+│   N-runs loop, and writes the standard sidecar files.
+│
+└── lib/                ──── engine-neutral helpers
+    ├── measure.sh            time_wrap, extractors, median_int, speedup_ratio
+    ├── datasets.sh           download/extract/cleanup the dataset cache
+    ├── runner.sh             FlowLog lib-mode runner crate synthesis
+    ├── run_info.sh           reproducibility manifest (resume-safety)
+    ├── common.sh             colors, trim, cache-safety guard
+    └── synth_common.sh       DL-syntax helpers (vendored from FlowLog)
 ```
 
----
+**Adding a new comparison engine** = drop a new file in `scripts/engines/`,
+source it from `cross_engine.sh`, and add columns to `CSV_HEADER` /
+`append_csv_row`. See [`scripts/lib/README.md`](./scripts/lib/README.md).
 
-## Layout (high-level)
+**Resume-safety.** Every CSV ships with a `run_info.txt` manifest. Re-running
+with the same parameters skips already-benched pairs; re-running with
+different parameters hard-fails with a diff. Pass `--fresh` to
+`cross_engine.sh` (or `make clean`) to start over.
 
-| Path             | What                                    | In git? |
-| ---------------- | --------------------------------------- | ------- |
-| `Makefile`       | one target per task                     | ✓       |
-| `scripts/`       | bash runners (bench_one, cross_engine, regression, ldbc) | ✓ |
-| `programs/`      | rule corpus, dialect-split              | ✓       |
-| `config/`        | `<prog>=<dataset>` lists                | ✓       |
-| `plotting/`      | speedup chart + historical renderers    | ✓       |
-| `tools/`         | `get_flowlog.sh` + env bootstrap        | ✓       |
+## Repo layout
+
+| Path | What | In git? |
+| --- | --- | --- |
+| `Makefile` | one target per task | ✓ |
+| `scripts/` | orchestrators + engines/ + lib/ (above) | ✓ |
+| `programs/` | rule corpus, dialect-split (`flowlog/`, `souffle/`, `duckdb/`) | ✓ |
+| `config/` | `<prog>=<dataset>` lists | ✓ |
+| `plotting/` | speedup chart + historical renderers | ✓ |
+| `tools/` | `get_flowlog.sh` + env bootstrap | ✓ |
 | `docs/historical/` | frozen perf snapshots from before the split | ✓ |
-| `flowlog/`       | per-ref engine builds (cached)          | ✗       |
-| `facts/`         | dataset cache (external data handler)   | ✗       |
-| `results/`       | CSVs, plots, raw timing                 | ✗       |
+| `flowlog/<short_sha>/` | per-ref FlowLog builds | ✗ |
+| `facts/` | dataset cache (external data handler) | ✗ |
+| `results/` | CSVs, plots, raw timing | ✗ |
 
-See [`AGENTS.md`](./AGENTS.md) for the full design and the file-by-file
-lineage from `flowlog@pre-bench-split`.
+## Requirements
 
----
+- Linux or macOS (`tools/env/env.sh`); Windows via WSL2.
+- Rust toolchain (rustup installs on a fresh box).
+- ~50 GB free for the FlowLog build cache + dataset cache.
+- A shared dataset mount can be symlinked to `facts/`; the runners'
+  cache-safety guard refuses to delete through a symlink unless
+  `FLOWLOG_FORCE_CLEANUP=1`.
 
-## Standard environment
+## Further reading
 
-- Linux or macOS (Windows users: run from WSL2; `tools/env/env.ps1` is a
-  best-effort starter for native PowerShell, but Soufflé has no Windows build).
-- Rust toolchain (rustup will install on a fresh box).
-- ~50 GB free for `flowlog/` build caches + `facts/` dataset cache (depending
-  on suite).
-- Optional: a shared dataset mount; symlink `facts/` to it and the safety
-  guard in the runners will refuse to delete through the symlink.
-
----
+- [`AGENTS.md`](./AGENTS.md) — design principles, repo split rationale,
+  agent contract, file-by-file lineage from `flowlog@pre-bench-split`.
+- [`scripts/lib/README.md`](./scripts/lib/README.md) — what each helper
+  in `lib/` and `engines/` owns.
 
 ## License
 
-MIT. See `LICENSE` (TBD — track upstream `flowlog-rs/flowlog`'s license).
+MIT. See `LICENSE` (TBD — track upstream `flowlog-rs/flowlog`).

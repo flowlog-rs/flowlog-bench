@@ -27,9 +27,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Shared bench helpers: ANSI colors, flowlog_truthy, trim,
-# cleanup_dataset_should_clean (CACHE_PATCH_v2 contract).
+# Shared bench helpers: colors / trim / flowlog_truthy / cleanup safety,
+# /usr/bin/time wrapping + extractors / median / kib_to_mib,
+# dataset cache (download + cleanup with the same safety guard).
 source "$(dirname "$0")/lib/common.sh"
+source "$(dirname "$0")/lib/measure.sh"
+source "$(dirname "$0")/lib/datasets.sh"
 
 # log/die kept local with this script's own [CHECK]/[ERROR] branding.
 log()  { echo -e "${CYAN}[CHECK]${NC} $*"; }
@@ -90,58 +93,13 @@ fmt_ms() {
     fi
 }
 
-# trim() lives in scripts/lib/common.sh.
+# trim() lives in scripts/lib/common.sh; time / RSS extractors and
+# median / avg / kib_to_mib live in scripts/lib/measure.sh. All sourced above.
 
-# ── GNU time -v sidecar extractors ────────────────────────────────────────────
-# Both helpers expect the path to a `/usr/bin/time -v -o <file>` output
-# file. Empty / missing / unparseable input → "N/A".
-
-_extract_peak_rss_kb() {
-    local f="$1"
-    [[ -f "$f" ]] || { echo "N/A"; return; }
-    local v
-    v=$(awk '/Maximum resident set size/ { print $NF; exit }' "$f" 2>/dev/null) || true
-    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "N/A"
-}
-
-# Parse "Elapsed (wall clock) time (h:mm:ss or m:ss): <X>" → integer ms.
-# Format X is `h:mm:ss` (rare) or `m:ss[.cc]` (common).
-_extract_elapsed_ms() {
-    local f="$1"
-    [[ -f "$f" ]] || { echo "N/A"; return; }
-    local v
-    v=$(awk '/Elapsed \(wall clock\) time/ {
-        n = split($NF, a, ":")
-        s = 0
-        for (i = 1; i <= n; i++) s = s * 60 + a[i]
-        printf "%d", int(s * 1000 + 0.5)
-        exit
-    }' "$f" 2>/dev/null) || true
-    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "N/A"
-}
-
-# ── Tiny stats helpers (operate on integer ms or KiB) ─────────────────────────
-_median_int() {
-    (( $# > 0 )) || { echo ""; return; }
-    printf '%s\n' "$@" | sort -n \
-        | awk '{ a[NR]=$1 } END {
-            if (NR % 2) print a[(NR+1)/2]
-            else printf "%d", int((a[NR/2] + a[NR/2+1]) / 2)
-        }'
-}
-_avg_int() {
-    (( $# > 0 )) || { echo ""; return; }
-    local sum=0 x
-    for x in "$@"; do sum=$(( sum + x )); done
-    echo $(( sum / $# ))
-}
-_kib_to_mib() {
-    local kib="$1"
-    [[ "$kib" =~ ^[0-9]+$ ]] || { echo "N/A"; return; }
-    awk -v k="$kib" 'BEGIN { printf "%.2f", k / 1024.0 }'
-}
-# _speedup numerator denominator  → ratio (3 decimals); "N/A" on bad input.
-# Convention: pass DB time as numerator, FL time as denominator, so >1 means FL is faster.
+# _speedup numerator denominator → ratio (3 decimals); "N/A" on bad input.
+# Convention: pass DB time as numerator, FL time as denominator, so >1 means
+# FL is faster. Kept inline (LDBC uses 3-decimal format; lib/measure.sh's
+# speedup_ratio uses 6 decimals).
 _speedup() {
     local n="$1" d="$2"
     [[ "$n" =~ ^[0-9]+$ && "$d" =~ ^[0-9]+$ ]] && (( d > 0 )) \
@@ -233,16 +191,16 @@ reset_pair_state() {
 # so the CSV stays parseable by naïve consumers.
 emit_summary_row() {
     local fl_med fl_avg db_med db_avg
-    fl_med=$(_median_int "${PAIR_FL_TIMES[@]}")
-    fl_avg=$(_avg_int    "${PAIR_FL_TIMES[@]}")
-    db_med=$(_median_int "${PAIR_DB_TIMES[@]}")
-    db_avg=$(_avg_int    "${PAIR_DB_TIMES[@]}")
+    fl_med=$(median_int "${PAIR_FL_TIMES[@]}")
+    fl_avg=$(avg_int    "${PAIR_FL_TIMES[@]}")
+    db_med=$(median_int "${PAIR_DB_TIMES[@]}")
+    db_avg=$(avg_int    "${PAIR_DB_TIMES[@]}")
 
     local fl_rss_med db_rss_med fl_rss_mib db_rss_mib speedup
-    fl_rss_med=$(_median_int "${PAIR_FL_RSS[@]}")
-    db_rss_med=$(_median_int "${PAIR_DB_RSS[@]}")
-    fl_rss_mib=$(_kib_to_mib "${fl_rss_med:-N/A}")
-    db_rss_mib=$(_kib_to_mib "${db_rss_med:-N/A}")
+    fl_rss_med=$(median_int "${PAIR_FL_RSS[@]}")
+    db_rss_med=$(median_int "${PAIR_DB_RSS[@]}")
+    fl_rss_mib=$(kib_to_mib "${fl_rss_med:-N/A}")
+    db_rss_mib=$(kib_to_mib "${db_rss_med:-N/A}")
     speedup=$(_speedup "${db_med:-N/A}" "${fl_med:-N/A}")
 
     local msg="${PAIR_MESSAGE//,/;}"
@@ -263,38 +221,28 @@ emit_summary_row() {
 
 # ── Dataset management ────────────────────────────────────────────────────────
 setup_dataset() {
-    local dataset_name="$1"
-    local extract_path="${FACT_DIR}/${dataset_name}"
-
-    if [[ -d "$extract_path" ]]; then
-        log "Dataset $dataset_name already cached"
+    local name="$1"
+    if [[ -d "${FACT_DIR}/${name}" ]]; then
+        log "Dataset $name already cached"
         return
     fi
-
     command -v wget >/dev/null 2>&1 || die "wget not found; cannot download datasets"
-
-    local dataset_tar="/dev/shm/${dataset_name}.tar.zst"
-    log "Downloading $dataset_name (.tar.zst) ..."
-    wget --no-verbose --timeout=60 --tries=3 --max-redirect=5 -O "$dataset_tar" \
-        "${HF_BASE}/dataset/ldbc/${dataset_name}.tar.zst" \
-        || die "Download failed: ${HF_BASE}/dataset/ldbc/${dataset_name}.tar.zst"
-    log "Extracting $dataset_name ..."
-    tar --use-compress-program=zstd -xf "$dataset_tar" -C "$FACT_DIR"
-    rm -f "$dataset_tar"
-
-    log "Dataset $dataset_name ready at $extract_path"
+    log "Downloading $name (.tar.zst) ..."
+    log "Extracting $name ..."
+    dataset_ensure_tar_zst "$name" "${HF_BASE}/dataset/ldbc/${name}.tar.zst" \
+        || die "Download/extract failed: ${HF_BASE}/dataset/ldbc/${name}.tar.zst"
+    log "Dataset $name ready at ${FACT_DIR}/${name}"
 }
 
 # Safety policy + symlink check live in scripts/lib/common.sh
 # (cleanup_dataset_should_clean) so cross_engine.sh, ldbc.sh, and any
 # future runner share one implementation of the CACHE_PATCH_v2 contract.
 cleanup_dataset() {
-    local dataset_name="$1"
-    if cleanup_dataset_should_clean "$dataset_name"; then
-        log "Cleaning up dataset $dataset_name"
-        rm -rf -- "${FACT_DIR}/${dataset_name}"
+    local name="$1"
+    if dataset_cleanup "$name"; then
+        log "Cleaning up dataset $name"
     else
-        log "Cleaning up dataset $dataset_name (${CLEANUP_SKIP_REASON})"
+        log "Cleaning up dataset $name (${CLEANUP_SKIP_REASON})"
     fi
 }
 
@@ -439,8 +387,8 @@ run_per_param() {
             >/dev/null 2>&1 || _fl_rc=$?
         case $_fl_rc in
             0)
-                fl_ms=$(_extract_elapsed_ms "$fl_rss_log")
-                fl_rss=$(_extract_peak_rss_kb "$fl_rss_log")
+                fl_ms=$(extract_elapsed_ms "$fl_rss_log")
+                fl_rss=$(extract_peak_rss_kb "$fl_rss_log")
                 for f in "$fl_out_dir"/*; do
                     [[ -f "$f" ]] && grep -v '^$' "$f" >> "$fl_param_out" || true
                 done
@@ -471,8 +419,8 @@ run_per_param() {
         _db_rc=${PIPESTATUS[0]}
         case $_db_rc in
             0)
-                db_ms=$(_extract_elapsed_ms "$db_rss_log")
-                db_rss=$(_extract_peak_rss_kb "$db_rss_log")
+                db_ms=$(extract_elapsed_ms "$db_rss_log")
+                db_rss=$(extract_peak_rss_kb "$db_rss_log")
                 ;;
             124)
                 db_status="timeout"
@@ -624,12 +572,12 @@ PYEOF
 
     # ── Per-pair console summary ──
     local fl_med fl_avg db_med db_avg fl_rss_med db_rss_med
-    fl_med=$(_median_int "${PAIR_FL_TIMES[@]}")
-    fl_avg=$(_avg_int    "${PAIR_FL_TIMES[@]}")
-    db_med=$(_median_int "${PAIR_DB_TIMES[@]}")
-    db_avg=$(_avg_int    "${PAIR_DB_TIMES[@]}")
-    fl_rss_med=$(_median_int "${PAIR_FL_RSS[@]}")
-    db_rss_med=$(_median_int "${PAIR_DB_RSS[@]}")
+    fl_med=$(median_int "${PAIR_FL_TIMES[@]}")
+    fl_avg=$(avg_int    "${PAIR_FL_TIMES[@]}")
+    db_med=$(median_int "${PAIR_DB_TIMES[@]}")
+    db_avg=$(avg_int    "${PAIR_DB_TIMES[@]}")
+    fl_rss_med=$(median_int "${PAIR_FL_RSS[@]}")
+    db_rss_med=$(median_int "${PAIR_DB_RSS[@]}")
 
     case "$PAIR_VERDICT" in
         OK)
@@ -643,8 +591,8 @@ PYEOF
             ;;
     esac
     if [[ ${#PAIR_FL_TIMES[@]} -gt 0 ]]; then
-        echo "         Flowlog  med=$(fmt_ms "${fl_med:-0}")  avg=$(fmt_ms "${fl_avg:-0}")  rss_med=$(_kib_to_mib "${fl_rss_med:-N/A}") MiB"
-        echo "         DuckDB   med=$(fmt_ms "${db_med:-0}")  avg=$(fmt_ms "${db_avg:-0}")  rss_med=$(_kib_to_mib "${db_rss_med:-N/A}") MiB"
+        echo "         Flowlog  med=$(fmt_ms "${fl_med:-0}")  avg=$(fmt_ms "${fl_avg:-0}")  rss_med=$(kib_to_mib "${fl_rss_med:-N/A}") MiB"
+        echo "         DuckDB   med=$(fmt_ms "${db_med:-0}")  avg=$(fmt_ms "${db_avg:-0}")  rss_med=$(kib_to_mib "${db_rss_med:-N/A}") MiB"
     fi
     if (( PAIR_MISMATCHES > 0 )); then
         echo "         Mismatch detail: $mismatch_log"
