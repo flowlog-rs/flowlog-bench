@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # tools/env/env.sh — one-time bootstrap for a fresh Linux/macOS box.
 # =============================================================================
@@ -100,7 +100,7 @@ echo
 echo "Next steps:"
 echo "  1. Verify cargo:   cargo --version"
 echo "  2. Try a fetch:    bash tools/get_flowlog.sh           # default FLOWLOG_REF=main"
-echo "  3. Run a smoke:    make cross-engine PROG=program_analysis/cspa.dl DATASET=cspa-httpd"
+echo "  3. Run a smoke:    make bench-one PROG=program_analysis/cspa.dl DATASET=cspa-httpd"
 echo
 echo "Optional:"
 echo "  - Point /datasets at your shared dataset cache (or set FACT_DIR per-run)."

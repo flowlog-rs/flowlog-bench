@@ -75,7 +75,10 @@ dataset_ensure_tar_zst() {
 dataset_cleanup() {
     local name="$1"
     if cleanup_dataset_should_clean "$name"; then
-        rm -rf -- "${FACT_DIR}/${name}"
+        # The :? guard is belt-and-braces; cleanup_dataset_should_clean
+        # already refuses on empty FACT_DIR. Both layers ensure no path
+        # ever expands to a bare "/" or "/<name>".
+        rm -rf -- "${FACT_DIR:?}/${name}"
         return 0
     fi
     return 1

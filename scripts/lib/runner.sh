@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Library-mode runner crate synthesis for the benchmark comparison.
 #
@@ -218,7 +218,7 @@ bench_lib_write_main_rs() {
 
     # Build one env var name per input relation: FLOWLOG_CSV_<REL>.
     local loaders=""
-    local rel csv_abs env_name
+    local rel env_name
     for pair in $rel_csv_pairs; do
         rel="${pair%%=*}"
         env_name="FLOWLOG_CSV_${rel^^}"

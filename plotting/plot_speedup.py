@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Plot compiler vs interpreter speedup from benchmark CSV results."""
+"""Plot compiler vs interpreter speedup from benchmark CSV results.
+
+Reads ``results/benchmark/comparison_results.csv`` (or any path passed
+as argv[1]) and writes ``speedup_figure.{pdf,png}`` next to it.
+
+Rows whose ``Load_Speedup`` / ``Exec_Speedup`` / ``Total_Speedup``
+columns are blank are silently skipped — the comparison config can
+mark pairs ``[interp:skip]``, in which case the CSV writer leaves
+those cells empty and there's no speedup to chart.
+"""
 
 import csv
 import os
@@ -18,19 +27,28 @@ FIG_SIZE = (18, 6)
 
 
 def read_csv(path):
-    """Read benchmark CSV and return programs, datasets, and speedup lists."""
+    """Read benchmark CSV and return programs, datasets, and speedup lists.
+
+    Rows missing any of the three speedup columns are dropped so that
+    interpreter-skipped pairs don't crash ``float("")``.
+    """
     programs, datasets = [], []
     load_sp, exec_sp, total_sp = [], [], []
 
     with open(path, "r") as f:
         for row in csv.DictReader(f):
-            prog = row["Program"]
-            prog = os.path.splitext(os.path.basename(prog))[0]
+            try:
+                load = float(row["Load_Speedup"])
+                exec_ = float(row["Exec_Speedup"])
+                total = float(row["Total_Speedup"])
+            except (KeyError, ValueError):
+                continue  # skip rows with missing/non-numeric speedups
+            prog = os.path.splitext(os.path.basename(row["Program"]))[0]
             programs.append(prog)
             datasets.append(row["Dataset"])
-            load_sp.append(float(row["Load_Speedup"]))
-            exec_sp.append(float(row["Exec_Speedup"]))
-            total_sp.append(float(row["Total_Speedup"]))
+            load_sp.append(load)
+            exec_sp.append(exec_)
+            total_sp.append(total)
 
     return programs, datasets, load_sp, exec_sp, total_sp
 
@@ -53,7 +71,7 @@ def plot_speedup(programs, datasets, load_sp, exec_sp, total_sp):
 
     fig, ax = plt.subplots(figsize=FIG_SIZE)
 
-    # Bars grow up/down from 1.0 baseline
+    # Bars grow up/down from the 1.0 baseline.
     series = [
         (x - BAR_WIDTH, load_sp, "Load Speedup", "#2196F3"),
         (x, exec_sp, "Execute Speedup", "#FF5722"),
@@ -63,14 +81,11 @@ def plot_speedup(programs, datasets, load_sp, exec_sp, total_sp):
         ax.bar(xpos, [v - 1.0 for v in vals], BAR_WIDTH,
                bottom=1.0, label=label, color=color, zorder=3)
 
-    # Baseline
     ax.axhline(y=1.0, color="black", linestyle="-", linewidth=1.5, alpha=0.9)
 
-    # Dataset tick labels
     ax.set_xticks(x)
     ax.set_xticklabels(datasets, rotation=45, ha="right", fontsize=7)
 
-    # Program group labels and separators
     for prog, start, end in build_group_info(programs):
         mid = (start + end) / 2.0
         ax.text(mid, -0.18, prog, ha="center", va="top", fontsize=8,
@@ -93,11 +108,22 @@ def plot_speedup(programs, datasets, load_sp, exec_sp, total_sp):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python plot_speedup.py <csv_path>")
-        sys.exit(1)
+        print("Usage: python plot_speedup.py <csv_path>", file=sys.stderr)
+        sys.exit(2)
 
     csv_path = sys.argv[1]
+    if not os.path.isfile(csv_path):
+        print(f"ERROR: csv not found: {csv_path}", file=sys.stderr)
+        sys.exit(2)
+
     programs, datasets, load_sp, exec_sp, total_sp = read_csv(csv_path)
+    if not programs:
+        print(f"ERROR: no plottable rows in {csv_path} "
+              f"(every row was missing one of Load_Speedup / Exec_Speedup / "
+              f"Total_Speedup — interpreter probably skipped for every pair)",
+              file=sys.stderr)
+        sys.exit(1)
+
     fig = plot_speedup(programs, datasets, load_sp, exec_sp, total_sp)
 
     output_dir = os.path.dirname(os.path.abspath(csv_path))

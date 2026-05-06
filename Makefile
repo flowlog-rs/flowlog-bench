@@ -133,9 +133,17 @@ ldbc:
 
 # -----------------------------------------------------------------------
 # plot: render the speedup chart from the most recent cross-engine CSV.
+# Override the input via PLOT_CSV=<path>; default is the cross_engine.sh
+# output file.
 # -----------------------------------------------------------------------
+PLOT_CSV ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
+
 plot:
-	@python3 $(ROOT_DIR)/plotting/plot_speedup.py
+	@if [[ ! -s "$(PLOT_CSV)" ]]; then \
+		echo "ERROR: no CSV at $(PLOT_CSV) — run \`make cross-engine\` first, or pass PLOT_CSV=<path>"; \
+		exit 2; \
+	fi
+	@python3 $(ROOT_DIR)/plotting/plot_speedup.py "$(PLOT_CSV)"
 
 # -----------------------------------------------------------------------
 # clean / distclean

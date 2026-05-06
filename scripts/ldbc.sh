@@ -1,27 +1,35 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
-# LDBC SNB Correctness Checker (per-param mode)
+# scripts/ldbc.sh — LDBC SNB cross-engine benchmark + correctness check.
 # =============================================================================
-# Reads config lines of the form "query=dataset", downloads the dataset from
-# HuggingFace if not cached, then runs each query with DuckDB and Flowlog
-# one param row at a time, verifying all results match.
+# Reads config lines of the form "query=dataset", downloads each dataset from
+# HuggingFace if not cached, then runs every query through both DuckDB and
+# FlowLog one parameter row at a time, comparing the two row sets for
+# correctness while collecting wall-clock time and peak RSS.
+#
+# Outputs (under results/ldbc/<UTC_timestamp>-<pid>/):
+#   summary.csv                            one row per (query, dataset)
+#   <query>_<dataset>_perparam.tsv         per-param wall-clock + RSS + verdict
+#   <query>_<dataset>_mismatches.txt       only when MISMATCH appears
+#   run_info.txt                           reproducibility manifest
 #
 # Usage:
 #   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>] [--sip]
+#
 #   --config     config file (default: config/ldbc.txt)
 #   --param_num  max param rows per query, 0 = all (default: 0)
-#   --timeout    per-param timeout in seconds (default: 300)
+#   --timeout    per-param SIGTERM cap in seconds (default: 300)
 #   --sip        forward --sip to flowlog-compiler (sideways info passing)
 #
 # Environment variables:
-#   FLOWLOG_BIN - path to flowlog-compiler binary
-#                 (default: ROOT_DIR/flowlog/main/target/release/flowlog-compiler;
-#                  the Makefile target sets this from get_flowlog.sh's output)
-#   DUCKDB_BIN  - path to duckdb binary (default: duckdb on PATH)
-#   WORKERS     - parallelism for both engines (default: 64)
-#   FACT_DIR    - dataset cache directory (default: ROOT_DIR/facts/ldbc)
-#   TIME_BIN    - GNU /usr/bin/time binary, required for both wall-clock
-#                 and peak-RSS measurement (default: /usr/bin/time)
+#   FLOWLOG_BIN  path to flowlog-compiler binary
+#                (default: ROOT_DIR/flowlog/main/target/release/flowlog-compiler;
+#                 the Makefile target sets this from get_flowlog.sh's output)
+#   DUCKDB_BIN   path to duckdb binary (default: duckdb on PATH)
+#   WORKERS      parallelism for both engines (default: 64)
+#   FACT_DIR     dataset cache directory (default: ROOT_DIR/facts/ldbc)
+#   TIME_BIN     GNU /usr/bin/time binary, required for both wall-clock
+#                and peak-RSS measurement (default: /usr/bin/time)
 # =============================================================================
 set -euo pipefail
 
@@ -46,7 +54,6 @@ command -v python3 >/dev/null 2>&1 || die "Required dependency 'python3' not fou
 command -v tar >/dev/null 2>&1 || die "Required dependency 'tar' not found on PATH; please install it."
 command -v zstd >/dev/null 2>&1 || die "Required dependency 'zstd' not found on PATH; please install it."
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG="${ROOT_DIR}/config/ldbc.txt"
 MAX_PARAMS=0
 TIMEOUT_SECS=300
@@ -54,10 +61,10 @@ EXTRA_FL_FLAGS=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --config)              CONFIG="$2";       shift 2 ;;
-        --param_num)           MAX_PARAMS="$2";   shift 2 ;;
-        --timeout|--time_out)  TIMEOUT_SECS="$2"; shift 2 ;;
-        --sip)                 EXTRA_FL_FLAGS="$EXTRA_FL_FLAGS --sip"; shift ;;
+        --config)     CONFIG="$2";       shift 2 ;;
+        --param_num)  MAX_PARAMS="$2";   shift 2 ;;
+        --timeout)    TIMEOUT_SECS="$2"; shift 2 ;;
+        --sip)        EXTRA_FL_FLAGS="$EXTRA_FL_FLAGS --sip"; shift ;;
         *) die "Unknown argument: $1" ;;
     esac
 done
@@ -353,6 +360,11 @@ run_per_param() {
 
     local orig_backup="${qwork}/param_backup.txt"
     cp "$param_file" "$orig_backup"
+    # The trap intentionally captures $orig_backup and $param_file at
+    # trap-creation time (double quotes): both are function-locals that
+    # will leave scope on early-return paths, but we still need the
+    # restore to fire from the EXIT/INT/TERM hooks.
+    # shellcheck disable=SC2064
     trap "cp '$orig_backup' '$param_file' 2>/dev/null; trap - EXIT INT TERM" EXIT INT TERM
 
     local sql_subst idx=0

@@ -16,6 +16,11 @@
 # ldbc.sh's takes a single message). Keeping them local to each script
 # is intentional — and a one-line definition each.
 # =============================================================================
+#
+# shellcheck disable=SC2034
+# Color constants and CLEANUP_SKIP_REASON are written here and read by
+# every script that sources this file; shellcheck only sees this file
+# in isolation, so the unused-warning is a false positive.
 
 [[ -n "${FLOWLOG_BENCH_COMMON_LOADED:-}" ]] && return 0
 FLOWLOG_BENCH_COMMON_LOADED=1

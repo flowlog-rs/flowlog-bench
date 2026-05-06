@@ -49,7 +49,7 @@ engine_compiler_run() {
     # Run NUM_RUNS times.
     local entries=""
     local -a rss_values=()
-    local run rc rss t r
+    local run rc t r
     for run in $(seq 1 "$NUM_RUNS"); do
         local run_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_run${run}.log"
         local rss_log="${run_log}.rss"

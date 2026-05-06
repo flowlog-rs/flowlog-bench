@@ -22,10 +22,12 @@ engine_interpreter_setup() {
     else
         log "$GREEN" "FOUND" "vldb26-artifact already cloned"
     fi
-    pushd "$INTERPRETER_DIR" >/dev/null
+    pushd "$INTERPRETER_DIR" >/dev/null \
+        || die "Failed to enter $INTERPRETER_DIR"
     log "$YELLOW" "BUILD" "Building interpreter (release)"
     cargo build --release 2>&1 | tail -5
-    popd >/dev/null
+    popd >/dev/null \
+        || die "Failed to leave $INTERPRETER_DIR"
     [[ -x "$INTERPRETER_BIN" ]] || die "Interpreter binary not found: $INTERPRETER_BIN"
     log "$GREEN" "OK" "Interpreter ready"
 }
