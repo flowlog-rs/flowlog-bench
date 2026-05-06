@@ -1,1 +1,30 @@
+# LDBC SNB Interactive complex queries: FlowLog vs DuckDB.
+#
+# Each uncommented row defines one (query, dataset) pair to run.
+# Format: <query>=<dataset>
+#
+# To wire a query in, BOTH of these must exist (the runner fails the
+# pair upfront if either is missing):
+#
+#   programs/ldbc/flowlog/<query>.dl     # FlowLog program
+#   programs/ldbc/duckdb/<query>.sql     # DuckDB equivalent
+#
+# This file IS the canonical sweep checklist — uncomment a line as
+# soon as both files land. The 14 LDBC SNB Interactive complex
+# queries are scaffolded below; queries 2 + 13 are the two that
+# currently have programs in this repo.
+
+# interactive-complex-1=ldbc_snb_interactive_sf3
+interactive-complex-2=ldbc_snb_interactive_sf3
+# interactive-complex-3=ldbc_snb_interactive_sf3
+# interactive-complex-4=ldbc_snb_interactive_sf3
+# interactive-complex-5=ldbc_snb_interactive_sf3
+# interactive-complex-6=ldbc_snb_interactive_sf3
+# interactive-complex-7=ldbc_snb_interactive_sf3
+# interactive-complex-8=ldbc_snb_interactive_sf3
+# interactive-complex-9=ldbc_snb_interactive_sf3
+# interactive-complex-10=ldbc_snb_interactive_sf3
+# interactive-complex-11=ldbc_snb_interactive_sf3
+# interactive-complex-12=ldbc_snb_interactive_sf3
 interactive-complex-13=ldbc_snb_interactive_sf3
+# interactive-complex-14=ldbc_snb_interactive_sf3

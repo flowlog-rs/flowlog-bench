@@ -63,6 +63,15 @@ FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts/ldbc}"
 FLOWLOG_BIN="${FLOWLOG_BIN:-${ROOT_DIR}/flowlog/main/target/release/flowlog-compiler}"
 DUCKDB_BIN="${DUCKDB_BIN:-$(command -v duckdb 2>/dev/null || die "duckdb not found in PATH; set DUCKDB_BIN or install duckdb")}"
 
+# /usr/bin/time -v is GNU time. Bash's builtin `time` does NOT support
+# -v (peak RSS), so we require the binary. It is the single source of
+# truth for both wall-clock elapsed and peak RSS, mirroring
+# cross_engine.sh's contract — having two independent timing sources
+# (date brackets + /usr/bin/time sidecar) would diverge by the wrapper
+# overhead on very short queries.
+TIME_BIN="${TIME_BIN:-/usr/bin/time}"
+[[ -x "$TIME_BIN" ]] || die "GNU /usr/bin/time not found at $TIME_BIN — apt install time, or set TIME_BIN=<path>"
+
 DL_DIR="${DL_DIR:-${ROOT_DIR}/programs/ldbc/flowlog}"
 SQL_DIR="${SQL_DIR:-${ROOT_DIR}/programs/ldbc/duckdb}"
 
@@ -80,6 +89,63 @@ fmt_ms() {
 }
 
 # trim() lives in scripts/lib/common.sh.
+
+# ── GNU time -v sidecar extractors ────────────────────────────────────────────
+# Both helpers expect the path to a `/usr/bin/time -v -o <file>` output
+# file. Empty / missing / unparseable input → "N/A".
+
+_extract_peak_rss_kb() {
+    local f="$1"
+    [[ -f "$f" ]] || { echo "N/A"; return; }
+    local v
+    v=$(awk '/Maximum resident set size/ { print $NF; exit }' "$f" 2>/dev/null) || true
+    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "N/A"
+}
+
+# Parse "Elapsed (wall clock) time (h:mm:ss or m:ss): <X>" → integer ms.
+# Format X is `h:mm:ss` (rare) or `m:ss[.cc]` (common).
+_extract_elapsed_ms() {
+    local f="$1"
+    [[ -f "$f" ]] || { echo "N/A"; return; }
+    local v
+    v=$(awk '/Elapsed \(wall clock\) time/ {
+        n = split($NF, a, ":")
+        s = 0
+        for (i = 1; i <= n; i++) s = s * 60 + a[i]
+        printf "%d", int(s * 1000 + 0.5)
+        exit
+    }' "$f" 2>/dev/null) || true
+    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "N/A"
+}
+
+# ── Tiny stats helpers (operate on integer ms or KiB) ─────────────────────────
+_median_int() {
+    (( $# > 0 )) || { echo ""; return; }
+    printf '%s\n' "$@" | sort -n \
+        | awk '{ a[NR]=$1 } END {
+            if (NR % 2) print a[(NR+1)/2]
+            else printf "%d", int((a[NR/2] + a[NR/2+1]) / 2)
+        }'
+}
+_avg_int() {
+    (( $# > 0 )) || { echo ""; return; }
+    local sum=0 x
+    for x in "$@"; do sum=$(( sum + x )); done
+    echo $(( sum / $# ))
+}
+_kib_to_mib() {
+    local kib="$1"
+    [[ "$kib" =~ ^[0-9]+$ ]] || { echo "N/A"; return; }
+    awk -v k="$kib" 'BEGIN { printf "%.2f", k / 1024.0 }'
+}
+# _speedup numerator denominator  → ratio (3 decimals); "N/A" on bad input.
+# Convention: pass DB time as numerator, FL time as denominator, so >1 means FL is faster.
+_speedup() {
+    local n="$1" d="$2"
+    [[ "$n" =~ ^[0-9]+$ && "$d" =~ ^[0-9]+$ ]] && (( d > 0 )) \
+        || { echo "N/A"; return; }
+    awk -v n="$n" -v d="$d" 'BEGIN { printf "%.3f", n / d }'
+}
 
 [[ -f "$CONFIG" ]]     || die "Config not found: $CONFIG"
 [[ -x "$DUCKDB_BIN" ]] || die "duckdb not found: $DUCKDB_BIN"
@@ -120,6 +186,79 @@ write_run_info "$LDBC_OUT_DIR" \
     "fact_dir=${FACT_DIR}"
 log "Output dir: $LDBC_OUT_DIR"
 
+# ── Durable summary CSV + per-pair state ──────────────────────────────────────
+# One row per configured (query, dataset) — emitted exactly once via
+# emit_summary_row, even when the pair fails before the per-param loop
+# (missing .dl, missing .sql, FlowLog compile error, etc.). Downstream
+# consumers can rely on this row count == #rows in the config file.
+SUMMARY_CSV="${LDBC_OUT_DIR}/summary.csv"
+SUMMARY_HEADER="Query,Dataset,Params_Available,Params_Selected,Params_Counted,FL_Median_ms,FL_Avg_ms,DB_Median_ms,DB_Avg_ms,FL_vs_DB_Speedup_Median,FL_Median_RSS_MiB,DB_Median_RSS_MiB,FL_Total_Rows,DB_Total_Rows,Rows_OK,FL_Errors,FL_Timeouts,DB_Errors,DB_Timeouts,Mismatches,Verdict,Failure_Phase,Failure_Message"
+echo "$SUMMARY_HEADER" > "$SUMMARY_CSV"
+
+# Per-pair state. Reset by reset_pair_state at the top of run_per_param.
+# All summary stats live here so emit_summary_row can be called
+# uniformly from any early-return path.
+declare -a PAIR_FL_TIMES=() PAIR_DB_TIMES=() PAIR_FL_RSS=() PAIR_DB_RSS=()
+PAIR_QUERY=""
+PAIR_DATASET=""
+PAIR_PARAMS_AVAIL=0
+PAIR_PARAMS_SELECTED=0
+PAIR_PARAMS_COUNTED=0
+PAIR_FL_TOTAL_ROWS=0
+PAIR_DB_TOTAL_ROWS=0
+PAIR_ROWS_OK=0
+PAIR_FL_ERRORS=0
+PAIR_FL_TIMEOUTS=0
+PAIR_DB_ERRORS=0
+PAIR_DB_TIMEOUTS=0
+PAIR_MISMATCHES=0
+PAIR_VERDICT="FAIL"
+PAIR_PHASE="setup"
+PAIR_MESSAGE=""
+
+reset_pair_state() {
+    PAIR_FL_TIMES=(); PAIR_DB_TIMES=(); PAIR_FL_RSS=(); PAIR_DB_RSS=()
+    PAIR_QUERY="$1"; PAIR_DATASET="$2"
+    PAIR_PARAMS_AVAIL=0; PAIR_PARAMS_SELECTED=0; PAIR_PARAMS_COUNTED=0
+    PAIR_FL_TOTAL_ROWS=0; PAIR_DB_TOTAL_ROWS=0; PAIR_ROWS_OK=0
+    PAIR_FL_ERRORS=0; PAIR_FL_TIMEOUTS=0; PAIR_DB_ERRORS=0; PAIR_DB_TIMEOUTS=0
+    PAIR_MISMATCHES=0
+    PAIR_VERDICT="FAIL"; PAIR_PHASE="setup"; PAIR_MESSAGE=""
+}
+
+# Append exactly one row to summary.csv. Computes medians/avgs from
+# the PAIR_* state. Sanitizes commas + newlines from the message field
+# so the CSV stays parseable by naïve consumers.
+emit_summary_row() {
+    local fl_med fl_avg db_med db_avg
+    fl_med=$(_median_int "${PAIR_FL_TIMES[@]}")
+    fl_avg=$(_avg_int    "${PAIR_FL_TIMES[@]}")
+    db_med=$(_median_int "${PAIR_DB_TIMES[@]}")
+    db_avg=$(_avg_int    "${PAIR_DB_TIMES[@]}")
+
+    local fl_rss_med db_rss_med fl_rss_mib db_rss_mib speedup
+    fl_rss_med=$(_median_int "${PAIR_FL_RSS[@]}")
+    db_rss_med=$(_median_int "${PAIR_DB_RSS[@]}")
+    fl_rss_mib=$(_kib_to_mib "${fl_rss_med:-N/A}")
+    db_rss_mib=$(_kib_to_mib "${db_rss_med:-N/A}")
+    speedup=$(_speedup "${db_med:-N/A}" "${fl_med:-N/A}")
+
+    local msg="${PAIR_MESSAGE//,/;}"
+    msg="${msg//$'\n'/ }"
+    msg="${msg//$'\r'/ }"
+
+    printf '%s,%s,%d,%d,%d,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s\n' \
+        "$PAIR_QUERY" "$PAIR_DATASET" \
+        "$PAIR_PARAMS_AVAIL" "$PAIR_PARAMS_SELECTED" "$PAIR_PARAMS_COUNTED" \
+        "${fl_med:-N/A}" "${fl_avg:-N/A}" "${db_med:-N/A}" "${db_avg:-N/A}" \
+        "$speedup" "$fl_rss_mib" "$db_rss_mib" \
+        "$PAIR_FL_TOTAL_ROWS" "$PAIR_DB_TOTAL_ROWS" "$PAIR_ROWS_OK" \
+        "$PAIR_FL_ERRORS" "$PAIR_FL_TIMEOUTS" "$PAIR_DB_ERRORS" "$PAIR_DB_TIMEOUTS" \
+        "$PAIR_MISMATCHES" \
+        "$PAIR_VERDICT" "$PAIR_PHASE" "$msg" \
+        >> "$SUMMARY_CSV"
+}
+
 # ── Dataset management ────────────────────────────────────────────────────────
 setup_dataset() {
     local dataset_name="$1"
@@ -158,14 +297,49 @@ cleanup_dataset() {
 }
 
 # ── Per-param runner ──────────────────────────────────────────────────────────
+# Runs one (query, dataset) pair through both engines, one param row at
+# a time. Always emits exactly one summary.csv row before returning,
+# even on early failure (missing files, compile error). Writes a
+# per-param TSV incrementally (so SIGINT mid-sweep leaves partial data)
+# and a mismatches.txt only when at least one param row diverges.
+#
+# Args: <query> <dataset> <data_dir>
+# Returns: 0 iff PAIR_VERDICT=OK; 1 otherwise (PARTIAL or FAIL).
 run_per_param() {
-    local query="$1" data_dir="$2"
+    local query="$1" dataset="$2" data_dir="$3"
+
+    reset_pair_state "$query" "$dataset"
+
     local dl_file="${DL_DIR}/${query}.dl"
     local sql_file="${SQL_DIR}/${query}.sql"
     local qwork="${WORK_DIR}/${query}"
     local fl_out_dir="${qwork}/fl_out"
     local fl_mode_flags=""
+    local perparam_tsv="${LDBC_OUT_DIR}/${query}_${dataset}_perparam.tsv"
+    local mismatch_log="${LDBC_OUT_DIR}/${query}_${dataset}_mismatches.txt"
+
     mkdir -p "$qwork"
+
+    # Write the per-param TSV header upfront so the artifact exists even
+    # if no params get to run (missing inputs, compile failure, etc.).
+    printf 'param_idx\tparam_row\tfl_ms\tdb_ms\tfl_rss_kb\tdb_rss_kb\tfl_rows\tdb_rows\tverdict\n' \
+        > "$perparam_tsv"
+
+    # ── Pre-flight: program files exist? ──
+    if [[ ! -f "$dl_file" ]]; then
+        PAIR_PHASE="missing_dl"
+        PAIR_MESSAGE="program file not found: $dl_file"
+        fail "$query: $PAIR_MESSAGE"
+        emit_summary_row
+        return 1
+    fi
+    if [[ ! -f "$sql_file" ]]; then
+        PAIR_PHASE="missing_sql"
+        PAIR_MESSAGE="program file not found: $sql_file"
+        fail "$query: $PAIR_MESSAGE"
+        emit_summary_row
+        return 1
+    fi
 
     if grep -Eq '^[[:space:]]*loop([[:space:]]|$)' "$dl_file"; then
         fl_mode_flags="--mode extend-batch"
@@ -178,11 +352,20 @@ run_per_param() {
             | sed 's/.*filename="\([^"]*\)".*/\1/'; } || true
     )
     if [[ -z "${param_fname:-}" ]]; then
-        fail "$query: could not determine param filename from $dl_file"
+        PAIR_PHASE="param_filename_detect"
+        PAIR_MESSAGE="could not extract filename= for param input from $dl_file"
+        fail "$query: $PAIR_MESSAGE"
+        emit_summary_row
         return 1
     fi
     local param_file="${data_dir}/${param_fname}"
-    [[ -f "$param_file" ]] || { fail "$query: param file not found: $param_file"; return 1; }
+    if [[ ! -f "$param_file" ]]; then
+        PAIR_PHASE="param_file_missing"
+        PAIR_MESSAGE="param file not found: $param_file"
+        fail "$query: $PAIR_MESSAGE"
+        emit_summary_row
+        return 1
+    fi
 
     # ── Compile Flowlog once ──
     log "$query: compiling Flowlog..."
@@ -192,12 +375,18 @@ run_per_param() {
     mkdir -p "$fl_out_dir"
     local fl_compile_log="${qwork}/fl_compile.log"
     if ! "$FLOWLOG_BIN" "$dl_file" -F "$data_dir" -D "$fl_out_dir" -o "$fl_bin" --str-intern $fl_mode_flags $EXTRA_FL_FLAGS >"$fl_compile_log" 2>&1; then
+        PAIR_PHASE="fl_compile"
+        PAIR_MESSAGE="Flowlog compile failed; tail: $(tail -3 "$fl_compile_log" | tr '\n' ';')"
         fail "$query: Flowlog compilation failed"
         echo "         $(tail -3 "$fl_compile_log")"
+        emit_summary_row
         return 1
     fi
     if [[ ! -x "$fl_bin" ]]; then
-        fail "$query: Flowlog binary not found after compilation"
+        PAIR_PHASE="fl_binary_missing"
+        PAIR_MESSAGE="$fl_bin not found after compilation"
+        fail "$query: $PAIR_MESSAGE"
+        emit_summary_row
         return 1
     fi
 
@@ -205,93 +394,111 @@ run_per_param() {
     local header
     header=$(head -1 "$param_file")
     mapfile -t param_rows < <(tail -n +2 "$param_file" | grep -v '^$')
-    local total=${#param_rows[@]}
-    if [[ "$MAX_PARAMS" -gt 0 && "$MAX_PARAMS" -lt "$total" ]]; then
+    PAIR_PARAMS_AVAIL=${#param_rows[@]}
+    if [[ "$MAX_PARAMS" -gt 0 && "$MAX_PARAMS" -lt "$PAIR_PARAMS_AVAIL" ]]; then
         param_rows=("${param_rows[@]:0:$MAX_PARAMS}")
-        total=$MAX_PARAMS
     fi
-    log "$query: running $total params (per-param)..."
+    PAIR_PARAMS_SELECTED=${#param_rows[@]}
+    log "$query: running $PAIR_PARAMS_SELECTED params (per-param)..."
 
     local orig_backup="${qwork}/param_backup.txt"
     cp "$param_file" "$orig_backup"
     trap "cp '$orig_backup' '$param_file' 2>/dev/null; trap - EXIT INT TERM" EXIT INT TERM
 
-    local fl_times=() db_times=()
-    local timeout_rows=() error_rows=() mismatch_rows=()
-    local total_rows=0
     local sql_subst idx=0
     sql_subst=$(sed "s|:dataDir|'${data_dir}'|g" "$sql_file")
 
+    local row
     for row in "${param_rows[@]}"; do
         idx=$(( idx + 1 ))
         printf '%s\n%s\n' "$header" "$row" > "$param_file"
 
         local fl_param_out="${qwork}/fl_${idx}.txt"
         local db_param_out="${qwork}/db_${idx}.csv"
-        local fl_ok=true db_ok=true
-        local fl_ms=0 db_ms=0
-        local _t0 _t1 _exit_code
+        local fl_rss_log="${qwork}/fl_${idx}.rss"
+        local db_rss_log="${qwork}/db_${idx}.rss"
+        local fl_status="ok" db_status="ok"
+        local fl_ms="N/A" db_ms="N/A"
+        local fl_rss="N/A" db_rss="N/A"
+        local fl_rows=0 db_rows=0
+        local row_verdict=""
 
-        # Flowlog
+        # ── FlowLog ──
         find "$fl_out_dir" -maxdepth 1 -type f -delete 2>/dev/null || true
-        printf "\r${CYAN}[CHECK]${NC} Flowlog  [%d/%d]  " "$idx" "$total" >&2
-        _t0=$(date +%s%3N)
+        printf "\r${CYAN}[CHECK]${NC} Flowlog  [%d/%d]  " "$idx" "$PAIR_PARAMS_SELECTED" >&2
         local fl_workers="${FLOWLOG_WORKERS:-$WORKERS}"
-        if timeout "$TIMEOUT_SECS" "$fl_bin" -w "$fl_workers" >/dev/null 2>&1;
-        then
-            _exit_code=0
-        else
-            _exit_code=$?
-        fi
-        _t1=$(date +%s%3N)
-        fl_ms=$(( _t1 - _t0 ))
-        if [[ $_exit_code -eq 0 ]]; then
-            for f in "$fl_out_dir"/*; do
-                [[ -f "$f" ]] && grep -v '^$' "$f" >> "$fl_param_out" || true
-            done
-        elif [[ $_exit_code -eq 124 ]]; then
-            fl_ok=false
-            timeout_rows+=( "  param[$idx] ($row): Flowlog timeout (${TIMEOUT_SECS}s)" )
-            > "$fl_param_out"
-        else
-            fl_ok=false
-            error_rows+=( "  param[$idx] ($row): Flowlog runtime error (exit=$_exit_code)" )
-            > "$fl_param_out"
-        fi
+        local _fl_rc=0
+        # /usr/bin/time -v writes its sidecar to $fl_rss_log via -o; FL's
+        # stdout/stderr are still discarded the same way as before.
+        # Exit code propagation: time -v → timeout → fl_bin. timeout
+        # exits 124 on SIGTERM cap; that's what we classify on.
+        "$TIME_BIN" -v -o "$fl_rss_log" \
+            timeout "$TIMEOUT_SECS" "$fl_bin" -w "$fl_workers" \
+            >/dev/null 2>&1 || _fl_rc=$?
+        case $_fl_rc in
+            0)
+                fl_ms=$(_extract_elapsed_ms "$fl_rss_log")
+                fl_rss=$(_extract_peak_rss_kb "$fl_rss_log")
+                for f in "$fl_out_dir"/*; do
+                    [[ -f "$f" ]] && grep -v '^$' "$f" >> "$fl_param_out" || true
+                done
+                ;;
+            124)
+                fl_status="timeout"
+                PAIR_FL_TIMEOUTS=$((PAIR_FL_TIMEOUTS + 1))
+                : > "$fl_param_out"
+                ;;
+            *)
+                fl_status="error"
+                PAIR_FL_ERRORS=$((PAIR_FL_ERRORS + 1))
+                : > "$fl_param_out"
+                ;;
+        esac
 
-        # DuckDB — write SQL to temp file to avoid quoting issues
+        # ── DuckDB ──
         local exec_sql="${qwork}/exec_${idx}.sql"
         printf 'SET threads=%s;\n%s\n' "$WORKERS" "$sql_subst" > "$exec_sql"
-        printf "\r${CYAN}[CHECK]${NC} DuckDB   [%d/%d]  " "$idx" "$total" >&2
-        _t0=$(date +%s%3N)
-        if timeout "$TIMEOUT_SECS" "$DUCKDB_BIN" -csv :memory: < "$exec_sql" 2>/dev/null \
-                | tail -n +2 > "$db_param_out"; then
-            _exit_code=0
-        else
-            _exit_code=${PIPESTATUS[0]}
-        fi
-        _t1=$(date +%s%3N)
-        db_ms=$(( _t1 - _t0 ))
-        if [[ $_exit_code -eq 0 ]]; then
-            : # ok
-        elif [[ $_exit_code -eq 124 ]]; then
-            db_ok=false
-            timeout_rows+=( "  param[$idx] ($row): DuckDB timeout (${TIMEOUT_SECS}s)" )
-            > "$db_param_out"
-        else
-            db_ok=false
-            error_rows+=( "  param[$idx] ($row): DuckDB runtime error (exit=$_exit_code)" )
-            > "$db_param_out"
-        fi
+        printf "\r${CYAN}[CHECK]${NC} DuckDB   [%d/%d]  " "$idx" "$PAIR_PARAMS_SELECTED" >&2
+        local _db_rc=0
+        # Pipeline: TIME_BIN -v -o sidecar timeout T duckdb ... | tail.
+        # PIPESTATUS[0] is /usr/bin/time's exit, which propagates the
+        # underlying timeout's. tail -n +2 strips the CSV header row.
+        "$TIME_BIN" -v -o "$db_rss_log" \
+            timeout "$TIMEOUT_SECS" "$DUCKDB_BIN" -csv :memory: < "$exec_sql" 2>/dev/null \
+            | tail -n +2 > "$db_param_out" || true
+        _db_rc=${PIPESTATUS[0]}
+        case $_db_rc in
+            0)
+                db_ms=$(_extract_elapsed_ms "$db_rss_log")
+                db_rss=$(_extract_peak_rss_kb "$db_rss_log")
+                ;;
+            124)
+                db_status="timeout"
+                PAIR_DB_TIMEOUTS=$((PAIR_DB_TIMEOUTS + 1))
+                : > "$db_param_out"
+                ;;
+            *)
+                db_status="error"
+                PAIR_DB_ERRORS=$((PAIR_DB_ERRORS + 1))
+                : > "$db_param_out"
+                ;;
+        esac
 
-        # Only count times when both engines succeed (no timeout, no error)
-        if $fl_ok && $db_ok; then
-            fl_times+=( "$fl_ms" )
-            db_times+=( "$db_ms" )
-        fi
-
-        # Per-param comparison
-        if $fl_ok && $db_ok; then
+        # ── Determine row verdict + correctness check ──
+        # Engine-level failures take precedence over correctness check —
+        # we can't compare a missing output. Order matters for clarity:
+        # surface FL_TIMEOUT before DB_TIMEOUT only because FL ran first
+        # in this loop iteration; either is a real failure.
+        if [[ "$fl_status" == "timeout" ]]; then
+            row_verdict="FL_TIMEOUT"
+        elif [[ "$fl_status" == "error" ]]; then
+            row_verdict="FL_ERROR"
+        elif [[ "$db_status" == "timeout" ]]; then
+            row_verdict="DB_TIMEOUT"
+        elif [[ "$db_status" == "error" ]]; then
+            row_verdict="DB_ERROR"
+        else
+            # Both succeeded — set-equality compare row sets.
             local cmp
             cmp=$(python3 - "$db_param_out" "$fl_param_out" <<'PYEOF'
 import sys, csv
@@ -310,78 +517,158 @@ def load_fl(p):
     return rows
 db = load_csv(sys.argv[1]); fl = load_fl(sys.argv[2])
 od, of = db - fl, fl - db
+print(f"DB_ROWS {len(db)}")
+print(f"FL_ROWS {len(fl)}")
 if not od and not of:
-    print(f"PASS {len(db)}")
+    print("PASS")
 else:
-    print(f"FAIL db={len(db)} fl={len(fl)} only_db={len(od)} only_fl={len(of)}")
-    for r in list(od)[:2]: print(f"    DB: {r}")
-    for r in list(of)[:2]: print(f"    FL: {r}")
+    print(f"FAIL only_db={len(od)} only_fl={len(of)}")
+    for r in list(od)[:3]: print(f"    DB: {r}")
+    for r in list(of)[:3]: print(f"    FL: {r}")
 PYEOF
             )
-            if [[ "$cmp" == PASS* ]]; then
-                total_rows=$(( total_rows + ${cmp#PASS } ))
+            db_rows=$(awk '/^DB_ROWS/ {print $2; exit}' <<< "$cmp")
+            fl_rows=$(awk '/^FL_ROWS/ {print $2; exit}' <<< "$cmp")
+            db_rows=${db_rows:-0}
+            fl_rows=${fl_rows:-0}
+            PAIR_FL_TOTAL_ROWS=$((PAIR_FL_TOTAL_ROWS + fl_rows))
+            PAIR_DB_TOTAL_ROWS=$((PAIR_DB_TOTAL_ROWS + db_rows))
+            if grep -q '^PASS$' <<< "$cmp"; then
+                row_verdict="OK"
+                PAIR_PARAMS_COUNTED=$((PAIR_PARAMS_COUNTED + 1))
+                PAIR_ROWS_OK=$((PAIR_ROWS_OK + db_rows))
+                PAIR_FL_TIMES+=( "$fl_ms" )
+                PAIR_DB_TIMES+=( "$db_ms" )
+                [[ "$fl_rss" =~ ^[0-9]+$ ]] && PAIR_FL_RSS+=( "$fl_rss" )
+                [[ "$db_rss" =~ ^[0-9]+$ ]] && PAIR_DB_RSS+=( "$db_rss" )
             else
-                mismatch_rows+=( "  param[$idx] ($row):" )
-                while IFS= read -r line; do mismatch_rows+=( "  $line" ); done \
-                    <<< "${cmp#FAIL }"
+                row_verdict="MISMATCH"
+                PAIR_MISMATCHES=$((PAIR_MISMATCHES + 1))
+                {
+                    echo "=== param[$idx] ($row) ==="
+                    echo "$cmp"
+                    echo
+                } >> "$mismatch_log"
             fi
         fi
+
+        # Append per-param TSV row. Sanitize the param row in case it
+        # contains tab characters (LDBC params are pipe-delimited so
+        # this should not happen, but cheap insurance).
+        local row_sanitized="${row//$'\t'/ }"
+        printf '%d\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n' \
+            "$idx" "$row_sanitized" \
+            "$fl_ms" "$db_ms" \
+            "$fl_rss" "$db_rss" \
+            "$fl_rows" "$db_rows" \
+            "$row_verdict" \
+            >> "$perparam_tsv"
     done
     printf "\r%80s\r" "" >&2
 
     cp "$orig_backup" "$param_file"
     trap - EXIT INT TERM
 
-    # ── Summary ──
-    local has_issues=false
-    if [[ ${#timeout_rows[@]} -gt 0 || ${#error_rows[@]} -gt 0 || ${#mismatch_rows[@]} -gt 0 ]]; then
-        has_issues=true
+    # ── Pair-level verdict ──
+    # OK      = every selected param produced matched output.
+    # PARTIAL = some selected params succeeded + matched, but at least
+    #           one had timeout/error/mismatch.
+    # FAIL    = zero selected params produced matched output (or the
+    #           pair failed before this loop, handled in early-returns
+    #           above).
+    local has_failures=false
+    if (( PAIR_FL_ERRORS + PAIR_FL_TIMEOUTS + PAIR_DB_ERRORS + PAIR_DB_TIMEOUTS + PAIR_MISMATCHES > 0 )); then
+        has_failures=true
+    fi
+    if (( PAIR_PARAMS_COUNTED == 0 )); then
+        PAIR_VERDICT="FAIL"
+        PAIR_PHASE="all_params_failed"
+        PAIR_MESSAGE="0/${PAIR_PARAMS_SELECTED} params produced matched output (FL_err=${PAIR_FL_ERRORS} FL_to=${PAIR_FL_TIMEOUTS} DB_err=${PAIR_DB_ERRORS} DB_to=${PAIR_DB_TIMEOUTS} mismatch=${PAIR_MISMATCHES})"
+    elif $has_failures; then
+        PAIR_VERDICT="PARTIAL"
+        PAIR_PHASE="param_loop"
+        PAIR_MESSAGE="${PAIR_PARAMS_COUNTED}/${PAIR_PARAMS_SELECTED} OK (FL_err=${PAIR_FL_ERRORS} FL_to=${PAIR_FL_TIMEOUTS} DB_err=${PAIR_DB_ERRORS} DB_to=${PAIR_DB_TIMEOUTS} mismatch=${PAIR_MISMATCHES})"
+    else
+        PAIR_VERDICT="OK"
+        PAIR_PHASE="ok"
+        PAIR_MESSAGE=""
     fi
 
-    local fl_avg=0 db_avg=0 fl_med=0 db_med=0
-    if [[ ${#fl_times[@]} -gt 0 ]]; then
-        local fl_sum=0; for t in "${fl_times[@]}"; do fl_sum=$(( fl_sum + t )); done
-        fl_avg=$(( fl_sum / ${#fl_times[@]} ))
-        fl_med=$(printf '%s\n' "${fl_times[@]}" | sort -n | awk 'BEGIN{c=0}{a[c++]=$1}END{print(c%2?a[int(c/2)]:int((a[c/2-1]+a[c/2])/2))}')
+    # ── Per-pair console summary ──
+    local fl_med fl_avg db_med db_avg fl_rss_med db_rss_med
+    fl_med=$(_median_int "${PAIR_FL_TIMES[@]}")
+    fl_avg=$(_avg_int    "${PAIR_FL_TIMES[@]}")
+    db_med=$(_median_int "${PAIR_DB_TIMES[@]}")
+    db_avg=$(_avg_int    "${PAIR_DB_TIMES[@]}")
+    fl_rss_med=$(_median_int "${PAIR_FL_RSS[@]}")
+    db_rss_med=$(_median_int "${PAIR_DB_RSS[@]}")
+
+    case "$PAIR_VERDICT" in
+        OK)
+            pass "${query}  (${PAIR_ROWS_OK} rows, ${PAIR_PARAMS_SELECTED} params)"
+            ;;
+        PARTIAL)
+            fail "${query}  PARTIAL: ${PAIR_PARAMS_COUNTED}/${PAIR_PARAMS_SELECTED} params OK"
+            ;;
+        *)
+            fail "${query}  FAIL: ${PAIR_MESSAGE}"
+            ;;
+    esac
+    if [[ ${#PAIR_FL_TIMES[@]} -gt 0 ]]; then
+        echo "         Flowlog  med=$(fmt_ms "${fl_med:-0}")  avg=$(fmt_ms "${fl_avg:-0}")  rss_med=$(_kib_to_mib "${fl_rss_med:-N/A}") MiB"
+        echo "         DuckDB   med=$(fmt_ms "${db_med:-0}")  avg=$(fmt_ms "${db_avg:-0}")  rss_med=$(_kib_to_mib "${db_rss_med:-N/A}") MiB"
     fi
-    if [[ ${#db_times[@]} -gt 0 ]]; then
-        local db_sum=0; for t in "${db_times[@]}"; do db_sum=$(( db_sum + t )); done
-        db_avg=$(( db_sum / ${#db_times[@]} ))
-        db_med=$(printf '%s\n' "${db_times[@]}" | sort -n | awk 'BEGIN{c=0}{a[c++]=$1}END{print(c%2?a[int(c/2)]:int((a[c/2-1]+a[c/2])/2))}')
+    if (( PAIR_MISMATCHES > 0 )); then
+        echo "         Mismatch detail: $mismatch_log"
+    fi
+    if (( PAIR_FL_ERRORS + PAIR_FL_TIMEOUTS + PAIR_DB_ERRORS + PAIR_DB_TIMEOUTS > 0 )); then
+        echo "         Per-param detail: $perparam_tsv"
     fi
 
+    # Reclaim disk: bulky raw .txt outputs in qwork are no longer needed.
+    # Mismatch artifact lives in $LDBC_OUT_DIR (outside qwork) so survives.
     rm -rf "$qwork"
 
-    local counted=${#fl_times[@]}
-    if ! $has_issues; then
-        pass "${query}  (${total_rows} rows, ${total} params)"
-        echo "         Flowlog  avg=$(fmt_ms $fl_avg)  median=$(fmt_ms $fl_med)"
-        echo "         DuckDB   avg=$(fmt_ms $db_avg)  median=$(fmt_ms $db_med)"
-        return 0
-    else
-        fail "${query}  (${total} params, ${counted} counted)"
-        echo "         Flowlog  avg=$(fmt_ms $fl_avg)  median=$(fmt_ms $fl_med)"
-        echo "         DuckDB   avg=$(fmt_ms $db_avg)  median=$(fmt_ms $db_med)"
-        if [[ ${#error_rows[@]} -gt 0 ]]; then
-            echo "         Errors (${#error_rows[@]}):"
-            printf '         %s\n' "${error_rows[@]}"
-        fi
-        if [[ ${#timeout_rows[@]} -gt 0 ]]; then
-            echo "         Timeouts (${#timeout_rows[@]}):"
-            printf '         %s\n' "${timeout_rows[@]}"
-        fi
-        if [[ ${#mismatch_rows[@]} -gt 0 ]]; then
-            echo "         Mismatches (${#mismatch_rows[@]}):"
-            printf '         %s\n' "${mismatch_rows[@]}"
-        fi
-        return 1
-    fi
+    emit_summary_row
+    [[ "$PAIR_VERDICT" == "OK" ]] && return 0 || return 1
+}
+
+# ── End-of-run summary table ──────────────────────────────────────────────────
+# Parse summary.csv back and print a fixed-width table to stdout. Mirrors
+# cross_engine.sh's generate_results in shape — operators get a quick
+# "how did the sweep go" view without scrolling through per-pair output.
+print_summary_table() {
+    [[ -s "$SUMMARY_CSV" ]] || return 0
+    local n_rows
+    n_rows=$(( $(wc -l < "$SUMMARY_CSV") - 1 ))   # subtract header
+    (( n_rows > 0 )) || return 0
+
+    echo
+    echo "=== LDBC summary (workers=$WORKERS) ==============================================================="
+    printf '%-32s %-30s %4s %4s %10s %10s %9s %9s %9s  %s\n' \
+        "Query" "Dataset" "Avl" "Cnt" "FL_med" "DB_med" "Speedup" "FL_RSS" "DB_RSS" "Verdict"
+    printf -- '-%.0s' {1..130}; echo
+    awk -F',' 'NR > 1 {
+        # Field map: 1=Query 2=Dataset 3=Available 5=Counted
+        # 6=FL_med_ms 8=DB_med_ms 10=Speedup 11=FL_RSS_MiB 12=DB_RSS_MiB 21=Verdict
+        flms = ($6 == "N/A") ? "N/A" : $6 "ms"
+        dbms = ($8 == "N/A") ? "N/A" : $8 "ms"
+        spd  = ($10 == "N/A") ? "N/A" : $10 "x"
+        flmm = ($11 == "N/A") ? "N/A" : $11 "MiB"
+        dbmm = ($12 == "N/A") ? "N/A" : $12 "MiB"
+        printf "%-32s %-30s %4s %4s %10s %10s %9s %9s %9s  %s\n",
+            $1, $2, $3, $5, flms, dbms, spd, flmm, dbmm, $21
+    }' "$SUMMARY_CSV"
+    echo
 }
 
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 # Group queries by dataset so each dataset is downloaded/cleaned up only once.
+# Also detects duplicate (query, dataset) entries — the per-param TSV
+# path is keyed on that pair, so duplicates would silently overwrite.
 declare -A dataset_queries   # dataset -> space-separated query list
+declare -A pair_seen         # "query=dataset" -> 1
 declare -a dataset_order=()  # preserve first-seen order
 
 while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
@@ -393,12 +680,20 @@ while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
     dataset="$(trim "${line#*=}")"
     [[ -z "$query" || -z "$dataset" ]] && continue
 
+    pair_key="${query}=${dataset}"
+    if [[ -n "${pair_seen[$pair_key]+x}" ]]; then
+        die "duplicate config entry: $pair_key (lines must be unique — per-param TSV path collides)"
+    fi
+    pair_seen[$pair_key]=1
+
     if [[ -z "${dataset_queries[$dataset]+x}" ]]; then
         dataset_queries[$dataset]=""
         dataset_order+=( "$dataset" )
     fi
     dataset_queries[$dataset]+="${query} "
 done < "$CONFIG"
+
+(( ${#dataset_order[@]} > 0 )) || die "no (query, dataset) pairs in $CONFIG"
 
 total=0; passed=0; failed=0
 
@@ -408,27 +703,29 @@ for dataset in "${dataset_order[@]}"; do
 
     for query in ${dataset_queries[$dataset]}; do
         log "$query (dataset: $dataset)"
-
-        DL_FILE="${DL_DIR}/${query}.dl"
-        SQL_FILE="${SQL_DIR}/${query}.sql"
-
-        [[ -f "$DL_FILE" ]]  || { fail "$query: missing $DL_FILE";  failed=$((failed+1)); continue; }
-        [[ -f "$SQL_FILE" ]] || { fail "$query: missing $SQL_FILE"; failed=$((failed+1)); continue; }
-
         total=$((total + 1))
 
-        if run_per_param "$query" "$DATA_DIR"; then
-            passed=$((passed+1))
+        # run_per_param does its own missing-file checks + always emits
+        # exactly one summary.csv row before returning, so the main
+        # loop here is just bookkeeping.
+        if run_per_param "$query" "$dataset" "$DATA_DIR"; then
+            passed=$((passed + 1))
         else
-            failed=$((failed+1))
+            failed=$((failed + 1))
         fi
     done
 
     cleanup_dataset "$dataset"
 done
 
-echo ""
+print_summary_table
+
 echo "=========================================="
-echo "Results: ${passed}/${total} passed, ${failed} failed"
+echo "Results: ${passed}/${total} pairs OK, ${failed} pair(s) PARTIAL/FAIL"
+echo "Artifacts: ${LDBC_OUT_DIR}/"
+echo "  summary.csv                           # one row per (query, dataset)"
+echo "  <query>_<dataset>_perparam.tsv        # per-param granular timings + RSS"
+echo "  <query>_<dataset>_mismatches.txt      # only when MISMATCH verdict appears"
+echo "  run_info.txt                          # reproducibility manifest"
 echo "=========================================="
 [[ $failed -eq 0 ]]
