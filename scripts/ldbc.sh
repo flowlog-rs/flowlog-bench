@@ -14,17 +14,21 @@
 #   run_info.txt                           reproducibility manifest
 #
 # Usage:
-#   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>] [--sip]
+#   bash scripts/ldbc.sh [--config <file>] [--param_num <n>] [--timeout <s>]
+#                        [--sip] [--keep-datasets]
 #
-#   --config     config file (default: config/ldbc.txt)
-#   --param_num  max param rows per query, 0 = all (default: 0)
-#   --timeout    per-param SIGTERM cap in seconds (default: 300)
-#   --sip        forward --sip to flowlog-compiler (sideways info passing)
+#   --config         config file (default: config/ldbc.txt)
+#   --param_num      max param rows per query, 0 = all (default: 0)
+#   --timeout        per-param SIGTERM cap in seconds (default: 300)
+#   --sip            forward --sip to flowlog-compiler (sideways info passing)
+#   --keep-datasets  skip dataset cleanup between queries. Required if
+#                    $FACT_DIR is a symlink — the script refuses to rm
+#                    -rf through one.
 #
 # Environment variables:
 #   FLOWLOG_BIN  path to flowlog-compiler binary
 #                (default: ROOT_DIR/flowlog/main/target/release/flowlog-compiler;
-#                 the Makefile target sets this from get_flowlog.sh's output)
+#                 the Makefile target sets this from scripts/get_flowlog.sh's output)
 #   DUCKDB_BIN   path to duckdb binary (default: duckdb on PATH)
 #   WORKERS      parallelism for both engines (default: 64)
 #   FACT_DIR     dataset cache directory (default: ROOT_DIR/facts/ldbc)
@@ -35,7 +39,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Shared bench helpers: colors / trim / flowlog_truthy / cleanup safety,
+# Shared bench helpers: colors / trim / cleanup safety,
 # /usr/bin/time wrapping + extractors / median / kib_to_mib,
 # dataset cache (download + cleanup with the same safety guard).
 source "$(dirname "$0")/lib/common.sh"
@@ -58,16 +62,19 @@ CONFIG="${ROOT_DIR}/config/ldbc.txt"
 MAX_PARAMS=0
 TIMEOUT_SECS=300
 EXTRA_FL_FLAGS=""
+KEEP_DATASETS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --config)     CONFIG="$2";       shift 2 ;;
-        --param_num)  MAX_PARAMS="$2";   shift 2 ;;
-        --timeout)    TIMEOUT_SECS="$2"; shift 2 ;;
-        --sip)        EXTRA_FL_FLAGS="$EXTRA_FL_FLAGS --sip"; shift ;;
+        --config)        CONFIG="$2";       shift 2 ;;
+        --param_num)     MAX_PARAMS="$2";   shift 2 ;;
+        --timeout)       TIMEOUT_SECS="$2"; shift 2 ;;
+        --sip)           EXTRA_FL_FLAGS="$EXTRA_FL_FLAGS --sip"; shift ;;
+        --keep-datasets) KEEP_DATASETS=1; shift ;;
         *) die "Unknown argument: $1" ;;
     esac
 done
+export KEEP_DATASETS
 
 HF_BASE="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main"
 FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts/ldbc}"

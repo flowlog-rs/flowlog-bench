@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# scripts/cross_engine.sh — FlowLog vs. baseline engines on the micro suite.
+# scripts/cross_engine.sh — multi-engine comparison on the oracle suite.
 #
-# Times the FlowLog compiler + lib runner against zero or more baselines
+# Times the FlowLog compiler against zero or more other engines
 # (vldb26 interpreter, Souffle), one (program × dataset) pair at a time,
 # and writes a single CSV with side-by-side timing + peak RSS columns.
 #
@@ -14,23 +14,25 @@
 #   make cross-engine [FLOWLOG_REF=<sha|tag|branch>]
 #
 # Flags:
-#   --baseline=<list>   comma list of {interpreter, souffle, none}.
-#                       Script default: interpreter; `make cross-engine`
-#                       passes BASELINE=souffle. `none` runs only the
-#                       compiler + lib columns.
-#   --target=<stem:ds>  run only one pair (stem = .dl basename without
-#                       extension); resume / skip semantics still apply.
-#   --fresh             wipe results/benchmark/ before running.
-#                       Otherwise pairs already in the CSV are skipped.
-#   -h, --help          print this header.
+#   --engines=<list>            comma list of comparison engines to run
+#                               alongside the FlowLog compiler:
+#                               {interpreter, souffle, none}.
+#                               Default: interpreter. `none` runs only
+#                               the compiler column.
+#   --target=<stem:ds>          run only one pair (stem = .dl basename without
+#                               extension); resume / skip semantics still apply.
+#   --fresh                     wipe results/benchmark/ before running.
+#                               Otherwise pairs already in the CSV are skipped.
+#   --keep-datasets             skip dataset cleanup between pairs.
+#                               Required if $FACT_DIR is a symlink — the
+#                               script refuses to rm -rf through one.
+#   -h, --help                  print this header.
 #
 # Environment knobs:
 #   WORKERS             thread count for every engine; default min(64, nproc).
 #                       Same value across runs you compare.
 #   NUM_RUNS            timed runs per (engine, pair). Median is kept. Default 3.
 #   FLOWLOG_RUN_TIMEOUT SIGTERM cap on a single attempt (seconds). Default 1800.
-#   FLOWLOG_KEEP_DATASETS=1   skip dataset cleanup between pairs.
-#   FLOWLOG_FORCE_CLEANUP=1   override symlink-safety guard for FACT_DIR.
 #   SOUFFLE_BIN         override Souffle binary location (default /usr/bin/souffle).
 #   SOUFFLE_PROG_DIR    override Souffle .dl corpus dir.
 #   TIME_BIN            override GNU /usr/bin/time location.
@@ -42,13 +44,16 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # --- Logging + shared helpers (colors, trim, cleanup safety) -------------
 source "${ROOT_DIR}/scripts/lib/common.sh"
-log() { local c="$1" t="$2"; shift 2; echo -e "${c}[${t}]${NC} $*"; }
+# Stderr — keeps stdout clean for $(_souffle_compile ...)-style captures
+# and for the summary table at the end.
+log() { local c="$1" t="$2"; shift 2; echo -e "${c}[${t}]${NC} $*" >&2; }
 die() { log "$RED" "ERROR" "$*"; exit 1; }
 
 # --- Argv parsing --------------------------------------------------------
 FRESH=0
-BASELINES="interpreter"
+ENGINES="interpreter"
 TARGET_FILTER=""
+KEEP_DATASETS=0
 POSITIONAL_ARGS=()
 while (( $# )); do
     case "$1" in
@@ -57,25 +62,27 @@ while (( $# )); do
                  sep==1 || sep==2 { sub(/^# ?/, ""); print }
                  sep>=3 { exit }' "$0"
             exit 0 ;;
-        --fresh)        FRESH=1; shift ;;
-        --baseline=*)   BASELINES="${1#--baseline=}"; shift ;;
-        --baseline)     BASELINES="$2"; shift 2 ;;
-        --target=*)     TARGET_FILTER="${1#--target=}"; shift ;;
-        --target)       TARGET_FILTER="$2"; shift 2 ;;
-        --)             shift; POSITIONAL_ARGS+=("$@"); break ;;
-        -*)             die "Unknown option: $1 (try --help)" ;;
-        *)              POSITIONAL_ARGS+=("$1"); shift ;;
+        --fresh)         FRESH=1; shift ;;
+        --engines=*)     ENGINES="${1#--engines=}"; shift ;;
+        --engines)       ENGINES="$2"; shift 2 ;;
+        --target=*)      TARGET_FILTER="${1#--target=}"; shift ;;
+        --target)        TARGET_FILTER="$2"; shift 2 ;;
+        --keep-datasets) KEEP_DATASETS=1; shift ;;
+        --)              shift; POSITIONAL_ARGS+=("$@"); break ;;
+        -*)              die "Unknown option: $1 (try --help)" ;;
+        *)               POSITIONAL_ARGS+=("$1"); shift ;;
     esac
 done
+export KEEP_DATASETS
 
 RUN_INTERPRETER=0; RUN_SOUFFLE=0
-case ",$BASELINES," in *,interpreter,*) RUN_INTERPRETER=1 ;; esac
-case ",$BASELINES," in *,souffle,*)     RUN_SOUFFLE=1 ;; esac
-case ",$BASELINES," in
-    *,none,*) ;;  # explicit no-baseline mode is fine
+case ",$ENGINES," in *,interpreter,*) RUN_INTERPRETER=1 ;; esac
+case ",$ENGINES," in *,souffle,*)     RUN_SOUFFLE=1 ;; esac
+case ",$ENGINES," in
+    *,none,*) ;;  # explicit compiler-only mode is fine
     *)
         (( RUN_INTERPRETER || RUN_SOUFFLE )) \
-            || die "--baseline must be 'none', 'interpreter', 'souffle', or comma combination (got: $BASELINES)"
+            || die "--engines must be 'none' or comma list of {interpreter,souffle} (got: $ENGINES)"
         ;;
 esac
 
@@ -113,20 +120,15 @@ FLOWLOG_RUN_TIMEOUT="${FLOWLOG_RUN_TIMEOUT:-1800}"
     || die "FLOWLOG_RUN_TIMEOUT must be a positive integer (seconds), got: $FLOWLOG_RUN_TIMEOUT"
 
 # --- Paths (env-overridable) ---------------------------------------------
-PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/micro/flowlog}"
+PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/oracle/flowlog}"
 FACT_DIR="${ROOT_DIR}/facts"
 LOG_DIR="${ROOT_DIR}/results/benchmark"
 CSV_FILE="${LOG_DIR}/comparison_results.csv"
 
-# Compiler + lib runner: built by tools/get_flowlog.sh; Makefile sets
-# FLOWLOG_BIN / FLOWLOG_SRC_DIR / FLOWLOG_RESOLVED_SHA after the fetch.
+# flowlog-compiler binary: built by scripts/get_flowlog.sh; Makefile sets
+# FLOWLOG_BIN / FLOWLOG_RESOLVED_SHA after the fetch.
 COMPILER_BIN="${FLOWLOG_BIN:-${ROOT_DIR}/flowlog/main/target/release/flowlog-compiler}"
 FLOWLOG_BIN="$COMPILER_BIN"
-FLOWLOG_SRC_DIR="${FLOWLOG_SRC_DIR:-${ROOT_DIR}/flowlog/main/src}"
-LIB_BENCH_RUNNER_DIR="${ROOT_DIR}/results/bench-lib/runner"
-LIB_BENCH_BIN="${LIB_BENCH_RUNNER_DIR}/target/release/flowlog_bench_lib"
-LIB_BENCH_SIP=0
-LIB_BENCH_STR_INTERN=0
 
 # Interpreter: vldb26-artifact lives next to this repo.
 INTERPRETER_DIR="${ROOT_DIR}/../vldb26-artifact"
@@ -136,14 +138,13 @@ INTERPRETER_PROG_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/
 
 # Souffle:
 SOUFFLE_BIN="${SOUFFLE_BIN:-/usr/bin/souffle}"
-SOUFFLE_PROG_DIR="${SOUFFLE_PROG_DIR:-${ROOT_DIR}/programs/micro/souffle}"
+SOUFFLE_PROG_DIR="${SOUFFLE_PROG_DIR:-${ROOT_DIR}/programs/oracle/souffle}"
 
 # Dataset URL template:
 DATASET_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main/dataset/csv"
 
-export FLOWLOG_BIN FLOWLOG_SRC_DIR PROG_DIR FACT_DIR LOG_DIR \
-       LIB_BENCH_RUNNER_DIR LIB_BENCH_BIN LIB_BENCH_SIP LIB_BENCH_STR_INTERN \
-       COMPILER_BIN INTERPRETER_DIR INTERPRETER_BIN INTERPRETER_PROG_DIR \
+export FLOWLOG_BIN PROG_DIR FACT_DIR LOG_DIR COMPILER_BIN \
+       INTERPRETER_DIR INTERPRETER_BIN INTERPRETER_PROG_DIR \
        INTERPRETER_PROG_URL SOUFFLE_BIN SOUFFLE_PROG_DIR \
        WORKERS NUM_RUNS FLOWLOG_RUN_TIMEOUT TIME_BIN
 
@@ -151,7 +152,6 @@ export FLOWLOG_BIN FLOWLOG_SRC_DIR PROG_DIR FACT_DIR LOG_DIR \
 source "${ROOT_DIR}/scripts/lib/measure.sh"
 source "${ROOT_DIR}/scripts/lib/datasets.sh"
 source "${ROOT_DIR}/scripts/engines/compiler.sh"
-source "${ROOT_DIR}/scripts/engines/libmode.sh"
 source "${ROOT_DIR}/scripts/engines/interpreter.sh"
 source "${ROOT_DIR}/scripts/engines/souffle.sh"
 
@@ -191,7 +191,7 @@ pair_has_tag() { [[ "${PAIR_TAGS:-}" == *"[$1]"* ]]; }
 # --- Setup gates ---------------------------------------------------------
 setup_compiler() {
     [[ -x "$COMPILER_BIN" ]] \
-        || die "flowlog-compiler not found at $COMPILER_BIN — invoke via the Makefile (which calls tools/get_flowlog.sh first), or set FLOWLOG_BIN=<path> manually."
+        || die "flowlog-compiler not found at $COMPILER_BIN — invoke via the Makefile (which calls scripts/get_flowlog.sh first), or set FLOWLOG_BIN=<path> manually."
     local sha="${FLOWLOG_RESOLVED_SHA:-unknown}"
     log "$BLUE" "SETUP" "Compiler: $COMPILER_BIN (flowlog @ ${sha:0:12})"
 }
@@ -220,11 +220,11 @@ cleanup_dataset_for_pair() {
 }
 
 # --- CSV writer ----------------------------------------------------------
-# 26 columns: timing (interp/comp/lib) + speedups + peak RSS + souffle +
-# crosscheck + per-engine RunsSucceeded counters. Empty *_RunsSucceeded =
-# engine wasn't requested for this pair. Header is byte-stable; downstream
-# consumers (plotting/) parse by column name.
-CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Lib_Exec,Lib_vs_Interp_Exec,Lib_vs_Compiler_Exec,Interp_PeakRss_MB,Compiler_PeakRss_MB,Lib_PeakRss_MB,Lib_vs_Compiler_Mem,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Lib_RunsSucceeded,Souffle_RunsSucceeded"
+# 20 columns: timing (interp/comp) + speedups + peak RSS + souffle +
+# crosscheck + per-engine RunsSucceeded counters. Empty *_RunsSucceeded
+# = engine wasn't requested for this pair. Header is byte-stable;
+# downstream consumers (plot/) parse by column name.
+CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded"
 
 init_csv() {
     mkdir -p "$(dirname "$CSV_FILE")"
@@ -290,37 +290,30 @@ PY
 # engine adapters.
 append_csv_row() {
     local stem="$1" dataset="$2"
-    local interp_log="$3" comp_log="$4" lib_log="$5" sf_log="$6"
+    local interp_log="$3" comp_log="$4" sf_log="$5"
 
-    # Read each engine's median timings (compiler + interpreter emit
-    # both Load + Total log lines; lib only emits the dataflow line).
-    local i_total i_load i_exec c_total c_load c_exec l_exec
+    # Median timings (both compiler + interpreter emit Load + Total log lines).
+    local i_total i_load i_exec c_total c_load c_exec
     i_total=$(extract_total_seconds "$interp_log")
     i_load=$( extract_load_seconds  "$interp_log")
     i_exec=$( compute_exec_seconds  "$i_total" "$i_load")
     c_total=$(extract_total_seconds "$comp_log")
     c_load=$( extract_load_seconds  "$comp_log")
     c_exec=$( compute_exec_seconds  "$c_total" "$c_load")
-    l_exec=$( extract_total_seconds "$lib_log")
 
-    local rs_load rs_exec rs_total lib_vs_interp lib_vs_comp
+    local rs_load rs_exec rs_total
     rs_load=$( speedup_ratio "$i_load"  "$c_load")
     rs_exec=$( speedup_ratio "$i_exec"  "$c_exec")
     rs_total=$(speedup_ratio "$i_total" "$c_total")
-    lib_vs_interp=$(speedup_ratio "$i_exec" "$l_exec")
-    lib_vs_comp=$(  speedup_ratio "$c_exec" "$l_exec")
 
-    # Median peak RSS (KiB) sidecars -> MiB cells; ratio cell.
-    local i_rss_kb c_rss_kb l_rss_kb i_rss_mb c_rss_mb l_rss_mb lib_vs_comp_mem
+    # Median peak RSS (KiB) sidecars -> MiB cells.
+    local i_rss_kb c_rss_kb i_rss_mb c_rss_mb
     i_rss_kb=$(cat "${interp_log}.median_rss_kb" 2>/dev/null || echo "N/A")
     c_rss_kb=$(cat "${comp_log}.median_rss_kb"   2>/dev/null || echo "N/A")
-    l_rss_kb=$(cat "${lib_log}.median_rss_kb"    2>/dev/null || echo "N/A")
     i_rss_mb=$(kib_to_mib "$i_rss_kb")
     c_rss_mb=$(kib_to_mib "$c_rss_kb")
-    l_rss_mb=$(kib_to_mib "$l_rss_kb")
-    lib_vs_comp_mem=$(speedup_ratio "$c_rss_mb" "$l_rss_mb")
 
-    # Souffle baseline (optional).
+    # Souffle (optional).
     local sf_total="N/A" sf_rss_mb="N/A" sf_vs_comp_total="N/A"
     if [[ -n "${sf_log:-}" && -s "${sf_log}.median_total_s" ]]; then
         sf_total=$(cat "${sf_log}.median_total_s")
@@ -340,13 +333,12 @@ append_csv_row() {
         esac
     fi
 
-    local i_n c_n l_n s_n
+    local i_n c_n s_n
     i_n=$(cat "${interp_log}.n_runs_succeeded" 2>/dev/null || true)
     c_n=$(cat "${comp_log}.n_runs_succeeded"   2>/dev/null || true)
-    l_n=$(cat "${lib_log}.n_runs_succeeded"    2>/dev/null || true)
     s_n=$(cat "${sf_log}.n_runs_succeeded"     2>/dev/null || true)
 
-    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${l_exec},${lib_vs_interp},${lib_vs_comp},${i_rss_mb},${c_rss_mb},${l_rss_mb},${lib_vs_comp_mem},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${l_n},${s_n}" \
+    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n}" \
         >> "$CSV_FILE"
 
     log "$GREEN" "CSV" "Appended ${stem}_${dataset} to $CSV_FILE"
@@ -365,21 +357,19 @@ fmt_speedup() {
 }
 
 print_pair_summary() {
-    local label="$1" interp_log="$2" comp_log="$3" lib_log="$4" sf_log="${5:-}"
+    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}"
 
-    local i_total i_load i_exec c_total c_load c_exec l_exec
+    local i_total i_load i_exec c_total c_load c_exec
     i_total=$(extract_total_seconds "$interp_log")
     i_load=$( extract_load_seconds  "$interp_log")
     i_exec=$( compute_exec_seconds  "$i_total" "$i_load")
     c_total=$(extract_total_seconds "$comp_log")
     c_load=$( extract_load_seconds  "$comp_log")
     c_exec=$( compute_exec_seconds  "$c_total" "$c_load")
-    l_exec=$( extract_total_seconds "$lib_log")
 
-    local i_rss_mb c_rss_mb l_rss_mb
+    local i_rss_mb c_rss_mb
     i_rss_mb=$(kib_to_mib "$(cat "${interp_log}.median_rss_kb" 2>/dev/null || echo)")
     c_rss_mb=$(kib_to_mib "$(cat "${comp_log}.median_rss_kb"   2>/dev/null || echo)")
-    l_rss_mb=$(kib_to_mib "$(cat "${lib_log}.median_rss_kb"    2>/dev/null || echo)")
 
     local sf_total="" sf_rss_mb=""
     if [[ -n "$sf_log" && -s "${sf_log}.median_total_s" ]]; then
@@ -390,9 +380,9 @@ print_pair_summary() {
     echo "----------------------------------------"
     log "$GREEN" "RESULT" "$label"
     log "$GREEN" "  LOAD" "Interp=${i_load}s  Comp=${c_load}s  Speedup=$(fmt_speedup "$i_load" "$c_load")"
-    log "$GREEN" "  EXEC" "Interp=${i_exec}s  Comp=${c_exec}s  Lib=${l_exec}s  Lib/Comp=$(fmt_speedup "$c_exec" "$l_exec")"
+    log "$GREEN" "  EXEC" "Interp=${i_exec}s  Comp=${c_exec}s  Speedup=$(fmt_speedup "$i_exec" "$c_exec")"
     log "$GREEN" " TOTAL" "Interp=${i_total}s  Comp=${c_total}s  Speedup=$(fmt_speedup "$i_total" "$c_total")"
-    log "$GREEN" "   MEM" "Interp=${i_rss_mb}MB  Comp=${c_rss_mb}MB  Lib=${l_rss_mb}MB  Lib/Comp=$(fmt_speedup "$c_rss_mb" "$l_rss_mb")"
+    log "$GREEN" "   MEM" "Interp=${i_rss_mb}MB  Comp=${c_rss_mb}MB"
     if [[ -n "$sf_total" ]]; then
         log "$GREEN" "SOUFFLE" "Total=${sf_total}s  PeakRss=${sf_rss_mb}MB  Souffle/Comp=$(fmt_speedup "$sf_total" "$c_total")"
     fi
@@ -400,23 +390,27 @@ print_pair_summary() {
 }
 
 # --- End-of-run summary table -------------------------------------------
+# Per-engine grid: one row per (pair, engine). Engines that didn't run for
+# a pair (not in --engines, or skipped via [interp:skip]/[souffle:skip])
+# are omitted from that pair's block. The "vs Compiler" column is
+# engine_total / compiler_total — compiler is always 1.00x, values > 1
+# mean slower than compiler.
+emit_summary_row() {
+    local label="$1" engine="$2" total="$3" rss_mb="$4" ratio="$5"
+    printf "| %-40s | %-11s | %s | %13s | %11s |\n" \
+        "$label" "$engine" "$(fmt_time "$total")" "$rss_mb" "$ratio"
+}
+
 print_summary_table() {
     echo ""
     echo "==================================================================================================================================================="
-    log "$BLUE" "SUMMARY" "Version Comparison Results (median of $NUM_RUNS runs)"
+    log "$BLUE" "SUMMARY" "Cross-engine results (median of $NUM_RUNS runs)"
     echo "==================================================================================================================================================="
     echo ""
 
-    printf "| %-40s | %-39s | %-53s | %-39s |\n" \
-        "Program-Dataset" "Load time (s)" "Execute time (s) — lib exec included" "Total time (s)"
-    printf "| %-40s | %13s %13s %11s | %13s %13s %13s %11s | %13s %13s %11s |\n" \
-        "" "Interp" "Compiler" "Speedup" \
-        "Interp" "Compiler" "Lib" "Lib/Comp" \
-        "Interp" "Compiler" "Speedup"
-    printf '%s' "|------------------------------------------|"
-    printf '%s' "-----------------------------------------|"
-    printf '%s' "-------------------------------------------------------|"
-    printf '%s\n' "-----------------------------------------|"
+    printf "| %-40s | %-11s | %13s | %13s | %11s |\n" \
+        "Program-Dataset" "Engine" "Total (s)" "Peak RSS (MB)" "vs Compiler"
+    printf '%s\n' "|------------------------------------------|-------------|---------------|---------------|-------------|"
 
     while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
         parse_config_line "$raw_line" || continue
@@ -428,22 +422,29 @@ print_summary_table() {
 
         local interp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_interpreter.log"
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
-        local lib_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_lib.log"
+        local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
 
-        local i_total i_load i_exec c_total c_load c_exec l_exec
-        i_total=$(extract_total_seconds "$interp_log")
-        i_load=$( extract_load_seconds  "$interp_log")
-        i_exec=$( compute_exec_seconds  "$i_total" "$i_load")
+        # Compiler row: always present (compiler always runs); baseline 1.00x.
+        local c_total c_rss_mb
         c_total=$(extract_total_seconds "$comp_log")
-        c_load=$( extract_load_seconds  "$comp_log")
-        c_exec=$( compute_exec_seconds  "$c_total" "$c_load")
-        l_exec=$( extract_total_seconds "$lib_log")
+        c_rss_mb=$(kib_to_mib "$(cat "${comp_log}.median_rss_kb" 2>/dev/null || echo)")
+        emit_summary_row "$label" "compiler" "$c_total" "$c_rss_mb" "1.00x"
 
-        printf "| %-40s | %s %s %11s | %s %s %s %11s | %s %s %11s |\n" \
-            "$label" \
-            "$(fmt_time "$i_load")"  "$(fmt_time "$c_load")"  "$(fmt_speedup "$i_load"  "$c_load")" \
-            "$(fmt_time "$i_exec")"  "$(fmt_time "$c_exec")"  "$(fmt_time "$l_exec")"  "$(fmt_speedup "$c_exec" "$l_exec")" \
-            "$(fmt_time "$i_total")" "$(fmt_time "$c_total")" "$(fmt_speedup "$i_total" "$c_total")"
+        if (( RUN_INTERPRETER )) && ! pair_has_tag "interp:skip"; then
+            local i_total i_rss_mb
+            i_total=$(extract_total_seconds "$interp_log")
+            i_rss_mb=$(kib_to_mib "$(cat "${interp_log}.median_rss_kb" 2>/dev/null || echo)")
+            emit_summary_row "" "interpreter" "$i_total" "$i_rss_mb" "$(fmt_speedup "$i_total" "$c_total")"
+        fi
+
+        if (( RUN_SOUFFLE )) && ! pair_has_tag "souffle:skip"; then
+            local sf_total="N/A" sf_rss_mb="N/A"
+            if [[ -s "${sf_log}.median_total_s" ]]; then
+                sf_total=$(cat "${sf_log}.median_total_s")
+                sf_rss_mb=$(kib_to_mib "$(cat "${sf_log}.median_rss_kb" 2>/dev/null || echo)")
+            fi
+            emit_summary_row "" "souffle" "$sf_total" "$sf_rss_mb" "$(fmt_speedup "$sf_total" "$c_total")"
+        fi
     done < "$CONFIG_FILE"
     echo ""
     log "$GREEN" "CSV" "Results saved to: $CSV_FILE"
@@ -463,7 +464,6 @@ main() {
 
     (( RUN_INTERPRETER )) && engine_interpreter_setup
     setup_compiler
-    engine_libmode_setup
     (( RUN_SOUFFLE )) && engine_souffle_setup
 
     if (( FRESH )); then
@@ -476,12 +476,12 @@ main() {
     # a prior run, current invocation's identity must match. Otherwise
     # the CSV could silently mix incompatible rows.
     if ! verify_run_info "$LOG_DIR" \
-            "baseline=${BASELINES}" \
+            "engines=${ENGINES}" \
             "target=${TARGET_FILTER:-(none)}"; then
         die "resume blocked — see diff above. Use --fresh to start over."
     fi
     write_run_info "$LOG_DIR" \
-        "baseline=${BASELINES}" \
+        "engines=${ENGINES}" \
         "target=${TARGET_FILTER:-(none)}"
 
     init_csv
@@ -513,16 +513,14 @@ main() {
 
         local interp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_interpreter.log"
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
-        local lib_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_lib.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
 
         # Clear stale sidecars so this iteration's CSV row is clean.
         rm -f "${interp_log}" "${interp_log}.median_rss_kb" "${interp_log}.n_runs_succeeded" \
               "${comp_log}.n_runs_succeeded" "${comp_log}.sizes" \
-              "${lib_log}.n_runs_succeeded" \
               "${sf_log}" "${sf_log}.median_rss_kb" "${sf_log}.median_total_s" "${sf_log}.n_runs_succeeded"
 
-        local rc_interp=0 rc_compiler=0 rc_lib=0 rc_souffle=0
+        local rc_interp=0 rc_compiler=0 rc_souffle=0
         local interp_required=0 souffle_required=0
 
         if (( RUN_INTERPRETER )) && ! pair_has_tag "interp:skip"; then
@@ -533,7 +531,6 @@ main() {
         fi
 
         engine_compiler_run "$PROG_NAME" "$DATASET_NAME" || rc_compiler=$?
-        engine_libmode_run      "$PROG_NAME" "$DATASET_NAME" || rc_lib=$?
 
         if (( RUN_SOUFFLE )) && ! pair_has_tag "souffle:skip"; then
             souffle_required=1
@@ -548,7 +545,6 @@ main() {
         # a transient failure as permanent (pair_already_done would skip).
         local pair_failed=0 fail_reasons=""
         (( rc_compiler != 0 )) && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }compiler"; }
-        (( rc_lib != 0 ))      && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }lib"; }
         (( interp_required && rc_interp != 0 )) \
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }interpreter"; }
         (( souffle_required && rc_souffle != 0 )) \
@@ -563,9 +559,9 @@ main() {
         fi
 
         print_pair_summary "${_display_stem}_${DATASET_NAME}" \
-            "$interp_log" "$comp_log" "$lib_log" "$sf_log"
+            "$interp_log" "$comp_log" "$sf_log"
         append_csv_row "$_display_stem" "$DATASET_NAME" \
-            "$interp_log" "$comp_log" "$lib_log" "$sf_log"
+            "$interp_log" "$comp_log" "$sf_log"
         cleanup_dataset_for_pair "$DATASET_NAME"
     done < "$CONFIG_FILE"
 

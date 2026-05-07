@@ -1,27 +1,24 @@
 #!/usr/bin/env bash
 # =============================================================================
-# tools/get_flowlog.sh — fetch + build flowlog at a given ref, idempotently.
+# scripts/get_flowlog.sh — fetch + build flowlog at FLOWLOG_REF, idempotently.
 # =============================================================================
 #
-# Per AGENTS.md ("Specifying which flowlog commit to bench" + design
-# principle 1, "Flowlog is a fetched input, not a fork"): this script
-# fetches and builds flowlog at a given ref. Honours
-# FLOWLOG_REF=<sha|tag|branch> (default: main). Output:
-# ./flowlog/<short_sha>/{src,target/release}. Each cached build lives at
-# flowlog/<short_sha>/, so re-running the same ref is free. This script
-# is idempotent: if the ref is already built, it no-ops.
+# Clones flowlog at FLOWLOG_REF=<sha|tag|branch> (default: main), builds
+# release, and caches the result at flowlog/<short_sha>/. Re-running with
+# the same ref is a no-op.
 #
-# Standard call shape:
+# Usage:
+#   bash scripts/get_flowlog.sh                       # ref=main
+#   FLOWLOG_REF=v0.5.0  bash scripts/get_flowlog.sh   # tag
+#   FLOWLOG_REF=abc1234 bash scripts/get_flowlog.sh   # commit
 #
-#   FLOWLOG_REF=abc1234 bash tools/get_flowlog.sh
-#
-# Output (on stdout, last line, machine-readable):
+# Output (last stdout line, tab-separated, machine-readable):
 #
 #   <full_sha>\t<short_sha>\t<absolute_build_dir>
 #
-# Consumers can capture this with:
+# Capture from a caller:
 #
-#   read FULL SHORT BUILD < <(bash tools/get_flowlog.sh | tail -1)
+#   read FULL SHORT BUILD < <(bash scripts/get_flowlog.sh | tail -1)
 #   FLOWLOG_BIN="${BUILD}/target/release/flowlog-compiler"
 #   FLOWLOG_SRC_DIR="${BUILD}/src"
 # =============================================================================
@@ -32,20 +29,19 @@ FLOWLOG_REF="${FLOWLOG_REF:-main}"
 FLOWLOG_REPO="${FLOWLOG_REPO:-https://github.com/flowlog-rs/flowlog.git}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
-log()  { echo -e "${CYAN}[get-flowlog]${NC} $*" >&2; }
-die()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
-ok()   { echo -e "${GREEN}[ok]${NC} $*" >&2; }
+log() { echo -e "${CYAN}[get-flowlog]${NC} $*" >&2; }
+die() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+ok()  { echo -e "${GREEN}[ok]${NC} $*" >&2; }
 
 command -v git   >/dev/null 2>&1 || die "git is required"
-command -v cargo >/dev/null 2>&1 || die "cargo (rust toolchain) is required — run tools/env/env.sh"
+command -v cargo >/dev/null 2>&1 || die "cargo (rust toolchain) is required — run env/env.sh"
 
 CACHE_ROOT="${ROOT_DIR}/flowlog"
 mkdir -p "$CACHE_ROOT"
 
 # -----------------------------------------------------------------------
-# Step 1: resolve FLOWLOG_REF -> full SHA via a bare mirror.
-# We keep a single bare clone at flowlog/.mirror to avoid re-cloning
-# the world for each ref. `git fetch` against an existing mirror is cheap.
+# Step 1: resolve FLOWLOG_REF -> full SHA via a bare mirror at
+# flowlog/.mirror, kept across runs so per-ref fetches stay cheap.
 # -----------------------------------------------------------------------
 MIRROR="${CACHE_ROOT}/.mirror"
 if [[ ! -d "$MIRROR" ]]; then
@@ -54,7 +50,7 @@ if [[ ! -d "$MIRROR" ]]; then
         || die "failed to clone $FLOWLOG_REPO"
 fi
 
-log "fetching latest refs into mirror (cheap if up-to-date) ..."
+log "fetching latest refs into mirror ..."
 git -C "$MIRROR" fetch --quiet --tags --prune origin '+refs/heads/*:refs/heads/*' \
     || die "git fetch failed in $MIRROR"
 
@@ -70,8 +66,7 @@ SRC_DIR="${BUILD_DIR}/src"
 RELEASE_BIN="${BUILD_DIR}/target/release/flowlog-compiler"
 
 # -----------------------------------------------------------------------
-# Step 2: idempotency — if release binary already exists for this SHA,
-# skip both checkout and build.
+# Step 2: idempotency — bail out early if the binary already exists.
 # -----------------------------------------------------------------------
 if [[ -x "$RELEASE_BIN" ]]; then
     ok "${SHORT_SHA} already built at ${BUILD_DIR}"
@@ -80,8 +75,8 @@ if [[ -x "$RELEASE_BIN" ]]; then
 fi
 
 # -----------------------------------------------------------------------
-# Step 3: materialize the source tree at <short_sha>/src.
-# We use a worktree off the mirror so multiple SHAs share object storage.
+# Step 3: materialize source via a worktree off the mirror, so multiple
+# SHAs share object storage.
 # -----------------------------------------------------------------------
 mkdir -p "$BUILD_DIR"
 if [[ ! -d "$SRC_DIR/.git" && ! -f "$SRC_DIR/.git" ]]; then
@@ -97,8 +92,7 @@ fi
 
 # -----------------------------------------------------------------------
 # Step 4: build release. CARGO_TARGET_DIR keeps each SHA's target/ inside
-# its own BUILD_DIR (not a shared cargo cache) so concurrent regression
-# runs on different SHAs don't stomp each other.
+# its own BUILD_DIR so concurrent regression runs don't stomp each other.
 # -----------------------------------------------------------------------
 log "cargo build --release (this may take a few minutes on first run) ..."
 (

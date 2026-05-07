@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # scripts/engines/compiler.sh — flowlog-compiler timing adapter.
 #
-# Caller contract (set by cross_engine.sh / bench_one.sh before sourcing):
+# Caller contract (set by cross_engine.sh / cross_flowlog_version.sh before sourcing):
 #   COMPILER_BIN          flowlog-compiler binary
-#   PROG_DIR              programs/micro/flowlog/
+#   PROG_DIR              programs/oracle/flowlog/
 #   FACT_DIR              datasets root
 #   LOG_DIR               where to write run + median logs
 #   WORKERS               -w value

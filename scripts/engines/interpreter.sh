@@ -34,7 +34,8 @@ engine_interpreter_setup() {
 
 # Download an interpreter .dl program file if not already cached.
 _interpreter_download_program() {
-    local file="$1" path="${INTERPRETER_PROG_DIR}/${file}"
+    local file="$1"
+    local path="${INTERPRETER_PROG_DIR}/${file}"
     mkdir -p "$INTERPRETER_PROG_DIR"
     [[ -f "$path" ]] && return 0
     log "$CYAN" "DOWNLOAD" "Interpreter program: $file"
