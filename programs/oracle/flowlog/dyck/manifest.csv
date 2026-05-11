@@ -1,0 +1,5 @@
+variant,kind,rule_perms,signature
+default.dl,default,"r0=0,1,2;r1=0,1,2",c83c34b8
+ablation_r1_p01.dl,ablation,"r0=0,1,2;r1=1,2,0",077bd7db
+ablation_r0_p01.dl,ablation,"r0=1,2,0;r1=0,1,2",4f64de8e
+variant_0001.dl,variant,"r0=1,2,0;r1=1,2,0",b6fe3d75

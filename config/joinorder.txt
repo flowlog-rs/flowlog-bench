@@ -1,0 +1,44 @@
+# Canonical join-order variant sweep config.
+# Only programs whose plan space is large or whose plan choice
+# meaningfully matters (≥5× spread / ≥5% speedup over default in prior
+# runs). The plan-insensitive small programs (andersen, cspa, sg, dyck)
+# are kept below as commented-out lines for reference / one-off checks;
+# uncomment if you need them. For a fast iteration loop on the small
+# set, prefer `config/quick_joinorder.txt`.
+
+# ---------------------------------------------------------------------
+# Active sweep targets
+# ---------------------------------------------------------------------
+
+# Medium: 27 variants — most plan-sensitive small program in the suite.
+galen.dl=galen
+
+# Heavy: 147 variants each (ablation + 100 random samples).
+cvc5.dl=cvc5
+z3.dl=z3
+
+# Heaviest: 326 variants each (doop-family program analyses).
+# These are where the experiment shines — wide rule sets, many k=4 / k=5
+# multi-atom rules, lots of catastrophic-tail plans.
+batik.dl=batik
+biojava.dl=biojava
+eclipse.dl=eclipse
+xalan.dl=xalan
+zxing.dl=zxing
+
+# ---------------------------------------------------------------------
+# Plan-insensitive — kept here for reference, not run by default.
+# Earlier runs showed ≤1.13× spread / ≤1.10× best speedup; the timing
+# data they produce is dominated by run-to-run noise. Uncomment if you
+# need a robust baseline that includes them.
+# ---------------------------------------------------------------------
+
+# sg.dl=G5K-0.001            # 2 variants
+# sg.dl=G10K-0.001           # 2 variants
+# dyck.dl=kernel             # 4 variants
+# dyck.dl=postgre            # 4 variants
+# andersen.dl=medium         # 4 variants
+# andersen.dl=large          # 4 variants
+# cspa.dl=cspa-httpd         # 4 variants
+# cspa.dl=cspa-linux         # 4 variants
+# cspa.dl=cspa-postgresql    # 4 variants
