@@ -472,17 +472,10 @@ main() {
     fi
     mkdir -p "$LOG_DIR"
 
-    # Resume safety: if results/benchmark/ already has a manifest from
-    # a prior run, current invocation's identity must match. Otherwise
-    # the CSV could silently mix incompatible rows.
-    if ! verify_run_info "$LOG_DIR" \
+    guard_run_info "$LOG_DIR" \
             "engines=${ENGINES}" \
-            "target=${TARGET_FILTER:-(none)}"; then
-        die "resume blocked — see diff above. Use --fresh to start over."
-    fi
-    write_run_info "$LOG_DIR" \
-        "engines=${ENGINES}" \
-        "target=${TARGET_FILTER:-(none)}"
+            "target=${TARGET_FILTER:-(none)}" \
+        || die "resume blocked — see diff above. Use --fresh to start over."
 
     init_csv
 

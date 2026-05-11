@@ -105,6 +105,13 @@ export FLOWLOG_BIN PROG_DIR FACT_DIR LOG_DIR COMPILER_BIN \
 source "${ROOT_DIR}/scripts/lib/measure.sh"
 source "${ROOT_DIR}/scripts/lib/datasets.sh"
 
+# ---- Reproducibility manifest -------------------------------------------
+RUN_INFO_BENCH_ROOT="$ROOT_DIR"
+RUN_INFO_RUNNER="cross_joinorder.sh"
+RUN_INFO_CONFIG_PATH="$CONFIG_FILE"
+export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH
+source "${ROOT_DIR}/scripts/lib/run_info.sh"
+
 # ---- config parsing -----------------------------------------------------
 parse_config_line() {
     local raw="$1"
@@ -388,6 +395,12 @@ main() {
         log "$YELLOW" "FRESH" "Wiped $LOG_DIR (--fresh)"
     fi
     mkdir -p "$LOG_DIR"
+
+    # Resume safety: mixing samples across params silently corrupts CSVs.
+    guard_run_info "$LOG_DIR" \
+            "target=${TARGET_FILTER:-(none)}" \
+            "timeout=${FLOWLOG_RUN_TIMEOUT}" \
+        || die "resume blocked — see diff above. Use --fresh to start over."
 
     while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
         parse_config_line "$raw_line" || continue

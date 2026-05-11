@@ -44,9 +44,6 @@ CONFIG_DIR := $(ROOT_DIR)/config
 FLOWLOG_REF ?= main
 ENGINES     ?= souffle
 CONFIG      ?= $(CONFIG_DIR)/default.txt
-# Separate slot for joinorder so cross-engine and cross-joinorder can
-# point at different (program, dataset) lists in the same Make session.
-JOINORDER_CONFIG ?= $(CONFIG_DIR)/joinorder.txt
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
@@ -121,19 +118,19 @@ gen-joinorder-variants:
 
 # -----------------------------------------------------------------------------
 # cross-joinorder: sweep all join-order variants per (program, dataset)
-# pair from JOINORDER_CONFIG. Defaults to config/joinorder.txt (the
-# plan-sensitive subset). For fast research-loop iteration, point at
-# config/quick_joinorder.txt instead.
+# pair from CONFIG. Defaults to config/joinorder.txt (the plan-sensitive
+# subset); pass CONFIG=config/quick_joinorder.txt for fast iteration.
 #
 # Usage:  make cross-joinorder
-#         make cross-joinorder JOINORDER_CONFIG=config/quick_joinorder.txt
+#         make cross-joinorder CONFIG=config/quick_joinorder.txt
 #         FLOWLOG_REF=abc1234 make cross-joinorder
 # -----------------------------------------------------------------------------
+cross-joinorder: CONFIG := $(CONFIG_DIR)/joinorder.txt
 cross-joinorder:
 	@read FULL SHORT BUILD < <(FLOWLOG_REF=$(FLOWLOG_REF) bash $(SCRIPTS)/get_flowlog.sh | tail -1); \
 	 FLOWLOG_BIN="$$BUILD/target/release/flowlog-compiler" \
 	 FLOWLOG_RESOLVED_SHA="$$FULL" \
-	 bash $(SCRIPTS)/joinorder/cross_joinorder.sh $(JOINORDER_CONFIG)
+	 bash $(SCRIPTS)/joinorder/cross_joinorder.sh $(CONFIG)
 
 # -----------------------------------------------------------------------------
 # joinorder-summary: per-pair fastest/median/slowest + default percentile.

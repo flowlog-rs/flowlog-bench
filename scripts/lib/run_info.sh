@@ -65,6 +65,10 @@ _run_info_sha256() {
 # Render the identity portion of the manifest to stdout. Excludes
 # date/host/mtime — those vary between runs and aren't part of identity.
 # Used by write_run_info (write) and verify_run_info (compare).
+#
+# Caller-supplied <key>=<val> kvs are sorted by key before rendering, so
+# callers can't accidentally break resume by passing the same kvs in a
+# different order in verify vs. write.
 # ---------------------------------------------------------------------
 _run_info_render_identity() {
     local config_path="${RUN_INFO_CONFIG_PATH:-}"
@@ -86,12 +90,10 @@ corpus_dirty    : ${corpus_dirty}
 cargo_version   : $(cargo --version 2>/dev/null || echo unknown)
 EOF
 
-    # Caller-supplied <key>=<val> pairs (per-runner knobs: engines,
-    # tolerances, base/head shas, …) — appended verbatim.
-    local kv
-    for kv in "$@"; do
-        printf '%-15s : %s\n' "${kv%%=*}" "${kv#*=}"
-    done
+    (( $# > 0 )) || return 0
+    printf '%s\n' "$@" \
+        | LC_ALL=C sort \
+        | awk -F= '{ printf "%-15s : ", $1; sub(/^[^=]*=/,""); print }'
 }
 
 # ---------------------------------------------------------------------
@@ -156,4 +158,24 @@ verify_run_info() {
         printf '%sFix:%s revert the changed parameters, or pass --fresh to start over.\n' "$_y" "$_n"
     } >&2
     return 1
+}
+
+# ---------------------------------------------------------------------
+# guard_run_info <outdir> [extra_key=val ...]
+#   Convenience wrapper: verify + write in one call. On an existing
+#   manifest with matching identity, skips the rewrite (preserves mtime
+#   so downstream "last started at" tooling stays meaningful). On
+#   mismatch, prints the diff and returns non-zero. On first run, writes
+#   the manifest fresh.
+#
+#   Callers should `guard_run_info "$LOG_DIR" "k1=v1" "k2=v2" || die …`.
+# ---------------------------------------------------------------------
+guard_run_info() {
+    local outdir="$1"; shift || true
+    local existing="${outdir}/run_info.txt"
+    if [[ -f "$existing" ]]; then
+        verify_run_info "$outdir" "$@" || return 1
+        return 0
+    fi
+    write_run_info "$outdir" "$@"
 }

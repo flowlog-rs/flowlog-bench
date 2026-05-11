@@ -78,10 +78,12 @@ fi
 # Argument parsing.
 # ----------------------------------------------------------------------
 KEEP_DATASETS=0
+FRESH=0
 POSITIONAL=()
 while (( $# )); do
     case "$1" in
         --keep-datasets) KEEP_DATASETS=1; shift ;;
+        --fresh)         FRESH=1; shift ;;
         --)              shift; POSITIONAL+=("$@"); break ;;
         -*)              echo "ERROR: unknown flag '$1' (try --help)" >&2; exit 2 ;;
         *)               POSITIONAL+=("$1"); shift ;;
@@ -210,12 +212,11 @@ log "bench knobs        : NUM_RUNS=$NUM_RUNS, WORKERS=$WORKERS"
 # Honours AGENTS.md principle 3 (scripts only write to results/) and
 # gives principle 6 something to anchor the run_info.txt manifest to.
 #
-# Wipe-and-recreate: this script has no resume model — every invocation
-# is fresh, so back-to-back invocations with the same BASE+HEAD pair
-# (rare, but possible) do not accumulate stale rows.
+# Strict resume: a re-run with the SAME OUT_DIR but a different identity
+# (workers, num_runs, tolerances, config sha) hard-fails so we don't
+# silently clobber a previous A/B result. --fresh wipes and starts over.
 # ----------------------------------------------------------------------
 OUT_DIR="${ROOT_DIR}/results/cross-flowlog-version/${BASE_SHORT}_vs_${HEAD_SHORT}"
-rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 SUMMARY_TSV="${OUT_DIR}/summary.tsv"
 
@@ -234,15 +235,21 @@ FLOWLOG_REF="(see base_ref + head_ref)"
 export RUN_INFO_BENCH_ROOT RUN_INFO_RUNNER RUN_INFO_CONFIG_PATH \
        FLOWLOG_RESOLVED_SHA FLOWLOG_BIN FLOWLOG_REF WORKERS NUM_RUNS
 source "${ROOT_DIR}/scripts/lib/run_info.sh"
-write_run_info "$OUT_DIR" \
-    "base_ref=${BASE_REF}" \
-    "base_sha=${BASE_FULL}" \
-    "base_short=${BASE_SHORT}" \
-    "head_ref=${HEAD_REF}" \
-    "head_sha=${HEAD_FULL}" \
-    "head_short=${HEAD_SHORT}" \
-    "time_pct=${TIME_PCT}" \
-    "rss_pct=${RSS_PCT}"
+
+if (( FRESH )); then
+    rm -rf "$OUT_DIR"
+    mkdir -p "$OUT_DIR"
+fi
+# base_short / head_short are derivable from the full SHAs (kept only
+# in $OUT_DIR's path encoding), so they're excluded from the identity.
+guard_run_info "$OUT_DIR" \
+        "base_ref=${BASE_REF}" \
+        "base_sha=${BASE_FULL}" \
+        "head_ref=${HEAD_REF}" \
+        "head_sha=${HEAD_FULL}" \
+        "time_pct=${TIME_PCT}" \
+        "rss_pct=${RSS_PCT}" \
+    || die "resume blocked — see diff above. Use --fresh to start over."
 log "output dir         : $OUT_DIR"
 
 # ----------------------------------------------------------------------
