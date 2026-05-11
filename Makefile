@@ -10,15 +10,19 @@
 # the flowlog repo.
 #
 # Targets:
-#   help                  — print this help block
-#   env                   — one-time host bootstrap (souffle, duckdb, rust, …)
-#   get-flowlog           — fetch + build flowlog at FLOWLOG_REF (default: main)
-#   cross-engine          — flowlog vs. {soufflé, interpreter, …} at one ref
-#   cross-flowlog-version — flowlog@BASE vs. flowlog@HEAD, A/B over commits
-#   ldbc                  — LDBC SNB timing / scaling
-#   plot                  — render speedup chart from results/
-#   clean                 — wipe results/ (keeps facts/ and flowlog/ caches)
-#   distclean             — also wipes flowlog/ build cache (forces re-fetch)
+#   help                       — print this help block
+#   env                        — one-time host bootstrap (souffle, duckdb, rust, …)
+#   get-flowlog                — fetch + build flowlog at FLOWLOG_REF (default: main)
+#   cross-engine               — flowlog vs. {soufflé, interpreter, …} at one ref
+#   cross-flowlog-version      — flowlog@BASE vs. flowlog@HEAD, A/B over commits
+#   gen-joinorder-variants     — regenerate join-order variant .dl files
+#   cross-joinorder            — sweep every join-order variant per (program, ds)
+#   joinorder-summary          — per-pair fastest/median/slowest report
+#   archive-joinorder          — snapshot results/joinorder/ to docs/historical/
+#   ldbc                       — LDBC SNB timing / scaling
+#   plot                       — render speedup chart from results/
+#   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
+#   distclean                  — also wipes flowlog/ build cache (forces re-fetch)
 #
 # Standard call shapes (see AGENTS.md, "Specifying which flowlog commit
 # to bench"):
@@ -33,7 +37,6 @@ SHELL := /bin/bash
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR   := $(shell pwd)
 SCRIPTS    := $(ROOT_DIR)/scripts
-TOOLS      := $(ROOT_DIR)/tools
 CONFIG_DIR := $(ROOT_DIR)/config
 
 # --- User-overridable defaults ----------------------------------------------
@@ -41,12 +44,17 @@ CONFIG_DIR := $(ROOT_DIR)/config
 FLOWLOG_REF ?= main
 ENGINES     ?= souffle
 CONFIG      ?= $(CONFIG_DIR)/default.txt
+# Separate slot for joinorder so cross-engine and cross-joinorder can
+# point at different (program, dataset) lists in the same Make session.
+JOINORDER_CONFIG ?= $(CONFIG_DIR)/joinorder.txt
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
 PLOT_CSV    ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
 
 .PHONY: help env get-flowlog cross-engine cross-flowlog-version \
+        cross-joinorder gen-joinorder-variants joinorder-summary \
+        archive-joinorder \
         ldbc plot clean distclean
 
 # -----------------------------------------------------------------------------
@@ -54,7 +62,7 @@ help:
 	@awk 'NF==0 || /^[^#]/ {exit} {sub(/^# ?/,""); print}' $(firstword $(MAKEFILE_LIST))
 
 env:
-	@bash $(TOOLS)/env/env.sh
+	@bash $(ROOT_DIR)/env.sh
 
 # -----------------------------------------------------------------------------
 # get-flowlog: fetch + build the engine at the chosen ref. Idempotent.
@@ -102,6 +110,50 @@ cross-flowlog-version:
 	@bash $(SCRIPTS)/cross_flowlog_version.sh \
 	    $(if $(filter 1,$(KEEP_DATASETS)),--keep-datasets,) \
 	    "$(FLOWLOG_BASE)" "$(FLOWLOG_HEAD)" "$(CONFIG)"
+
+# -----------------------------------------------------------------------------
+# gen-joinorder-variants: regenerate per-program join-order variants
+# under programs/oracle/flowlog/<stem>/. Idempotent — wipes stale
+# variants in each <stem>/ before re-emitting.
+# -----------------------------------------------------------------------------
+gen-joinorder-variants:
+	@python3 $(SCRIPTS)/joinorder/gen_joinorder_variants.py --all
+
+# -----------------------------------------------------------------------------
+# cross-joinorder: sweep all join-order variants per (program, dataset)
+# pair from JOINORDER_CONFIG. Defaults to config/joinorder.txt (the
+# plan-sensitive subset). For fast research-loop iteration, point at
+# config/quick_joinorder.txt instead.
+#
+# Usage:  make cross-joinorder
+#         make cross-joinorder JOINORDER_CONFIG=config/quick_joinorder.txt
+#         FLOWLOG_REF=abc1234 make cross-joinorder
+# -----------------------------------------------------------------------------
+cross-joinorder:
+	@read FULL SHORT BUILD < <(FLOWLOG_REF=$(FLOWLOG_REF) bash $(SCRIPTS)/get_flowlog.sh | tail -1); \
+	 FLOWLOG_BIN="$$BUILD/target/release/flowlog-compiler" \
+	 FLOWLOG_RESOLVED_SHA="$$FULL" \
+	 bash $(SCRIPTS)/joinorder/cross_joinorder.sh $(JOINORDER_CONFIG)
+
+# -----------------------------------------------------------------------------
+# joinorder-summary: per-pair fastest/median/slowest + default percentile.
+# Pass filter substrings to narrow output:  make joinorder-summary FILTER=andersen
+# -----------------------------------------------------------------------------
+joinorder-summary:
+	@python3 $(SCRIPTS)/joinorder/joinorder_summary.py $(FILTER)
+
+# -----------------------------------------------------------------------------
+# archive-joinorder: snapshot results/joinorder/ into docs/historical/.
+# Captures pair CSVs + a regenerated SUMMARY.md + a README with run
+# conditions (flowlog SHA, host, sysctl, workers). Does NOT delete the
+# source or git-add — prints the suggested commit command.
+#
+# Usage:  make archive-joinorder
+#         make archive-joinorder ARCHIVE_FORCE=1   # overwrite existing snapshot
+# -----------------------------------------------------------------------------
+archive-joinorder:
+	@python3 $(SCRIPTS)/joinorder/archive_joinorder.py \
+	    $(if $(filter 1,$(ARCHIVE_FORCE)),--force,)
 
 # -----------------------------------------------------------------------------
 # ldbc: LDBC SNB timing / scaling at one ref. Uses LDBC_CONFIG (NOT

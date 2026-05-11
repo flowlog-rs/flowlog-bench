@@ -25,7 +25,15 @@ engine_compiler_run() {
     local prog_file stem prog_path dataset_path binary best_log
     prog_file="$(basename "$prog_name")"
     stem="${prog_file%.*}"
-    prog_path="${PROG_DIR}/${prog_name}"
+    # Programs live under <stem>/<variant>.dl after the join-order layout
+    # migration. A config entry like `andersen.dl=medium` is shorthand for
+    # `andersen/default.dl=medium`; an entry that already names a folder
+    # (`andersen/sample_0042.dl=medium`) is taken as-is.
+    if [[ "$prog_name" == */* ]]; then
+        prog_path="${PROG_DIR}/${prog_name}"
+    else
+        prog_path="${PROG_DIR}/${stem}/default.dl"
+    fi
     [[ -f "$prog_path" ]] || die "Compiler program not found: $prog_path"
 
     dataset_path="$(realpath "${FACT_DIR}/${dataset_name}")"
