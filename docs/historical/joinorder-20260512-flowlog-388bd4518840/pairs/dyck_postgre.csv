@@ -1,0 +1,5 @@
+Variant,Kind,Signature,Total_s,PeakRss_MB,RunsSucceeded,vs_Default,SemanticPreserve
+default,default,"r0=0,1,2;r1=0,1,2",0.495995964,1057.23,3,1.000000,match
+ablation_r1_p01,ablation,"r0=0,1,2;r1=1,2,0",0.494997568,1046.10,3,0.997987,match
+ablation_r0_p01,ablation,"r0=1,2,0;r1=0,1,2",0.536896970,1041.16,3,1.082462,match
+variant_0001,variant,"r0=1,2,0;r1=1,2,0",0.559316405,1050.25,3,1.127663,match
