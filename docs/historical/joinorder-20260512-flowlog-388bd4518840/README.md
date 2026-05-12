@@ -12,10 +12,17 @@
 
 ## Headline findings
 
-_TODO: fill in 3–5 bullets summarising what this sweep showed. Suggested
-fields to cover: programs where a non-default plan beat default by ≥5%,
-programs where default was at the optimum, plan-sensitive programs
-(spread ≥ 5×), and any failure-mode insights worth flagging._
+- **Heavy doop-family programs have catastrophic plan tails.** batik (59.5× worst slowdown, 25% TIMEOUTs), biojava (127× worst, 17% TIMEOUTs), cvc5 (67× worst, 7% TIMEOUTs), galen (27× worst). Trap plans push RSS to 100–250 GB (host ceiling).
+- **Non-default plans beat default by ≥5% on three programs.** biojava 1.23× (biggest), batik 1.15×, cvc5 1.07×. Default ranks: biojava 52nd pct (half the plan space beats default), batik/cvc5 ~20th pct.
+- **Default plan is at the optimum (0th pct)** on andersen_medium, cspa-httpd, cspa-linux, cspa-postgresql, galen — default heuristic already wins.
+- **Distributions are bimodal: a tight basin around default + a sparse catastrophic tail.** biojava is the cleanest example: 54% of variants land in 2.5–3.5 s, only 4% land in 3.5–30 s, then 17% timeout. Ablations (single-rule swaps) almost never escape the basin (1% TIMEOUT for biojava ablations vs 56% for biojava random samples).
+- **Plan-insensitive programs confirmed** (spread ≤ 1.13×): andersen, cspa, dyck, sg — the `joinorder.txt` config correctly relegates them to the commented-out section.
+
+## Coverage caveats
+
+- **Mixed SHAs.** galen/cvc5/z3 and batik rows 1–75 were measured under `aa01e8e6a76b`; batik 76–326, biojava, and eclipse were measured under `388bd4518840` after a resume. Run-to-run variance is typically ±10%, so cross-pair comparisons remain meaningful, but be cautious comparing batik's first quartile to its last three quartiles.
+- **eclipse partial: 121/326 variants (ablation phase only).** No random `sample_*` data — the catastrophic-tail story for eclipse is not yet measured.
+- **xalan, zxing: not measured.** Sweep was stopped mid-eclipse before reaching them.
 
 ## What's in this snapshot
 
