@@ -17,14 +17,35 @@ galen.dl=galen
 cvc5.dl=cvc5
 z3.dl=z3
 
-# Heaviest: 326 variants each (doop-family program analyses).
+# Heaviest: 326 variants each (DOOP context-insensitive points-to).
+# Single rule file (doop/default.dl) cross 20 DaCapo 23.11-MR2-chopin apps.
 # These are where the experiment shines — wide rule sets, many k=4 / k=5
-# multi-atom rules, lots of catastrophic-tail plans.
-batik.dl=batik
-biojava.dl=biojava
-eclipse.dl=eclipse
-xalan.dl=xalan
-zxing.dl=zxing
+# multi-atom rules, lots of catastrophic-tail plans. Facts on HuggingFace:
+# dataset/csv/<app>.zip. See docs/doop-data-prep.md for setup + per-app notes.
+#
+# Active subset: 5 representative apps spanning small/medium/large workloads
+# (VarPointsTo from ~2.7M to ~438M). Uncomment more lines below to sweep
+# the full 20-app chopin set (each adds ~5-30 min per join-order variant).
+doop.dl=batik
+doop.dl=biojava
+doop.dl=eclipse
+doop.dl=xalan
+doop.dl=zxing
+# doop.dl=avrora           # small (VPT  2.2M)
+# doop.dl=cassandra        # small (VPT  1.9M)
+# doop.dl=fop              # large (VPT 39.8M)
+# doop.dl=graphchi         # small (VPT  2.4M)
+# doop.dl=h2               # large (VPT 39.9M)
+# doop.dl=h2o              # medium (VPT 17.9M)
+# doop.dl=jme              # small (VPT  4.8M)
+# doop.dl=jython           # HUGE (VPT 438M; flowlog ~4 min, souffle ~7 min per run)
+# doop.dl=kafka            # small (VPT  2.5M)
+# doop.dl=luindex          # small (VPT  6.1M, uses synthetic main wrapper)
+# doop.dl=lusearch         # small (VPT  2.7M, uses synthetic main wrapper)
+# doop.dl=pmd              # small (VPT  8.5M)
+# doop.dl=spring           # medium (VPT 26.0M)
+# doop.dl=sunflow          # small (VPT 11.6M)
+# doop.dl=tomcat           # small (VPT  5.0M, uses synthetic main wrapper)
 
 # ---------------------------------------------------------------------
 # Plan-insensitive — kept here for reference, not run by default.

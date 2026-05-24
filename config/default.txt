@@ -23,19 +23,42 @@ dyck.dl=postgre
 crdt.dl=crdt
 galen.dl=galen
 
-# Program analysis (integer-typed)
+# Program analysis (integer-typed legacy + Polonius borrow checker)
 andersen.dl=medium
 andersen.dl=large
+borrow=clap-rs
+borrow=materialize
+borrow=wgpu
+borrow=scallop
 cspa.dl=cspa-httpd
 cspa.dl=cspa-linux
 cspa.dl=cspa-postgresql
 csda.dl=csda-httpd
 csda.dl=csda-linux
 csda.dl=csda-postgresql
-batik.dl=batik
-biojava.dl=biojava
-eclipse.dl=eclipse
-xalan.dl=xalan
 cvc5.dl=cvc5
 z3.dl=z3
-zxing.dl=zxing
+
+# DOOP context-insensitive points-to (string-typed; canonical chopin set).
+# Single rule file (doop/default.dl) cross 20 DaCapo 23.11-MR2-chopin apps.
+# Facts on HuggingFace: dataset/csv/<app>.zip. See docs/doop-data-prep.md.
+doop.dl=avrora
+doop.dl=batik
+doop.dl=biojava
+doop.dl=cassandra
+doop.dl=eclipse
+doop.dl=fop
+doop.dl=graphchi
+doop.dl=h2
+doop.dl=h2o
+doop.dl=jme
+doop.dl=jython
+doop.dl=kafka
+doop.dl=luindex
+doop.dl=lusearch
+doop.dl=pmd
+doop.dl=spring
+doop.dl=sunflow
+doop.dl=tomcat
+doop.dl=xalan
+doop.dl=zxing
