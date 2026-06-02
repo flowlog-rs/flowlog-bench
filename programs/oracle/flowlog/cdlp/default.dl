@@ -63,7 +63,9 @@ LabelNext(i + 1, v, min(l)) :-
     ModeCount(i, v, c).
 
 // promote to Label
-Label(i + 1, v, l) :- LabelNext(i + 1, v, l).
+// NOTE: body atoms cannot carry arithmetic args in FlowLog, so bind the
+// already-incremented iteration of LabelNext to a fresh var `j` (= i+1).
+Label(j, v, l) :- LabelNext(j, v, l).
 
 // isolated vertices: carry forward
 .decl HasNbr(iter: int32, v: int64)

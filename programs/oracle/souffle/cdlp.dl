@@ -1,0 +1,125 @@
+// LDBC Graphalytics CDLP — UNROLLED K=10 (Souffle).
+// Label propagation, mode label, smallest-id tie-break. Auto-generated.
+.decl Arc(src: number, dst: number)
+.input Arc(IO=file, filename="Arc.csv", delimiter=",")
+.decl Vertex(v: number)
+.input Vertex(IO=file, filename="Vertex.csv", delimiter=",")
+.decl UndirEdge(u: number, v: number)
+UndirEdge(u, v) :- Arc(u, v), u != v.
+UndirEdge(v, u) :- Arc(u, v), u != v.
+.decl Label0(v: number, l: number)
+Label0(v, v) :- Vertex(v).
+.decl NbrLabelCount0(v: number, l: number, c: number)
+NbrLabelCount0(v, l, c) :- Label0(u, l), UndirEdge(v, u), c = count : { Label0(w, l), UndirEdge(v, w) }.
+.decl ModeCount0(v: number, c: number)
+ModeCount0(v, c) :- NbrLabelCount0(v, _, _), c = max cc : { NbrLabelCount0(v, _, cc) }.
+.decl LabelNext0(v: number, l: number)
+LabelNext0(v, l) :- ModeCount0(v, c), l = min ll : { NbrLabelCount0(v, ll, c) }.
+.decl HasNbr0(v: number)
+HasNbr0(v) :- NbrLabelCount0(v, _, _).
+.decl Label1(v: number, l: number)
+Label1(v, l) :- LabelNext0(v, l).
+Label1(v, lprev) :- Label0(v, lprev), !HasNbr0(v).
+.decl NbrLabelCount1(v: number, l: number, c: number)
+NbrLabelCount1(v, l, c) :- Label1(u, l), UndirEdge(v, u), c = count : { Label1(w, l), UndirEdge(v, w) }.
+.decl ModeCount1(v: number, c: number)
+ModeCount1(v, c) :- NbrLabelCount1(v, _, _), c = max cc : { NbrLabelCount1(v, _, cc) }.
+.decl LabelNext1(v: number, l: number)
+LabelNext1(v, l) :- ModeCount1(v, c), l = min ll : { NbrLabelCount1(v, ll, c) }.
+.decl HasNbr1(v: number)
+HasNbr1(v) :- NbrLabelCount1(v, _, _).
+.decl Label2(v: number, l: number)
+Label2(v, l) :- LabelNext1(v, l).
+Label2(v, lprev) :- Label1(v, lprev), !HasNbr1(v).
+.decl NbrLabelCount2(v: number, l: number, c: number)
+NbrLabelCount2(v, l, c) :- Label2(u, l), UndirEdge(v, u), c = count : { Label2(w, l), UndirEdge(v, w) }.
+.decl ModeCount2(v: number, c: number)
+ModeCount2(v, c) :- NbrLabelCount2(v, _, _), c = max cc : { NbrLabelCount2(v, _, cc) }.
+.decl LabelNext2(v: number, l: number)
+LabelNext2(v, l) :- ModeCount2(v, c), l = min ll : { NbrLabelCount2(v, ll, c) }.
+.decl HasNbr2(v: number)
+HasNbr2(v) :- NbrLabelCount2(v, _, _).
+.decl Label3(v: number, l: number)
+Label3(v, l) :- LabelNext2(v, l).
+Label3(v, lprev) :- Label2(v, lprev), !HasNbr2(v).
+.decl NbrLabelCount3(v: number, l: number, c: number)
+NbrLabelCount3(v, l, c) :- Label3(u, l), UndirEdge(v, u), c = count : { Label3(w, l), UndirEdge(v, w) }.
+.decl ModeCount3(v: number, c: number)
+ModeCount3(v, c) :- NbrLabelCount3(v, _, _), c = max cc : { NbrLabelCount3(v, _, cc) }.
+.decl LabelNext3(v: number, l: number)
+LabelNext3(v, l) :- ModeCount3(v, c), l = min ll : { NbrLabelCount3(v, ll, c) }.
+.decl HasNbr3(v: number)
+HasNbr3(v) :- NbrLabelCount3(v, _, _).
+.decl Label4(v: number, l: number)
+Label4(v, l) :- LabelNext3(v, l).
+Label4(v, lprev) :- Label3(v, lprev), !HasNbr3(v).
+.decl NbrLabelCount4(v: number, l: number, c: number)
+NbrLabelCount4(v, l, c) :- Label4(u, l), UndirEdge(v, u), c = count : { Label4(w, l), UndirEdge(v, w) }.
+.decl ModeCount4(v: number, c: number)
+ModeCount4(v, c) :- NbrLabelCount4(v, _, _), c = max cc : { NbrLabelCount4(v, _, cc) }.
+.decl LabelNext4(v: number, l: number)
+LabelNext4(v, l) :- ModeCount4(v, c), l = min ll : { NbrLabelCount4(v, ll, c) }.
+.decl HasNbr4(v: number)
+HasNbr4(v) :- NbrLabelCount4(v, _, _).
+.decl Label5(v: number, l: number)
+Label5(v, l) :- LabelNext4(v, l).
+Label5(v, lprev) :- Label4(v, lprev), !HasNbr4(v).
+.decl NbrLabelCount5(v: number, l: number, c: number)
+NbrLabelCount5(v, l, c) :- Label5(u, l), UndirEdge(v, u), c = count : { Label5(w, l), UndirEdge(v, w) }.
+.decl ModeCount5(v: number, c: number)
+ModeCount5(v, c) :- NbrLabelCount5(v, _, _), c = max cc : { NbrLabelCount5(v, _, cc) }.
+.decl LabelNext5(v: number, l: number)
+LabelNext5(v, l) :- ModeCount5(v, c), l = min ll : { NbrLabelCount5(v, ll, c) }.
+.decl HasNbr5(v: number)
+HasNbr5(v) :- NbrLabelCount5(v, _, _).
+.decl Label6(v: number, l: number)
+Label6(v, l) :- LabelNext5(v, l).
+Label6(v, lprev) :- Label5(v, lprev), !HasNbr5(v).
+.decl NbrLabelCount6(v: number, l: number, c: number)
+NbrLabelCount6(v, l, c) :- Label6(u, l), UndirEdge(v, u), c = count : { Label6(w, l), UndirEdge(v, w) }.
+.decl ModeCount6(v: number, c: number)
+ModeCount6(v, c) :- NbrLabelCount6(v, _, _), c = max cc : { NbrLabelCount6(v, _, cc) }.
+.decl LabelNext6(v: number, l: number)
+LabelNext6(v, l) :- ModeCount6(v, c), l = min ll : { NbrLabelCount6(v, ll, c) }.
+.decl HasNbr6(v: number)
+HasNbr6(v) :- NbrLabelCount6(v, _, _).
+.decl Label7(v: number, l: number)
+Label7(v, l) :- LabelNext6(v, l).
+Label7(v, lprev) :- Label6(v, lprev), !HasNbr6(v).
+.decl NbrLabelCount7(v: number, l: number, c: number)
+NbrLabelCount7(v, l, c) :- Label7(u, l), UndirEdge(v, u), c = count : { Label7(w, l), UndirEdge(v, w) }.
+.decl ModeCount7(v: number, c: number)
+ModeCount7(v, c) :- NbrLabelCount7(v, _, _), c = max cc : { NbrLabelCount7(v, _, cc) }.
+.decl LabelNext7(v: number, l: number)
+LabelNext7(v, l) :- ModeCount7(v, c), l = min ll : { NbrLabelCount7(v, ll, c) }.
+.decl HasNbr7(v: number)
+HasNbr7(v) :- NbrLabelCount7(v, _, _).
+.decl Label8(v: number, l: number)
+Label8(v, l) :- LabelNext7(v, l).
+Label8(v, lprev) :- Label7(v, lprev), !HasNbr7(v).
+.decl NbrLabelCount8(v: number, l: number, c: number)
+NbrLabelCount8(v, l, c) :- Label8(u, l), UndirEdge(v, u), c = count : { Label8(w, l), UndirEdge(v, w) }.
+.decl ModeCount8(v: number, c: number)
+ModeCount8(v, c) :- NbrLabelCount8(v, _, _), c = max cc : { NbrLabelCount8(v, _, cc) }.
+.decl LabelNext8(v: number, l: number)
+LabelNext8(v, l) :- ModeCount8(v, c), l = min ll : { NbrLabelCount8(v, ll, c) }.
+.decl HasNbr8(v: number)
+HasNbr8(v) :- NbrLabelCount8(v, _, _).
+.decl Label9(v: number, l: number)
+Label9(v, l) :- LabelNext8(v, l).
+Label9(v, lprev) :- Label8(v, lprev), !HasNbr8(v).
+.decl NbrLabelCount9(v: number, l: number, c: number)
+NbrLabelCount9(v, l, c) :- Label9(u, l), UndirEdge(v, u), c = count : { Label9(w, l), UndirEdge(v, w) }.
+.decl ModeCount9(v: number, c: number)
+ModeCount9(v, c) :- NbrLabelCount9(v, _, _), c = max cc : { NbrLabelCount9(v, _, cc) }.
+.decl LabelNext9(v: number, l: number)
+LabelNext9(v, l) :- ModeCount9(v, c), l = min ll : { NbrLabelCount9(v, ll, c) }.
+.decl HasNbr9(v: number)
+HasNbr9(v) :- NbrLabelCount9(v, _, _).
+.decl Label10(v: number, l: number)
+Label10(v, l) :- LabelNext9(v, l).
+Label10(v, lprev) :- Label9(v, lprev), !HasNbr9(v).
+.decl FinalLabel(v: number, l: number)
+FinalLabel(v, l) :- Label10(v, l).
+.printsize FinalLabel
+.output FinalLabel

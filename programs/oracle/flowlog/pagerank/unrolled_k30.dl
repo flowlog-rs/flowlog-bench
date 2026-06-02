@@ -1,0 +1,348 @@
+// LDBC Graphalytics PageRank — UNROLLED K=30 (FlowLog).
+// Integer-scaled by 1e9, damping 0.85. Auto-generated; do not hand-edit.
+.decl Arc(src: int64, dst: int64)
+.input Arc(IO="file", filename="Arc.csv", delimiter=",")
+.decl Vertex(v: int64)
+.input Vertex(IO="file", filename="Vertex.csv", delimiter=",")
+.decl N(n: int64)
+N(count(v)) :- Vertex(v).
+.decl Outdeg(v: int64, d: int64)
+Outdeg(v, count(u)) :- Arc(v, u).
+.decl Base(b: int64)
+Base(150000000 / n) :- N(n).
+.decl PR0(v: int64, pr: int64)
+PR0(v, 1000000000 / n) :- Vertex(v), N(n).
+.decl ContribTerm0(u: int64, v: int64, t: int64)
+ContribTerm0(u, v, pr / d) :- PR0(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib0(u: int64, c: int64)
+Contrib0(u, sum(t)) :- ContribTerm0(u, v, t).
+.decl HasContrib0(v: int64)
+HasContrib0(v) :- Contrib0(v, _).
+.decl Dpart0(v: int64, dp: int64)
+Dpart0(v, 85 * c / 100) :- Contrib0(v, c).
+.decl PR1(v: int64, pr: int64)
+PR1(v, b + dp) :- Base(b), Dpart0(v, dp).
+PR1(v, b) :- Vertex(v), Base(b), !HasContrib0(v).
+.decl ContribTerm1(u: int64, v: int64, t: int64)
+ContribTerm1(u, v, pr / d) :- PR1(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib1(u: int64, c: int64)
+Contrib1(u, sum(t)) :- ContribTerm1(u, v, t).
+.decl HasContrib1(v: int64)
+HasContrib1(v) :- Contrib1(v, _).
+.decl Dpart1(v: int64, dp: int64)
+Dpart1(v, 85 * c / 100) :- Contrib1(v, c).
+.decl PR2(v: int64, pr: int64)
+PR2(v, b + dp) :- Base(b), Dpart1(v, dp).
+PR2(v, b) :- Vertex(v), Base(b), !HasContrib1(v).
+.decl ContribTerm2(u: int64, v: int64, t: int64)
+ContribTerm2(u, v, pr / d) :- PR2(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib2(u: int64, c: int64)
+Contrib2(u, sum(t)) :- ContribTerm2(u, v, t).
+.decl HasContrib2(v: int64)
+HasContrib2(v) :- Contrib2(v, _).
+.decl Dpart2(v: int64, dp: int64)
+Dpart2(v, 85 * c / 100) :- Contrib2(v, c).
+.decl PR3(v: int64, pr: int64)
+PR3(v, b + dp) :- Base(b), Dpart2(v, dp).
+PR3(v, b) :- Vertex(v), Base(b), !HasContrib2(v).
+.decl ContribTerm3(u: int64, v: int64, t: int64)
+ContribTerm3(u, v, pr / d) :- PR3(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib3(u: int64, c: int64)
+Contrib3(u, sum(t)) :- ContribTerm3(u, v, t).
+.decl HasContrib3(v: int64)
+HasContrib3(v) :- Contrib3(v, _).
+.decl Dpart3(v: int64, dp: int64)
+Dpart3(v, 85 * c / 100) :- Contrib3(v, c).
+.decl PR4(v: int64, pr: int64)
+PR4(v, b + dp) :- Base(b), Dpart3(v, dp).
+PR4(v, b) :- Vertex(v), Base(b), !HasContrib3(v).
+.decl ContribTerm4(u: int64, v: int64, t: int64)
+ContribTerm4(u, v, pr / d) :- PR4(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib4(u: int64, c: int64)
+Contrib4(u, sum(t)) :- ContribTerm4(u, v, t).
+.decl HasContrib4(v: int64)
+HasContrib4(v) :- Contrib4(v, _).
+.decl Dpart4(v: int64, dp: int64)
+Dpart4(v, 85 * c / 100) :- Contrib4(v, c).
+.decl PR5(v: int64, pr: int64)
+PR5(v, b + dp) :- Base(b), Dpart4(v, dp).
+PR5(v, b) :- Vertex(v), Base(b), !HasContrib4(v).
+.decl ContribTerm5(u: int64, v: int64, t: int64)
+ContribTerm5(u, v, pr / d) :- PR5(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib5(u: int64, c: int64)
+Contrib5(u, sum(t)) :- ContribTerm5(u, v, t).
+.decl HasContrib5(v: int64)
+HasContrib5(v) :- Contrib5(v, _).
+.decl Dpart5(v: int64, dp: int64)
+Dpart5(v, 85 * c / 100) :- Contrib5(v, c).
+.decl PR6(v: int64, pr: int64)
+PR6(v, b + dp) :- Base(b), Dpart5(v, dp).
+PR6(v, b) :- Vertex(v), Base(b), !HasContrib5(v).
+.decl ContribTerm6(u: int64, v: int64, t: int64)
+ContribTerm6(u, v, pr / d) :- PR6(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib6(u: int64, c: int64)
+Contrib6(u, sum(t)) :- ContribTerm6(u, v, t).
+.decl HasContrib6(v: int64)
+HasContrib6(v) :- Contrib6(v, _).
+.decl Dpart6(v: int64, dp: int64)
+Dpart6(v, 85 * c / 100) :- Contrib6(v, c).
+.decl PR7(v: int64, pr: int64)
+PR7(v, b + dp) :- Base(b), Dpart6(v, dp).
+PR7(v, b) :- Vertex(v), Base(b), !HasContrib6(v).
+.decl ContribTerm7(u: int64, v: int64, t: int64)
+ContribTerm7(u, v, pr / d) :- PR7(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib7(u: int64, c: int64)
+Contrib7(u, sum(t)) :- ContribTerm7(u, v, t).
+.decl HasContrib7(v: int64)
+HasContrib7(v) :- Contrib7(v, _).
+.decl Dpart7(v: int64, dp: int64)
+Dpart7(v, 85 * c / 100) :- Contrib7(v, c).
+.decl PR8(v: int64, pr: int64)
+PR8(v, b + dp) :- Base(b), Dpart7(v, dp).
+PR8(v, b) :- Vertex(v), Base(b), !HasContrib7(v).
+.decl ContribTerm8(u: int64, v: int64, t: int64)
+ContribTerm8(u, v, pr / d) :- PR8(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib8(u: int64, c: int64)
+Contrib8(u, sum(t)) :- ContribTerm8(u, v, t).
+.decl HasContrib8(v: int64)
+HasContrib8(v) :- Contrib8(v, _).
+.decl Dpart8(v: int64, dp: int64)
+Dpart8(v, 85 * c / 100) :- Contrib8(v, c).
+.decl PR9(v: int64, pr: int64)
+PR9(v, b + dp) :- Base(b), Dpart8(v, dp).
+PR9(v, b) :- Vertex(v), Base(b), !HasContrib8(v).
+.decl ContribTerm9(u: int64, v: int64, t: int64)
+ContribTerm9(u, v, pr / d) :- PR9(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib9(u: int64, c: int64)
+Contrib9(u, sum(t)) :- ContribTerm9(u, v, t).
+.decl HasContrib9(v: int64)
+HasContrib9(v) :- Contrib9(v, _).
+.decl Dpart9(v: int64, dp: int64)
+Dpart9(v, 85 * c / 100) :- Contrib9(v, c).
+.decl PR10(v: int64, pr: int64)
+PR10(v, b + dp) :- Base(b), Dpart9(v, dp).
+PR10(v, b) :- Vertex(v), Base(b), !HasContrib9(v).
+.decl ContribTerm10(u: int64, v: int64, t: int64)
+ContribTerm10(u, v, pr / d) :- PR10(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib10(u: int64, c: int64)
+Contrib10(u, sum(t)) :- ContribTerm10(u, v, t).
+.decl HasContrib10(v: int64)
+HasContrib10(v) :- Contrib10(v, _).
+.decl Dpart10(v: int64, dp: int64)
+Dpart10(v, 85 * c / 100) :- Contrib10(v, c).
+.decl PR11(v: int64, pr: int64)
+PR11(v, b + dp) :- Base(b), Dpart10(v, dp).
+PR11(v, b) :- Vertex(v), Base(b), !HasContrib10(v).
+.decl ContribTerm11(u: int64, v: int64, t: int64)
+ContribTerm11(u, v, pr / d) :- PR11(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib11(u: int64, c: int64)
+Contrib11(u, sum(t)) :- ContribTerm11(u, v, t).
+.decl HasContrib11(v: int64)
+HasContrib11(v) :- Contrib11(v, _).
+.decl Dpart11(v: int64, dp: int64)
+Dpart11(v, 85 * c / 100) :- Contrib11(v, c).
+.decl PR12(v: int64, pr: int64)
+PR12(v, b + dp) :- Base(b), Dpart11(v, dp).
+PR12(v, b) :- Vertex(v), Base(b), !HasContrib11(v).
+.decl ContribTerm12(u: int64, v: int64, t: int64)
+ContribTerm12(u, v, pr / d) :- PR12(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib12(u: int64, c: int64)
+Contrib12(u, sum(t)) :- ContribTerm12(u, v, t).
+.decl HasContrib12(v: int64)
+HasContrib12(v) :- Contrib12(v, _).
+.decl Dpart12(v: int64, dp: int64)
+Dpart12(v, 85 * c / 100) :- Contrib12(v, c).
+.decl PR13(v: int64, pr: int64)
+PR13(v, b + dp) :- Base(b), Dpart12(v, dp).
+PR13(v, b) :- Vertex(v), Base(b), !HasContrib12(v).
+.decl ContribTerm13(u: int64, v: int64, t: int64)
+ContribTerm13(u, v, pr / d) :- PR13(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib13(u: int64, c: int64)
+Contrib13(u, sum(t)) :- ContribTerm13(u, v, t).
+.decl HasContrib13(v: int64)
+HasContrib13(v) :- Contrib13(v, _).
+.decl Dpart13(v: int64, dp: int64)
+Dpart13(v, 85 * c / 100) :- Contrib13(v, c).
+.decl PR14(v: int64, pr: int64)
+PR14(v, b + dp) :- Base(b), Dpart13(v, dp).
+PR14(v, b) :- Vertex(v), Base(b), !HasContrib13(v).
+.decl ContribTerm14(u: int64, v: int64, t: int64)
+ContribTerm14(u, v, pr / d) :- PR14(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib14(u: int64, c: int64)
+Contrib14(u, sum(t)) :- ContribTerm14(u, v, t).
+.decl HasContrib14(v: int64)
+HasContrib14(v) :- Contrib14(v, _).
+.decl Dpart14(v: int64, dp: int64)
+Dpart14(v, 85 * c / 100) :- Contrib14(v, c).
+.decl PR15(v: int64, pr: int64)
+PR15(v, b + dp) :- Base(b), Dpart14(v, dp).
+PR15(v, b) :- Vertex(v), Base(b), !HasContrib14(v).
+.decl ContribTerm15(u: int64, v: int64, t: int64)
+ContribTerm15(u, v, pr / d) :- PR15(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib15(u: int64, c: int64)
+Contrib15(u, sum(t)) :- ContribTerm15(u, v, t).
+.decl HasContrib15(v: int64)
+HasContrib15(v) :- Contrib15(v, _).
+.decl Dpart15(v: int64, dp: int64)
+Dpart15(v, 85 * c / 100) :- Contrib15(v, c).
+.decl PR16(v: int64, pr: int64)
+PR16(v, b + dp) :- Base(b), Dpart15(v, dp).
+PR16(v, b) :- Vertex(v), Base(b), !HasContrib15(v).
+.decl ContribTerm16(u: int64, v: int64, t: int64)
+ContribTerm16(u, v, pr / d) :- PR16(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib16(u: int64, c: int64)
+Contrib16(u, sum(t)) :- ContribTerm16(u, v, t).
+.decl HasContrib16(v: int64)
+HasContrib16(v) :- Contrib16(v, _).
+.decl Dpart16(v: int64, dp: int64)
+Dpart16(v, 85 * c / 100) :- Contrib16(v, c).
+.decl PR17(v: int64, pr: int64)
+PR17(v, b + dp) :- Base(b), Dpart16(v, dp).
+PR17(v, b) :- Vertex(v), Base(b), !HasContrib16(v).
+.decl ContribTerm17(u: int64, v: int64, t: int64)
+ContribTerm17(u, v, pr / d) :- PR17(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib17(u: int64, c: int64)
+Contrib17(u, sum(t)) :- ContribTerm17(u, v, t).
+.decl HasContrib17(v: int64)
+HasContrib17(v) :- Contrib17(v, _).
+.decl Dpart17(v: int64, dp: int64)
+Dpart17(v, 85 * c / 100) :- Contrib17(v, c).
+.decl PR18(v: int64, pr: int64)
+PR18(v, b + dp) :- Base(b), Dpart17(v, dp).
+PR18(v, b) :- Vertex(v), Base(b), !HasContrib17(v).
+.decl ContribTerm18(u: int64, v: int64, t: int64)
+ContribTerm18(u, v, pr / d) :- PR18(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib18(u: int64, c: int64)
+Contrib18(u, sum(t)) :- ContribTerm18(u, v, t).
+.decl HasContrib18(v: int64)
+HasContrib18(v) :- Contrib18(v, _).
+.decl Dpart18(v: int64, dp: int64)
+Dpart18(v, 85 * c / 100) :- Contrib18(v, c).
+.decl PR19(v: int64, pr: int64)
+PR19(v, b + dp) :- Base(b), Dpart18(v, dp).
+PR19(v, b) :- Vertex(v), Base(b), !HasContrib18(v).
+.decl ContribTerm19(u: int64, v: int64, t: int64)
+ContribTerm19(u, v, pr / d) :- PR19(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib19(u: int64, c: int64)
+Contrib19(u, sum(t)) :- ContribTerm19(u, v, t).
+.decl HasContrib19(v: int64)
+HasContrib19(v) :- Contrib19(v, _).
+.decl Dpart19(v: int64, dp: int64)
+Dpart19(v, 85 * c / 100) :- Contrib19(v, c).
+.decl PR20(v: int64, pr: int64)
+PR20(v, b + dp) :- Base(b), Dpart19(v, dp).
+PR20(v, b) :- Vertex(v), Base(b), !HasContrib19(v).
+.decl ContribTerm20(u: int64, v: int64, t: int64)
+ContribTerm20(u, v, pr / d) :- PR20(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib20(u: int64, c: int64)
+Contrib20(u, sum(t)) :- ContribTerm20(u, v, t).
+.decl HasContrib20(v: int64)
+HasContrib20(v) :- Contrib20(v, _).
+.decl Dpart20(v: int64, dp: int64)
+Dpart20(v, 85 * c / 100) :- Contrib20(v, c).
+.decl PR21(v: int64, pr: int64)
+PR21(v, b + dp) :- Base(b), Dpart20(v, dp).
+PR21(v, b) :- Vertex(v), Base(b), !HasContrib20(v).
+.decl ContribTerm21(u: int64, v: int64, t: int64)
+ContribTerm21(u, v, pr / d) :- PR21(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib21(u: int64, c: int64)
+Contrib21(u, sum(t)) :- ContribTerm21(u, v, t).
+.decl HasContrib21(v: int64)
+HasContrib21(v) :- Contrib21(v, _).
+.decl Dpart21(v: int64, dp: int64)
+Dpart21(v, 85 * c / 100) :- Contrib21(v, c).
+.decl PR22(v: int64, pr: int64)
+PR22(v, b + dp) :- Base(b), Dpart21(v, dp).
+PR22(v, b) :- Vertex(v), Base(b), !HasContrib21(v).
+.decl ContribTerm22(u: int64, v: int64, t: int64)
+ContribTerm22(u, v, pr / d) :- PR22(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib22(u: int64, c: int64)
+Contrib22(u, sum(t)) :- ContribTerm22(u, v, t).
+.decl HasContrib22(v: int64)
+HasContrib22(v) :- Contrib22(v, _).
+.decl Dpart22(v: int64, dp: int64)
+Dpart22(v, 85 * c / 100) :- Contrib22(v, c).
+.decl PR23(v: int64, pr: int64)
+PR23(v, b + dp) :- Base(b), Dpart22(v, dp).
+PR23(v, b) :- Vertex(v), Base(b), !HasContrib22(v).
+.decl ContribTerm23(u: int64, v: int64, t: int64)
+ContribTerm23(u, v, pr / d) :- PR23(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib23(u: int64, c: int64)
+Contrib23(u, sum(t)) :- ContribTerm23(u, v, t).
+.decl HasContrib23(v: int64)
+HasContrib23(v) :- Contrib23(v, _).
+.decl Dpart23(v: int64, dp: int64)
+Dpart23(v, 85 * c / 100) :- Contrib23(v, c).
+.decl PR24(v: int64, pr: int64)
+PR24(v, b + dp) :- Base(b), Dpart23(v, dp).
+PR24(v, b) :- Vertex(v), Base(b), !HasContrib23(v).
+.decl ContribTerm24(u: int64, v: int64, t: int64)
+ContribTerm24(u, v, pr / d) :- PR24(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib24(u: int64, c: int64)
+Contrib24(u, sum(t)) :- ContribTerm24(u, v, t).
+.decl HasContrib24(v: int64)
+HasContrib24(v) :- Contrib24(v, _).
+.decl Dpart24(v: int64, dp: int64)
+Dpart24(v, 85 * c / 100) :- Contrib24(v, c).
+.decl PR25(v: int64, pr: int64)
+PR25(v, b + dp) :- Base(b), Dpart24(v, dp).
+PR25(v, b) :- Vertex(v), Base(b), !HasContrib24(v).
+.decl ContribTerm25(u: int64, v: int64, t: int64)
+ContribTerm25(u, v, pr / d) :- PR25(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib25(u: int64, c: int64)
+Contrib25(u, sum(t)) :- ContribTerm25(u, v, t).
+.decl HasContrib25(v: int64)
+HasContrib25(v) :- Contrib25(v, _).
+.decl Dpart25(v: int64, dp: int64)
+Dpart25(v, 85 * c / 100) :- Contrib25(v, c).
+.decl PR26(v: int64, pr: int64)
+PR26(v, b + dp) :- Base(b), Dpart25(v, dp).
+PR26(v, b) :- Vertex(v), Base(b), !HasContrib25(v).
+.decl ContribTerm26(u: int64, v: int64, t: int64)
+ContribTerm26(u, v, pr / d) :- PR26(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib26(u: int64, c: int64)
+Contrib26(u, sum(t)) :- ContribTerm26(u, v, t).
+.decl HasContrib26(v: int64)
+HasContrib26(v) :- Contrib26(v, _).
+.decl Dpart26(v: int64, dp: int64)
+Dpart26(v, 85 * c / 100) :- Contrib26(v, c).
+.decl PR27(v: int64, pr: int64)
+PR27(v, b + dp) :- Base(b), Dpart26(v, dp).
+PR27(v, b) :- Vertex(v), Base(b), !HasContrib26(v).
+.decl ContribTerm27(u: int64, v: int64, t: int64)
+ContribTerm27(u, v, pr / d) :- PR27(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib27(u: int64, c: int64)
+Contrib27(u, sum(t)) :- ContribTerm27(u, v, t).
+.decl HasContrib27(v: int64)
+HasContrib27(v) :- Contrib27(v, _).
+.decl Dpart27(v: int64, dp: int64)
+Dpart27(v, 85 * c / 100) :- Contrib27(v, c).
+.decl PR28(v: int64, pr: int64)
+PR28(v, b + dp) :- Base(b), Dpart27(v, dp).
+PR28(v, b) :- Vertex(v), Base(b), !HasContrib27(v).
+.decl ContribTerm28(u: int64, v: int64, t: int64)
+ContribTerm28(u, v, pr / d) :- PR28(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib28(u: int64, c: int64)
+Contrib28(u, sum(t)) :- ContribTerm28(u, v, t).
+.decl HasContrib28(v: int64)
+HasContrib28(v) :- Contrib28(v, _).
+.decl Dpart28(v: int64, dp: int64)
+Dpart28(v, 85 * c / 100) :- Contrib28(v, c).
+.decl PR29(v: int64, pr: int64)
+PR29(v, b + dp) :- Base(b), Dpart28(v, dp).
+PR29(v, b) :- Vertex(v), Base(b), !HasContrib28(v).
+.decl ContribTerm29(u: int64, v: int64, t: int64)
+ContribTerm29(u, v, pr / d) :- PR29(v, pr), Arc(v, u), Outdeg(v, d).
+.decl Contrib29(u: int64, c: int64)
+Contrib29(u, sum(t)) :- ContribTerm29(u, v, t).
+.decl HasContrib29(v: int64)
+HasContrib29(v) :- Contrib29(v, _).
+.decl Dpart29(v: int64, dp: int64)
+Dpart29(v, 85 * c / 100) :- Contrib29(v, c).
+.decl PR30(v: int64, pr: int64)
+PR30(v, b + dp) :- Base(b), Dpart29(v, dp).
+PR30(v, b) :- Vertex(v), Base(b), !HasContrib29(v).
+.decl FinalPR(v: int64, pr: int64)
+FinalPR(v, pr) :- PR30(v, pr).
+.printsize FinalPR
+.output FinalPR
