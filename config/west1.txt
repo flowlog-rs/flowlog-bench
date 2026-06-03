@@ -1,0 +1,41 @@
+# =============================================================================
+# config/west1.txt — west1 run: DOOP + Polonius @ 32 threads, median of 5.
+#
+# String-typed workloads. FlowLog uses `--str-intern` by default (since
+# commit ba5b104); Soufflé port uses `:symbol` columns. Both engines run
+# with 32 worker threads (WORKERS=32 for FlowLog, `-j 32` at Soufflé
+# compile + run, wired up by scripts/engines/souffle.sh).
+#
+# Reproduce:
+#   WORKERS=32 NUM_RUNS=5 FLOWLOG_REF=20f2aa0 \
+#     make cross-engine ENGINES=souffle CONFIG=config/west1.txt
+#   (add KEEP_DATASETS=1 because facts/ is a symlinked mount on this host)
+# =============================================================================
+
+# --- DOOP: 20 DaCapo 23.11-MR2-chopin apps -----------------------------------
+doop=avrora
+doop=batik
+doop=biojava
+doop=cassandra
+doop=eclipse
+doop=fop
+doop=graphchi
+doop=h2
+doop=h2o
+doop=jme
+doop=jython
+doop=kafka
+doop=luindex
+doop=lusearch
+doop=pmd
+doop=spring
+doop=sunflow
+doop=tomcat
+doop=xalan
+doop=zxing
+
+# --- Polonius: 4 Rust crates -------------------------------------------------
+polonius=clap-rs
+polonius=materialize
+polonius=wgpu
+polonius=scallop
