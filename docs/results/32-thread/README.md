@@ -86,13 +86,15 @@ bit-identical between FlowLog and Soufflé.
 # 1. Prep flowlog binary at the same commit.
 FLOWLOG_REF=20f2aa0 bash scripts/get_flowlog.sh
 
-# 2. DOOP (20 apps × 5 runs each):
-WORKERS=32 NUM_RUNS=5 EXTRA_FL_FLAGS=--str-intern \
+# 2. DOOP (20 apps × 5 runs each). `--str-intern` is on by default for
+#    string-typed workloads; set FL_NO_STR_INTERN=1 only for the rare
+#    integer-only ablation.
+WORKERS=32 NUM_RUNS=5 \
   bash scripts/cross_engine.sh --engines=souffle --keep-datasets \
     config/doop_all.txt
 
 # 3. Polonius (4 crates × 5 runs each):
-WORKERS=32 NUM_RUNS=5 EXTRA_FL_FLAGS=--str-intern \
+WORKERS=32 NUM_RUNS=5 \
   bash scripts/cross_engine.sh --engines=souffle --keep-datasets \
     config/polonius_only.txt
 ```
