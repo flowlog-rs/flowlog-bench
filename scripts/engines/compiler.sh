@@ -43,13 +43,18 @@ engine_compiler_run() {
     log "$BLUE" "RUN" "Compiler:  $prog_file + $dataset_name (batch, w=$WORKERS, runs=$NUM_RUNS)"
     mkdir -p "$LOG_DIR" "$(dirname "$binary")"
 
-    # Compile .dl -> standalone executable (once per pair).
+    # Compile .dl -> standalone executable (once per pair). Pass `-D -`
+    # so `.printsize` directives surface on the binary's stdout (which
+    # the per-run logger captures) — without this, programs that use
+    # .printsize (e.g. doop, polonius) fail with "output_dir is unset".
     local compile_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_build.log"
     rm -f "$binary"
     "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
+        -D - \
         -o "$binary" \
         --mode datalog-batch \
+        ${EXTRA_FL_FLAGS:-} \
         > "$compile_log" 2>&1 \
         || die "Compilation failed for $prog_file (see $compile_log)"
     [[ -x "$binary" ]] || die "Binary not found: $binary"

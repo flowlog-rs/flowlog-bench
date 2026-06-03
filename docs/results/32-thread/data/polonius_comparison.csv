@@ -1,0 +1,5 @@
+Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded
+polonius,clap-rs,N/A,0.000125865,,N/A,50.866072324,,N/A,50.866198189,,N/A,15114.55,138.771330595,12725.50,2.728164,match(20),,5,5
+polonius,materialize,N/A,0.000050584,,N/A,15.905147323,,N/A,15.905197907,,N/A,4944.63,52.536736727,4680.00,3.303117,match(20),,5,5
+polonius,wgpu,N/A,0.000166411,,N/A,50.881824262,,N/A,50.881990673,,N/A,15121.05,140.591248989,12728.05,2.763085,match(20),,5,5
+polonius,scallop,N/A,0.000055985,,N/A,6.267879136,,N/A,6.267935121,,N/A,5791.53,35.032862425,5465.07,5.589219,match(20),,5,5
