@@ -1,0 +1,217 @@
+// DDlog translation of programs/oracle/souffle/z3.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): Arch_memory_access_truncate.csv -> Arch_memory_access_truncate, Arch_reg_reg_arithmetic_operation.csv -> Arch_reg_reg_arithmetic_operation, Arch_return_reg.csv -> Arch_return_reg, Block_next.csv -> Block_next, Block_last_instruction.csv -> Block_last_instruction, Code_in_block.csv -> Code_in_block, Direct_call.csv -> Direct_call, May_fallthrough.csv -> May_fallthrough, Reg_def_use_block_last_def.csv -> Reg_def_use_block_last_def, Reg_def_use_defined_in_block.csv -> Reg_def_use_defined_in_block, Reg_def_use_flow_def.csv -> Reg_def_use_flow_def, Reg_def_use_live_var_def.csv -> Reg_def_use_live_var_def, Reg_def_use_ref_in_block.csv -> Reg_def_use_ref_in_block, Reg_def_use_return_block_end.csv -> Reg_def_use_return_block_end, Reg_def_use_used.csv -> Reg_def_use_used, Reg_def_use_used_in_block.csv -> Reg_def_use_used_in_block, Reg_used_for.csv -> Reg_used_for, Relative_jump_table_entry_candidate.csv -> Relative_jump_table_entry_candidate, Stack_def_use_def.csv -> Stack_def_use_def, Stack_def_use_defined_in_block.csv -> Stack_def_use_defined_in_block, Stack_def_use_live_var_def.csv -> Stack_def_use_live_var_def, Stack_def_use_ref_in_block.csv -> Stack_def_use_ref_in_block, Stack_def_use_used_in_block.csv -> Stack_def_use_used_in_block, Stack_def_use_used.csv -> Stack_def_use_used, Stack_def_use_live_var_used.csv -> Stack_def_use_live_var_used, Jump_table_start.csv -> Jump_table_start, Def_used_for_address.csv -> Def_used_for_address_0, Stack_def_use_block_last_def.csv -> Stack_def_use_block_last_def
+// sizes (printsize): Stack_def_use_def_used, Reg_def_use_return_val_used, Reg_def_use_live_var_used, Jump_table_target, Reg_def_use_def_used, Reg_def_use_live_var_at_prior_used, Reg_def_use_live_var_at_block_end, Reg_reg_arithmetic_operation_defs, Def_used_for_address, Stack_def_use_live_var_at_block_end, Stack_def_use_live_var_at_prior_used
+
+typedef node = signed<32>
+
+// -------------------- edbs -------------------
+input relation Arch_memory_access_truncate(accessType:node, ea:node, directReg:node, baseReg:node, indexReg:node, offset:node)
+input relation Arch_reg_reg_arithmetic_operation(ea:node, dst:node, src1:node, src2:node, mult:node, offset:node)
+input relation Arch_return_reg(reg:node)
+input relation Block_next(block:node, blockEnd:node, nextBlock:node)
+input relation Block_last_instruction(block:node, ea:node)
+input relation Code_in_block(ea:node, block:node)
+input relation Direct_call(ea:node, dest:node)
+input relation May_fallthrough(o:node, d:node)
+input relation Reg_def_use_block_last_def(ea:node, eA_def:node, var_:node)
+input relation Reg_def_use_defined_in_block(block:node, var_:node)
+input relation Reg_def_use_flow_def(ea:node, var_:node, eA_next:node, value:node)
+input relation Reg_def_use_live_var_def(block:node, varIdentity:node, liveVar:node, eA_def:node)
+input relation Reg_def_use_ref_in_block(block:node, var_:node)
+input relation Reg_def_use_return_block_end(callee:node, calleeEnd:node, block:node, blockEnd:node)
+input relation Reg_def_use_used(ea:node, var_:node, index:node)
+input relation Reg_def_use_used_in_block(block:node, eA_used:node, var_:node, index:node)
+input relation Reg_used_for(ea:node, reg:node, type_:node)
+input relation Relative_jump_table_entry_candidate(ea:node, tableStart:node, size:node, reference:node, dest:node, scale:node, offset:node)
+input relation Stack_def_use_def(ea:node, varReg:node, varPos:node)
+input relation Stack_def_use_defined_in_block(block:node, varReg:node, varPos:node)
+input relation Stack_def_use_live_var_def(block:node, varIdentityReg:node, varIdentityPos:node, liveVarReg:node, liveVarPos:node, eA_def:node)
+input relation Stack_def_use_ref_in_block(block:node, varReg:node, varPos:node)
+input relation Stack_def_use_used_in_block(block:node, eA_used:node, varReg:node, varPos:node, index:node)
+input relation Stack_def_use_used(ea:node, varReg:node, varPos:node, index:node)
+
+// -------------------- fake edbs -------------------
+input relation Stack_def_use_live_var_used(block:node, liveVarReg:node, liveVarPos:node, usedVarReg:node, usedVarPos:node, eA_used:node, index:node, moves:node)
+input relation Jump_table_start(eA_jump:node, size:node, tableStart:node, tableRef:node, scale:node)
+input relation Def_used_for_address_0(eA_def:node, reg:node, type_:node)
+input relation Stack_def_use_block_last_def(ea:node, eA_def:node, varReg:node, varPos:node)
+
+// -------------------- idbs -------------------
+output relation Stack_def_use_def_used(eA_def:node, varDefReg:node, varDefPos:node, eA_used:node, varUsedReg:node, varUsedPos:node)
+output relation Reg_def_use_return_val_used(eA_call:node, callee:node, reg:node, eA_used:node, index_used:node)
+output relation Reg_def_use_live_var_used(block:node, liveVar:node, eA_used:node, index:node)
+output relation Jump_table_target(ea:node, dest:node)
+output relation Reg_def_use_def_used(eA_def:node, var_:node, eA_used:node, index_used:node)
+output relation Reg_def_use_live_var_at_prior_used(eA_used:node, blockUsed:node, var_:node)
+output relation Reg_def_use_live_var_at_block_end(block:node, blockUsed:node, var_:node)
+output relation Reg_reg_arithmetic_operation_defs(ea:node, reg_def:node, eA_def1:node, reg1:node, eA_def2:node, reg2:node, mult:node, offset:node)
+output relation Def_used_for_address(eA_def:node, reg:node, type_:node)
+output relation Stack_def_use_live_var_at_block_end(block:node, blockUsed:node, varReg:node, varPos:node)
+output relation Stack_def_use_live_var_at_prior_used(eA_used:node, blockUsed:node, varReg:node, varPos:node)
+
+// -------------------- rules -------------------
+
+////////// Jump_table_target
+Jump_table_target(ea, dest) :-
+   Jump_table_start(ea, size, tableStart, _, _),
+   Relative_jump_table_entry_candidate(_, tableStart, size, _, dest, _, _).
+////////// end of Jump_table_target (1/1)
+
+
+////////// Reg_def_use_def_used
+Reg_def_use_def_used(eA_def, var_, eA_used, index) :-
+   Reg_def_use_used(eA_used, var_, index),
+   Reg_def_use_block_last_def(eA_used, eA_def, var_).
+
+Reg_def_use_def_used(eA_def, varIdentity, eA_used, index) :-
+   Reg_def_use_live_var_at_block_end(block, blockUsed, var_),
+   Reg_def_use_live_var_def(block, varIdentity, var_, eA_def),
+   Reg_def_use_live_var_used(blockUsed, var_, eA_used, index).
+
+Reg_def_use_def_used(eA_def, var_, next_EA_used, nextIndex) :-
+   Reg_def_use_live_var_at_prior_used(eA_used, nextUsedBlock, var_),
+   Reg_def_use_def_used(eA_def, var_, eA_used, _),
+   Reg_def_use_live_var_used(nextUsedBlock, var_, next_EA_used, nextIndex).
+
+Reg_def_use_def_used(eA_def, reg, eA_used, index) :-
+   Reg_def_use_return_val_used(_, callee, reg, eA_used, index),
+   Reg_def_use_return_block_end(callee, _, _, blockEnd),
+   Reg_def_use_block_last_def(blockEnd, eA_def, reg).
+////////// end of Reg_def_use_def_used (4/4)
+
+
+////////// Reg_def_use_return_val_used
+Reg_def_use_return_val_used(eA_call, callee, reg, eA_used, index_used) :-
+   Arch_return_reg(reg),
+   Reg_def_use_def_used(eA_call, reg, eA_used, index_used),
+   Direct_call(eA_call, callee).
+////////// end of Reg_def_use_return_val_used (1/1)
+
+
+////////// Reg_def_use_live_var_def
+Reg_def_use_live_var_used(block, var_, eA_used, index) :-
+   Reg_def_use_used_in_block(block, eA_used, var_, index),
+   not Reg_def_use_block_last_def(eA_used, _, var_).
+
+Reg_def_use_live_var_used(retBlock, reg, eA_used, index) :-
+   Reg_def_use_return_block_end(callee, _, retBlock, retBlockEnd),
+   Reg_def_use_return_val_used(_, callee, reg, eA_used, index),
+   not Reg_def_use_block_last_def(retBlockEnd, _, reg).
+////////// end of Reg_def_use_live_var_def (1/1)
+
+
+////////// Reg_def_use_live_var_at_prior_used
+Reg_def_use_live_var_at_prior_used(eA_used, blockUsed, var_) :-
+   Reg_def_use_live_var_at_block_end(block, blockUsed, var_),
+   Reg_def_use_used_in_block(block, eA_used, var_, _),
+   not Reg_def_use_defined_in_block(block, var_).
+////////// end of Reg_def_use_live_var_at_prior_used (1/1)
+
+
+////////// Reg_def_use_live_var_at_block_end
+Reg_def_use_live_var_at_block_end(prevBlock, block, var_) :-
+   Block_next(prevBlock, prevBlockEnd, block),
+   Reg_def_use_live_var_used(block, var_, _, _),
+   not Reg_def_use_flow_def(prevBlockEnd, var_, block, _).
+
+Reg_def_use_live_var_at_block_end(prevBlock, blockUsed, var_) :-
+   Reg_def_use_live_var_at_block_end(block, blockUsed, var_),
+   Block_next(prevBlock, _, block),
+   not Reg_def_use_ref_in_block(block, var_).
+////////// end of Reg_def_use_live_var_at_block_end (2/2)
+
+
+////////// Reg_reg_arithmetic_operation_defs
+Reg_reg_arithmetic_operation_defs(ea, reg_def, eA_def1, reg1, eA_def2, reg2, mult, offset) :-
+   Def_used_for_address(ea, reg_def, _),
+   Arch_reg_reg_arithmetic_operation(ea, reg_def, reg1, reg2, mult, offset),
+   reg1 != reg2,
+   Reg_def_use_def_used(eA_def1, reg1, ea, _),
+   ea != eA_def1,
+   Reg_def_use_def_used(eA_def2, reg2, ea, _),
+   ea != eA_def2.
+////////// end of Reg_reg_arithmetic_operation_defs (1/1)
+
+
+////////// Def_used_for_address
+Def_used_for_address(ea, reg, type_) :-
+   Def_used_for_address_0(ea, reg, type_),
+   type_ == 8859592.
+
+Def_used_for_address(eA_def, reg, type_) :-
+   Reg_def_use_def_used(eA_def, reg, ea, _),
+   Reg_used_for(ea, reg, type_).
+
+Def_used_for_address(eA_def, reg, type_) :-
+   Def_used_for_address(eA_used, _, type_),
+   Reg_def_use_def_used(eA_def, reg, eA_used, _).
+
+Def_used_for_address(eA_def, reg1, type_) :-
+   Def_used_for_address(eALoad, reg2, type_),
+   Arch_memory_access_truncate(0, eALoad, reg2, regBaseLoad, 4, stackPosLoad),
+   Stack_def_use_def_used(eAStore, regBaseStore, stackPosStore, eALoad, regBaseLoad, stackPosLoad),
+   Arch_memory_access_truncate(2309374, eAStore, reg1, regBaseStore, 4, stackPosStore),
+   Reg_def_use_def_used(eA_def, reg1, eAStore, _).
+////////// end of Def_used_for_address (4/4)
+
+
+////////// Stack_def_use_def_used
+Stack_def_use_def_used(eA_def, varr, varp, eA_used, varr, varp) :-
+   Stack_def_use_used(eA_used, varr, varp, _),
+   Stack_def_use_block_last_def(eA_used, eA_def, varr, varp).
+
+Stack_def_use_def_used(eA_def, defVarr, defVarp, eA_used, varUsedr, varUsedp) :-
+   Stack_def_use_live_var_at_block_end(block, blockUsed, varr, varp),
+   Stack_def_use_live_var_def(block, defVarr, defVarp, varr, varp, eA_def),
+   Stack_def_use_live_var_used(blockUsed, varr, varp, varUsedr, varUsedp, eA_used, _, _).
+
+Stack_def_use_def_used(eA_def, defVarr, defVarp, eA_used, usedVarr, usedVarp) :-
+   Stack_def_use_live_var_used(ea, defVarr, defVarp, usedVarr, usedVarp, eA_used, _, _),
+   May_fallthrough(eA_def, ea),
+   Code_in_block(eA_def, block),
+   Code_in_block(ea, block),
+   Stack_def_use_def(eA_def, defVarr, defVarp).
+
+Stack_def_use_def_used(eA_def, varDefr, varDefp, next_EA_used, varUsedr, varUsedp) :-
+   Stack_def_use_live_var_at_prior_used(eA_used, nextUsedBlock, varr, varp),
+   Stack_def_use_def_used(eA_def, varDefr, varDefp, eA_used, varr, varp),
+   Stack_def_use_live_var_used(nextUsedBlock, varr, varp, varUsedr, varUsedp, next_EA_used, _, _).
+////////// end of Stack_def_use_def_used (4/4)
+
+
+////////// Stack_def_use_live_var_at_block_end
+Stack_def_use_live_var_at_block_end(prevBlock, blockUsed, inlined_BaseReg_374, inlined_StackPos_374) :-
+   Stack_def_use_live_var_at_block_end(block, blockUsed, inlined_BaseReg_374, inlined_StackPos_374),
+   Block_next(prevBlock, _, block),
+   not Stack_def_use_ref_in_block(block, inlined_BaseReg_374, inlined_StackPos_374),
+   not Reg_def_use_defined_in_block(block, inlined_BaseReg_374).
+
+Stack_def_use_live_var_at_block_end(prevBlock, block, varr, varp) :-
+   Block_next(prevBlock, _, block),
+   Stack_def_use_live_var_used(block, varr, varp, _, _, _, _, _).
+////////// end of Stack_def_use_live_var_at_block_end (2/2)
+
+
+////////// Stack_def_use_live_var_at_prior_used
+Stack_def_use_live_var_at_prior_used(eA_used, blockUsed, inlined_BaseReg_375, inlined_StackPos_375) :-
+   Stack_def_use_live_var_at_block_end(block, blockUsed, inlined_BaseReg_375, inlined_StackPos_375),
+   Stack_def_use_used_in_block(block, eA_used, inlined_BaseReg_375, inlined_StackPos_375, _),
+   not Reg_def_use_defined_in_block(block, inlined_BaseReg_375),
+   not Stack_def_use_defined_in_block(block, inlined_BaseReg_375, inlined_StackPos_375).
+////////// end of Stack_def_use_live_var_at_prior_used (1/1)
+
+
+// -------------------- sizes (printsize) -------------------
+output relation RelationSizes(rel: string, size: bit<64>)
+
+RelationSizes("Stack_def_use_def_used", size) :- Stack_def_use_def_used(eA_def, varDefReg, varDefPos, eA_used, varUsedReg, varUsedPos), var size = (eA_def, varDefReg, varDefPos, eA_used, varUsedReg, varUsedPos).group_by(()).count_distinct().
+RelationSizes("Reg_def_use_return_val_used", size) :- Reg_def_use_return_val_used(eA_call, callee, reg, eA_used, index_used), var size = (eA_call, callee, reg, eA_used, index_used).group_by(()).count_distinct().
+RelationSizes("Reg_def_use_live_var_used", size) :- Reg_def_use_live_var_used(block, liveVar, eA_used, index), var size = (block, liveVar, eA_used, index).group_by(()).count_distinct().
+RelationSizes("Jump_table_target", size) :- Jump_table_target(ea, dest), var size = (ea, dest).group_by(()).count_distinct().
+RelationSizes("Reg_def_use_def_used", size) :- Reg_def_use_def_used(eA_def, var_, eA_used, index_used), var size = (eA_def, var_, eA_used, index_used).group_by(()).count_distinct().
+RelationSizes("Reg_def_use_live_var_at_prior_used", size) :- Reg_def_use_live_var_at_prior_used(eA_used, blockUsed, var_), var size = (eA_used, blockUsed, var_).group_by(()).count_distinct().
+RelationSizes("Reg_def_use_live_var_at_block_end", size) :- Reg_def_use_live_var_at_block_end(block, blockUsed, var_), var size = (block, blockUsed, var_).group_by(()).count_distinct().
+RelationSizes("Reg_reg_arithmetic_operation_defs", size) :- Reg_reg_arithmetic_operation_defs(ea, reg_def, eA_def1, reg1, eA_def2, reg2, mult, offset), var size = (ea, reg_def, eA_def1, reg1, eA_def2, reg2, mult, offset).group_by(()).count_distinct().
+RelationSizes("Def_used_for_address", size) :- Def_used_for_address(eA_def, reg, type_), var size = (eA_def, reg, type_).group_by(()).count_distinct().
+RelationSizes("Stack_def_use_live_var_at_block_end", size) :- Stack_def_use_live_var_at_block_end(block, blockUsed, varReg, varPos), var size = (block, blockUsed, varReg, varPos).group_by(()).count_distinct().
+RelationSizes("Stack_def_use_live_var_at_prior_used", size) :- Stack_def_use_live_var_at_prior_used(eA_used, blockUsed, varReg, varPos), var size = (eA_used, blockUsed, varReg, varPos).group_by(()).count_distinct().

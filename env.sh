@@ -15,7 +15,7 @@
 #   bash env.sh --list                    # print engine list
 #   bash env.sh --help
 #
-# Engines: duckdb, souffle, umbra, interpreter.
+# Engines: duckdb, souffle, ddlog, umbra, interpreter.
 # Idempotent: every install_* function early-returns if the target
 # binary is already present, so running this with --all on a partially-
 # bootstrapped box only fills in the gaps.
@@ -36,7 +36,7 @@ HOME_BIN="$HOME/bin"
 # ---------------------------------------------------------------------
 # CLI parsing.
 # ---------------------------------------------------------------------
-AVAILABLE=("duckdb" "souffle" "umbra" "interpreter")
+AVAILABLE=("duckdb" "souffle" "ddlog" "umbra" "interpreter")
 SELECTED=()
 
 show_help() {
@@ -153,6 +153,53 @@ install_souffle() {
     ok "souffle installed at $(command -v souffle)"
 }
 
+# DDlog v1.2.3 generates Rust crates that build with rustc 1.76, but NOT
+# with a modern stable toolchain (>= ~1.80 rejects the vendored
+# differential_datalog lib). We pin 1.76 and build generated crates with
+# `cargo +1.76 build --release`. This matches the reference benchmarking rig.
+DDLOG_RUST="1.76"
+_ensure_ddlog_rust() {
+    command -v rustup >/dev/null 2>&1 || { warn "rustup missing — ddlog crates need rust ${DDLOG_RUST}"; return; }
+    if rustup toolchain list 2>/dev/null | grep -q "^${DDLOG_RUST}"; then
+        ok "rust ${DDLOG_RUST} toolchain present (build ddlog crates with: cargo +${DDLOG_RUST} build --release)"
+        return
+    fi
+    log "installing rust ${DDLOG_RUST} toolchain for ddlog (generated crates need it) ..."
+    rustup toolchain install "${DDLOG_RUST}" --profile minimal >/dev/null 2>&1 \
+        && ok "rust ${DDLOG_RUST} ready (build ddlog crates with: cargo +${DDLOG_RUST} build --release)" \
+        || warn "could not install rust ${DDLOG_RUST} — ddlog crates won't compile without it"
+}
+
+install_ddlog() {
+    # DDlog (Differential Datalog) — prebuilt v1.2.3 compiler release. The
+    # `ddlog` compiler is a standalone Haskell binary; the Rust crates it
+    # generates per program are built at bench time with `cargo +1.76`
+    # (see _ensure_ddlog_rust). The tarball unpacks a top-level ./ddlog/
+    # dir (bin/, lib/, vendor/, ...) which doubles as $DDLOG_HOME.
+    local ddlog_home="$HOME/ddlog"
+    if [[ -x "$ddlog_home/bin/ddlog" ]]; then
+        ok "ddlog already installed at $ddlog_home"
+        add_to_path "$ddlog_home/bin"
+        add_env_line "export DDLOG_HOME=\"$ddlog_home\""
+        export DDLOG_HOME="$ddlog_home"
+        _ensure_ddlog_rust
+        return
+    fi
+    log "installing ddlog v1.2.3 (prebuilt Linux release) ..."
+    local url="https://github.com/vmware-archive/differential-datalog/releases/download/v1.2.3/ddlog-v1.2.3-20211213235218-Linux.tar.gz"
+    local tmp="/dev/shm/ddlog.tar.gz"
+    curl -fsSL "$url" -o "$tmp" || die "failed to download ddlog release from $url"
+    tar -xzf "$tmp" -C "$HOME" || { rm -f "$tmp"; die "failed to extract ddlog tarball"; }
+    rm -f "$tmp"
+    [[ -x "$ddlog_home/bin/ddlog" ]] \
+        || die "ddlog binary missing after extract: $ddlog_home/bin/ddlog"
+    add_to_path "$ddlog_home/bin"
+    add_env_line "export DDLOG_HOME=\"$ddlog_home\""
+    export DDLOG_HOME="$ddlog_home"
+    ok "ddlog installed at $ddlog_home ($("$ddlog_home/bin/ddlog" --version 2>/dev/null | head -1))"
+    _ensure_ddlog_rust
+}
+
 install_umbra() {
     _ensure_docker
     if [[ -n "$(sudo docker images -q umbradb/umbra:latest 2>/dev/null)" ]]; then
@@ -206,6 +253,7 @@ if (( ${#SELECTED[@]} > 0 )); then
     log "engines requested: ${SELECTED[*]}"
     selected duckdb      && install_duckdb
     selected souffle     && install_souffle
+    selected ddlog       && install_ddlog
     selected umbra       && install_umbra
     selected interpreter && install_interpreter
 else

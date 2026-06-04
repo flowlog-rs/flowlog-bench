@@ -1,0 +1,653 @@
+// DDlog translation of programs/oracle/flowlog/doop/default.dl
+// STRING-typed (interned: istring), faithful to the FlowLog source of truth.
+// Idioms (relation splitting, negation `not`, string concat `++`) per reference repo.
+// Renames: underscore-prefixed FlowLog relations `_Foo` -> `Foo_in`.
+//
+// inputs (file -> relation):
+//   DirectSuperclass.facts       -> DirectSuperclass
+//   DirectSuperinterface.facts   -> DirectSuperinterface
+//   MainClass.facts              -> MainClass
+//   FormalParam.facts            -> FormalParam
+//   ComponentType.facts          -> ComponentType
+//   AssignReturnValue.facts      -> AssignReturnValue
+//   ActualParam.facts            -> ActualParam
+//   Method-Modifier.facts        -> Method_Modifier
+//   Var-Type.facts               -> Var_Type
+//   ClassType.facts              -> ClassType_in
+//   ArrayType.facts              -> ArrayType_in
+//   InterfaceType.facts          -> InterfaceType_in
+//   Var-DeclaringMethod.facts    -> Var_DeclaringMethod_in
+//   ApplicationClass.facts       -> ApplicationClass_in
+//   ThisVar.facts                -> ThisVar_in
+//   NormalHeap.facts             -> NormalHeap_in
+//   StringConstant.facts         -> StringConstant_in
+//   AssignHeapAllocation.facts   -> AssignHeapAllocation_in
+//   AssignLocal.facts            -> AssignLocal_in
+//   AssignCast.facts             -> AssignCast_in
+//   Field.facts                  -> Field_in
+//   StaticMethodInvocation.facts -> StaticMethodInvocation_in
+//   SpecialMethodInvocation.facts-> SpecialMethodInvocation_in
+//   VirtualMethodInvocation.facts-> VirtualMethodInvocation_in
+//   Method.facts                 -> Method_in
+//   StoreInstanceField.facts     -> StoreInstanceField_in
+//   LoadInstanceField.facts      -> LoadInstanceField_in
+//   StoreStaticField.facts       -> StoreStaticField_in
+//   LoadStaticField.facts        -> LoadStaticField_in
+//   StoreArrayIndex.facts        -> StoreArrayIndex_in
+//   LoadArrayIndex.facts         -> LoadArrayIndex_in
+//   Return.facts                 -> Return_in
+
+// ---------------------------------------------------------------------------
+// EDB inputs (.input in FlowLog)
+// ---------------------------------------------------------------------------
+input relation DirectSuperclass(class:istring, superclass:istring)
+input relation DirectSuperinterface(ref_:istring, interface:istring)
+input relation MainClass(class:istring)
+input relation FormalParam(index:istring, method:istring, var_:istring)
+input relation ComponentType(arrayType:istring, componentType:istring)
+input relation AssignReturnValue(invocation:istring, to:istring)
+input relation ActualParam(index:istring, invocation:istring, var_:istring)
+input relation Method_Modifier(mod_:istring, method:istring)
+input relation Var_Type(var_:istring, type_:istring)
+
+// ---------------------------------------------------------------------------
+// Main schema (IDB)
+// ---------------------------------------------------------------------------
+output relation HeapAllocation_Type(heap:istring, type_:istring)
+output relation IsType(t:istring)
+output relation IsReferenceType(t:istring)
+output relation IsArrayType(t:istring)
+output relation IsClassType(t:istring)
+output relation IsInterfaceType(t:istring)
+output relation ApplicationClass(ref_:istring)
+output relation Field_DeclaringType(field:istring, declaringClass:istring)
+output relation Method_DeclaringType(method:istring, declaringType:istring)
+output relation Method_ReturnType(method:istring, returnType:istring)
+output relation Method_SimpleName(method:istring, simpleName:istring)
+output relation Method_ParamTypes(method:istring, params:istring)
+output relation ThisVar(method:istring, var_:istring)
+output relation Var_DeclaringMethod(var_:istring, method:istring)
+output relation Instruction_Method(insn:istring, inMethod:istring)
+output relation IsVirtualMethodInvocation_Insn(insn:istring)
+output relation IsStaticMethodInvocation_Insn(insn:istring)
+output relation FieldInstruction_Signature(insn:istring, sign:istring)
+output relation LoadInstanceField_Base(insn:istring, var_:istring)
+output relation LoadInstanceField_To(insn:istring, var_:istring)
+output relation StoreInstanceField_From(insn:istring, var_:istring)
+output relation StoreInstanceField_Base(insn:istring, var_:istring)
+output relation LoadStaticField_To(insn:istring, var_:istring)
+output relation StoreStaticField_From(insn:istring, var_:istring)
+output relation LoadArrayIndex_Base(insn:istring, var_:istring)
+output relation LoadArrayIndex_To(insn:istring, var_:istring)
+output relation StoreArrayIndex_From(insn:istring, var_:istring)
+output relation StoreArrayIndex_Base(insn:istring, var_:istring)
+output relation AssignInstruction_To(insn:istring, to:istring)
+output relation AssignCast_From(insn:istring, from:istring)
+output relation AssignCast_Type(insn:istring, type_:istring)
+output relation AssignLocal_From(insn:istring, from:istring)
+output relation AssignHeapAllocation_Heap(insn:istring, heap:istring)
+output relation ReturnNonvoid_Var(return_:istring, var_:istring)
+output relation MethodInvocation_Method(invocation:istring, signature:istring)
+output relation VirtualMethodInvocation_Base(invocation:istring, base:istring)
+output relation VirtualMethodInvocation_SimpleName(invocation:istring, simplename:istring)
+output relation VirtualMethodInvocation_Descriptor(invocation:istring, descriptor:istring)
+output relation SpecialMethodInvocation_Base(invocation:istring, base:istring)
+output relation MethodInvocation_Base(invocation:istring, base:istring)
+
+// Fat schema
+output relation LoadInstanceField(base:istring, sig:istring, to:istring, inmethod:istring)
+output relation StoreInstanceField(from:istring, base:istring, signature:istring, inmethod:istring)
+output relation LoadStaticField(sig:istring, to:istring, inmethod:istring)
+output relation StoreStaticField(from:istring, signature:istring, inmethod:istring)
+output relation LoadArrayIndex(base:istring, to:istring, inmethod:istring)
+output relation StoreArrayIndex(from:istring, base:istring, inmethod:istring)
+output relation AssignCast(type_:istring, from:istring, to:istring, inmethod:istring)
+output relation AssignLocal(from:istring, to:istring, inmethod:istring)
+output relation AssignHeapAllocation(heap:istring, to:istring, inmethod:istring)
+output relation ReturnVar(var_:istring, method:istring)
+output relation StaticMethodInvocation(invocation:istring, signature:istring, inmethod:istring)
+
+// Method_Descriptor computed via cat
+output relation Method_Descriptor(method:istring, descriptor:istring)
+
+// ---------------------------------------------------------------------------
+// imports (.input underscore-prefixed in FlowLog -> renamed Foo_in)
+// ---------------------------------------------------------------------------
+input relation ClassType_in(class:istring)
+input relation ArrayType_in(arrayType:istring)
+input relation InterfaceType_in(interface:istring)
+input relation Var_DeclaringMethod_in(var_:istring, method:istring)
+input relation ApplicationClass_in(type_:istring)
+input relation ThisVar_in(method:istring, var_:istring)
+input relation NormalHeap_in(id:istring, type_:istring)
+input relation StringConstant_in(id:istring)
+input relation AssignHeapAllocation_in(instruction:istring, index:istring, heap:istring, to:istring, inmethod:istring, linenumber:istring)
+input relation AssignLocal_in(instruction:istring, index:istring, from:istring, to:istring, inmethod:istring)
+input relation AssignCast_in(instruction:istring, index:istring, from:istring, to:istring, type_:istring, inmethod:istring)
+input relation Field_in(signature:istring, declaringClass:istring, simplename:istring, type_:istring)
+
+// ---------------------------------------------------------------------------
+// rules (block 1)
+// ---------------------------------------------------------------------------
+IsType(class) :- ClassType_in(class).
+IsReferenceType(class) :- ClassType_in(class).
+IsClassType(class) :- ClassType_in(class).
+
+IsType(arrayType) :- ArrayType_in(arrayType).
+IsReferenceType(arrayType) :- ArrayType_in(arrayType).
+IsArrayType(arrayType) :- ArrayType_in(arrayType).
+
+IsType(interface) :- InterfaceType_in(interface).
+IsReferenceType(interface) :- InterfaceType_in(interface).
+IsInterfaceType(interface) :- InterfaceType_in(interface).
+
+Var_DeclaringMethod(var_, method) :- Var_DeclaringMethod_in(var_, method).
+
+IsType(type_) :- ApplicationClass_in(type_).
+IsReferenceType(type_) :- ApplicationClass_in(type_).
+ApplicationClass(type_) :- ApplicationClass_in(type_).
+
+ThisVar(method, var_) :- ThisVar_in(method, var_).
+
+IsType(type_) :- NormalHeap_in(_, type_).
+HeapAllocation_Type(id, type_) :- NormalHeap_in(id, type_).
+HeapAllocation_Type(id, i"java.lang.String") :- StringConstant_in(id).
+
+Instruction_Method(instruction, method) :-
+  AssignHeapAllocation_in(instruction, index, heap, to, method, linenumber).
+AssignInstruction_To(instruction, to) :-
+  AssignHeapAllocation_in(instruction, index, heap, to, method, linenumber).
+AssignHeapAllocation_Heap(instruction, heap) :-
+  AssignHeapAllocation_in(instruction, index, heap, to, method, linenumber).
+
+Instruction_Method(instruction, method) :-
+  AssignLocal_in(instruction, index, from, to, method).
+AssignLocal_From(instruction, from) :-
+  AssignLocal_in(instruction, index, from, to, method).
+AssignInstruction_To(instruction, to) :-
+  AssignLocal_in(instruction, index, from, to, method).
+
+Instruction_Method(instruction, method) :-
+  AssignCast_in(instruction, index, from, to, type_, method).
+AssignCast_Type(instruction, type_) :-
+  AssignCast_in(instruction, index, from, to, type_, method).
+AssignCast_From(instruction, from) :-
+  AssignCast_in(instruction, index, from, to, type_, method).
+AssignInstruction_To(instruction, to) :-
+  AssignCast_in(instruction, index, from, to, type_, method).
+
+Field_DeclaringType(signature, declaringType) :- Field_in(signature, declaringType, _, _).
+
+MethodInvocation_Base(invocation, base) :- VirtualMethodInvocation_Base(invocation, base).
+MethodInvocation_Base(invocation, base) :- SpecialMethodInvocation_Base(invocation, base).
+
+// ---------------------------------------------------------------------------
+// imports (block 2)
+// ---------------------------------------------------------------------------
+input relation StaticMethodInvocation_in(instruction:istring, index:istring, signature:istring, method:istring)
+input relation SpecialMethodInvocation_in(instruction:istring, index:istring, signature:istring, base:istring, method:istring)
+input relation VirtualMethodInvocation_in(instruction:istring, index:istring, signature:istring, base:istring, method:istring)
+input relation Method_in(method:istring, simplename:istring, params:istring, declaringType:istring, returnType:istring, jvmDescriptor:istring, arity:istring)
+input relation StoreInstanceField_in(instruction:istring, index:istring, from:istring, base:istring, signature:istring, method:istring)
+input relation LoadInstanceField_in(instruction:istring, index:istring, to:istring, base:istring, signature:istring, method:istring)
+input relation StoreStaticField_in(instruction:istring, index:istring, from:istring, signature:istring, method:istring)
+input relation LoadStaticField_in(instruction:istring, index:istring, to:istring, signature:istring, method:istring)
+input relation StoreArrayIndex_in(instruction:istring, index:istring, from:istring, base:istring, method:istring)
+input relation LoadArrayIndex_in(instruction:istring, index:istring, to:istring, base:istring, method:istring)
+input relation Return_in(instruction:istring, index:istring, var_:istring, method:istring)
+
+// rules (block 2)
+Instruction_Method(instruction, method) :-
+  StaticMethodInvocation_in(instruction, index, signature, method).
+IsStaticMethodInvocation_Insn(instruction) :-
+  StaticMethodInvocation_in(instruction, index, signature, method).
+MethodInvocation_Method(instruction, signature) :-
+  StaticMethodInvocation_in(instruction, index, signature, method).
+
+Instruction_Method(instruction, method) :-
+  SpecialMethodInvocation_in(instruction, index, signature, base, method).
+SpecialMethodInvocation_Base(instruction, base) :-
+  SpecialMethodInvocation_in(instruction, index, signature, base, method).
+MethodInvocation_Method(instruction, signature) :-
+  SpecialMethodInvocation_in(instruction, index, signature, base, method).
+
+Instruction_Method(instruction, method) :-
+  VirtualMethodInvocation_in(instruction, index, signature, base, method).
+IsVirtualMethodInvocation_Insn(instruction) :-
+  VirtualMethodInvocation_in(instruction, index, signature, base, method).
+VirtualMethodInvocation_Base(instruction, base) :-
+  VirtualMethodInvocation_in(instruction, index, signature, base, method).
+MethodInvocation_Method(instruction, signature) :-
+  VirtualMethodInvocation_in(instruction, index, signature, base, method).
+
+Method_SimpleName(method, simplename) :-
+  Method_in(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
+Method_ParamTypes(method, params) :-
+  Method_in(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
+Method_DeclaringType(method, declaringType) :-
+  Method_in(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
+Method_ReturnType(method, returnType) :-
+  Method_in(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
+
+// Method_Descriptor computed via cat
+Method_Descriptor(method, intern(ival(returnType) ++ "(" ++ ival(params) ++ ")")) :-
+  Method_ReturnType(method, returnType),
+  Method_ParamTypes(method, params).
+
+Instruction_Method(instruction, method) :-
+  StoreInstanceField_in(instruction, index, from, base, signature, method).
+FieldInstruction_Signature(instruction, signature) :-
+  StoreInstanceField_in(instruction, index, from, base, signature, method).
+StoreInstanceField_Base(instruction, base) :-
+  StoreInstanceField_in(instruction, index, from, base, signature, method).
+StoreInstanceField_From(instruction, from) :-
+  StoreInstanceField_in(instruction, index, from, base, signature, method).
+
+Instruction_Method(instruction, method) :-
+  LoadInstanceField_in(instruction, index, to, base, signature, method).
+FieldInstruction_Signature(instruction, signature) :-
+  LoadInstanceField_in(instruction, index, to, base, signature, method).
+LoadInstanceField_Base(instruction, base) :-
+  LoadInstanceField_in(instruction, index, to, base, signature, method).
+LoadInstanceField_To(instruction, to) :-
+  LoadInstanceField_in(instruction, index, to, base, signature, method).
+
+Instruction_Method(instruction, method) :-
+  StoreStaticField_in(instruction, index, from, signature, method).
+FieldInstruction_Signature(instruction, signature) :-
+  StoreStaticField_in(instruction, index, from, signature, method).
+StoreStaticField_From(instruction, from) :-
+  StoreStaticField_in(instruction, index, from, signature, method).
+
+Instruction_Method(instruction, method) :-
+  LoadStaticField_in(instruction, index, to, signature, method).
+FieldInstruction_Signature(instruction, signature) :-
+  LoadStaticField_in(instruction, index, to, signature, method).
+LoadStaticField_To(instruction, to) :-
+  LoadStaticField_in(instruction, index, to, signature, method).
+
+Instruction_Method(instruction, method) :-
+  StoreArrayIndex_in(instruction, index, from, base, method).
+StoreArrayIndex_Base(instruction, base) :-
+  StoreArrayIndex_in(instruction, index, from, base, method).
+StoreArrayIndex_From(instruction, from) :-
+  StoreArrayIndex_in(instruction, index, from, base, method).
+
+Instruction_Method(instruction, method) :-
+  LoadArrayIndex_in(instruction, index, to, base, method).
+LoadArrayIndex_Base(instruction, base) :-
+  LoadArrayIndex_in(instruction, index, to, base, method).
+LoadArrayIndex_To(instruction, to) :-
+  LoadArrayIndex_in(instruction, index, to, base, method).
+
+Instruction_Method(instruction, method) :-
+  Return_in(instruction, index, var_, method).
+ReturnNonvoid_Var(instruction, var_) :-
+  Return_in(instruction, index, var_, method).
+
+// ---------------------------------------------------------------------------
+// fat schema population
+// ---------------------------------------------------------------------------
+LoadInstanceField(base, sig, to, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  LoadInstanceField_Base(insn, base),
+  FieldInstruction_Signature(insn, sig),
+  LoadInstanceField_To(insn, to).
+StoreInstanceField(from, base, sig, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  StoreInstanceField_From(insn, from),
+  StoreInstanceField_Base(insn, base),
+  FieldInstruction_Signature(insn, sig).
+LoadStaticField(sig, to, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  FieldInstruction_Signature(insn, sig),
+  LoadStaticField_To(insn, to).
+StoreStaticField(from, sig, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  StoreStaticField_From(insn, from),
+  FieldInstruction_Signature(insn, sig).
+LoadArrayIndex(base, to, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  LoadArrayIndex_Base(insn, base),
+  LoadArrayIndex_To(insn, to).
+StoreArrayIndex(from, base, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  StoreArrayIndex_From(insn, from),
+  StoreArrayIndex_Base(insn, base).
+AssignCast(type_, from, to, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  AssignCast_From(insn, from),
+  AssignInstruction_To(insn, to),
+  AssignCast_Type(insn, type_).
+AssignLocal(from, to, inmethod) :-
+  AssignInstruction_To(insn, to),
+  Instruction_Method(insn, inmethod),
+  AssignLocal_From(insn, from).
+AssignHeapAllocation(heap, to, inmethod) :-
+  Instruction_Method(insn, inmethod),
+  AssignHeapAllocation_Heap(insn, heap),
+  AssignInstruction_To(insn, to).
+ReturnVar(var_, method) :-
+  Instruction_Method(insn, method),
+  ReturnNonvoid_Var(insn, var_).
+StaticMethodInvocation(invocation, signature, inmethod) :-
+  IsStaticMethodInvocation_Insn(invocation),
+  Instruction_Method(invocation, inmethod),
+  MethodInvocation_Method(invocation, signature).
+VirtualMethodInvocation_SimpleName(invocation, simplename) :-
+  IsVirtualMethodInvocation_Insn(invocation),
+  MethodInvocation_Method(invocation, signature),
+  Method_SimpleName(signature, simplename),
+  Method_Descriptor(signature, descriptor).
+VirtualMethodInvocation_Descriptor(invocation, descriptor) :-
+  IsVirtualMethodInvocation_Insn(invocation),
+  MethodInvocation_Method(invocation, signature),
+  Method_SimpleName(signature, simplename),
+  Method_Descriptor(signature, descriptor).
+
+// ---------------------------------------------------------------------------
+// Basic (type-based) analysis
+// ---------------------------------------------------------------------------
+output relation MethodLookup(simplename:istring, descriptor:istring, type_:istring, method:istring)
+output relation MethodImplemented(simplename:istring, descriptor:istring, type_:istring, method:istring)
+output relation DirectSubclass(a:istring, c:istring)
+output relation Subclass(c:istring, a:istring)
+output relation Superclass(c:istring, a:istring)
+output relation Superinterface(k:istring, c:istring)
+output relation SubtypeOf(subtype:istring, type_:istring)
+output relation SupertypeOf(supertype:istring, type_:istring)
+output relation SubtypeOfDifferent(subtype:istring, type_:istring)
+output relation MainMethodDeclaration(method:istring)
+
+MethodLookup(simplename, descriptor, type_, method) :-
+  MethodImplemented(simplename, descriptor, type_, method).
+MethodLookup(simplename, descriptor, type_, method) :-
+  DirectSuperclass(type_, supertype),
+  MethodLookup(simplename, descriptor, supertype, method),
+  not MethodImplemented(simplename, descriptor, type_, _).
+MethodLookup(simplename, descriptor, type_, method) :-
+  DirectSuperinterface(type_, supertype),
+  MethodLookup(simplename, descriptor, supertype, method),
+  not MethodImplemented(simplename, descriptor, type_, _).
+MethodImplemented(simplename, descriptor, type_, method) :-
+  Method_SimpleName(method, simplename),
+  Method_Descriptor(method, descriptor),
+  Method_DeclaringType(method, type_),
+  not Method_Modifier(i"abstract", method).
+MainMethodDeclaration(method) :-
+  MainClass(type_),
+  Method_DeclaringType(method, type_),
+  method != i"<java.util.prefs.Base64: void main(java.lang.String[])>",
+  method != i"<sun.java2d.loops.GraphicsPrimitiveMgr: void main(java.lang.String[])>",
+  method != i"<sun.security.provider.PolicyParser: void main(java.lang.String[])>",
+  Method_SimpleName(method, i"main"),
+  Method_Descriptor(method, i"void(java.lang.String[])"),
+  Method_Modifier(i"public", method),
+  Method_Modifier(i"static", method).
+
+DirectSubclass(a, c) :-
+  DirectSuperclass(a, c).
+Subclass(c, a) :-
+  DirectSubclass(a, c).
+Subclass(c, a) :-
+  Subclass(b, a),
+  DirectSubclass(b, c).
+Superclass(c, a) :-
+  Subclass(a, c).
+Superinterface(k, c) :-
+  DirectSuperinterface(c, k).
+Superinterface(k, c) :-
+  DirectSuperinterface(c, j),
+  Superinterface(k, j).
+Superinterface(k, c) :-
+  DirectSuperclass(c, super_),
+  Superinterface(k, super_).
+
+SubtypeOf(s, s) :-
+  IsClassType(s).
+SubtypeOf(t, t) :-
+  IsType(t).
+SubtypeOf(s, t) :-
+  Subclass(t, s).
+SubtypeOf(s, s) :-
+  IsInterfaceType(s).
+SubtypeOf(s, t) :-
+  IsClassType(s),
+  Superinterface(t, s).
+SubtypeOf(s, t) :-
+  IsInterfaceType(s),
+  IsType(t),
+  t == i"java.lang.Object".
+SubtypeOf(s, t) :-
+  IsArrayType(s),
+  IsType(t),
+  t == i"java.lang.Object".
+SubtypeOf(s, t) :-
+  IsInterfaceType(s),
+  Superinterface(t, s).
+SubtypeOf(s, t) :-
+  SubtypeOf(sc, tc),
+  ComponentType(s, sc),
+  ComponentType(t, tc),
+  IsReferenceType(sc),
+  IsReferenceType(tc).
+SubtypeOf(s, t) :-
+  IsArrayType(s),
+  IsInterfaceType(t),
+  IsType(t),
+  t == i"java.lang.Cloneable".
+SubtypeOf(s, t) :-
+  IsArrayType(s),
+  IsInterfaceType(t),
+  IsType(t),
+  t == i"java.io.Serializable".
+
+SupertypeOf(s, t) :-
+  SubtypeOf(t, s).
+SubtypeOfDifferent(s, t) :-
+  SubtypeOf(s, t),
+  s != t.
+
+// ---------------------------------------------------------------------------
+// class initialization
+// ---------------------------------------------------------------------------
+output relation ClassInitializer(type_:istring, method:istring)
+output relation InitializedClass(classOrInterface:istring)
+
+ClassInitializer(type_, method) :-
+   MethodImplemented(i"<clinit>", i"void()", type_, method).
+InitializedClass(superclass) :-
+   InitializedClass(class),
+   DirectSuperclass(class, superclass).
+InitializedClass(superinterface) :-
+   InitializedClass(classOrInterface),
+   DirectSuperinterface(classOrInterface, superinterface).
+InitializedClass(class) :-
+   MainMethodDeclaration(method),
+   Method_DeclaringType(method, class).
+InitializedClass(class) :-
+   Reachable(inmethod),
+   AssignHeapAllocation(heap, _, inmethod),
+   HeapAllocation_Type(heap, class).
+InitializedClass(class) :-
+   Reachable(inmethod),
+   Instruction_Method(invocation, inmethod),
+   IsStaticMethodInvocation_Insn(invocation),
+   MethodInvocation_Method(invocation, signature),
+   Method_DeclaringType(signature, class).
+InitializedClass(classOrInterface) :-
+   Reachable(inmethod),
+   StoreStaticField(_, signature, inmethod),
+   Field_DeclaringType(signature, classOrInterface).
+InitializedClass(classOrInterface) :-
+   Reachable(inmethod),
+   LoadStaticField(signature, _, inmethod),
+   Field_DeclaringType(signature, classOrInterface).
+Reachable(clinit) :-
+   InitializedClass(class),
+   ClassInitializer(class, clinit).
+
+// ---------------------------------------------------------------------------
+// Main (value-based) analysis
+// ---------------------------------------------------------------------------
+output relation Assign(to:istring, from:istring)
+output relation VarPointsTo(heap:istring, var_:istring)
+output relation InstanceFieldPointsTo(heap:istring, fld:istring, baseheap:istring)
+output relation StaticFieldPointsTo(heap:istring, fld:istring)
+output relation CallGraphEdge(invocation:istring, meth:istring)
+output relation ArrayIndexPointsTo(baseheap:istring, heap:istring)
+output relation Reachable(method:istring)
+
+Assign(actual, formal) :-
+  CallGraphEdge(invocation, method),
+  FormalParam(index, method, formal),
+  ActualParam(index, invocation, actual).
+Assign(return_, local) :-
+  CallGraphEdge(invocation, method),
+  ReturnVar(return_, method),
+  AssignReturnValue(invocation, local).
+VarPointsTo(heap, var_) :-
+  AssignHeapAllocation(heap, var_, inMethod),
+  Reachable(inMethod).
+VarPointsTo(heap, to) :-
+  Assign(from, to),
+  VarPointsTo(heap, from).
+VarPointsTo(heap, to) :-
+  Reachable(inmethod),
+  AssignLocal(from, to, inmethod),
+  VarPointsTo(heap, from).
+VarPointsTo(heap, to) :-
+  Reachable(inmethod),
+  AssignCast(type_, from, to, inmethod),
+  SupertypeOf(type_, heaptype),
+  HeapAllocation_Type(heap, heaptype),
+  VarPointsTo(heap, from).
+ArrayIndexPointsTo(baseheap, heap) :-
+  Reachable(inmethod),
+  StoreArrayIndex(from, base, inmethod),
+  VarPointsTo(baseheap, base),
+  VarPointsTo(heap, from),
+  HeapAllocation_Type(heap, heaptype),
+  HeapAllocation_Type(baseheap, baseheaptype),
+  ComponentType(baseheaptype, componenttype),
+  SupertypeOf(componenttype, heaptype).
+VarPointsTo(heap, to) :-
+  Reachable(inmethod),
+  LoadArrayIndex(base, to, inmethod),
+  VarPointsTo(baseheap, base),
+  ArrayIndexPointsTo(baseheap, heap),
+  Var_Type(to, type_),
+  HeapAllocation_Type(baseheap, baseheaptype),
+  ComponentType(baseheaptype, basecomponenttype),
+  SupertypeOf(type_, basecomponenttype).
+VarPointsTo(heap, to) :-
+  Reachable(inmethod),
+  LoadInstanceField(base, signature, to, inmethod),
+  VarPointsTo(baseheap, base),
+  InstanceFieldPointsTo(heap, signature, baseheap).
+VarPointsTo(heap, to) :-
+  Reachable(inmethod),
+  LoadStaticField(fld, to, inmethod),
+  StaticFieldPointsTo(heap, fld).
+VarPointsTo(heap, this) :-
+  Reachable(inMethod),
+  Instruction_Method(invocation, inMethod),
+  VirtualMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  HeapAllocation_Type(heap, heaptype),
+  VirtualMethodInvocation_SimpleName(invocation, simplename),
+  VirtualMethodInvocation_Descriptor(invocation, descriptor),
+  MethodLookup(simplename, descriptor, heaptype, toMethod),
+  ThisVar(toMethod, this).
+InstanceFieldPointsTo(heap, fld, baseheap) :-
+  Reachable(inmethod),
+  StoreInstanceField(from, base, fld, inmethod),
+  VarPointsTo(heap, from),
+  VarPointsTo(baseheap, base).
+StaticFieldPointsTo(heap, fld) :-
+  Reachable(inmethod),
+  StoreStaticField(from, fld, inmethod),
+  VarPointsTo(heap, from).
+
+Reachable(toMethod) :-
+  Reachable(inMethod),
+  Instruction_Method(invocation, inMethod),
+  VirtualMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  HeapAllocation_Type(heap, heaptype),
+  VirtualMethodInvocation_SimpleName(invocation, simplename),
+  VirtualMethodInvocation_Descriptor(invocation, descriptor),
+  MethodLookup(simplename, descriptor, heaptype, toMethod).
+CallGraphEdge(invocation, toMethod) :-
+  Reachable(inMethod),
+  Instruction_Method(invocation, inMethod),
+  VirtualMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  HeapAllocation_Type(heap, heaptype),
+  VirtualMethodInvocation_SimpleName(invocation, simplename),
+  VirtualMethodInvocation_Descriptor(invocation, descriptor),
+  MethodLookup(simplename, descriptor, heaptype, toMethod).
+
+Reachable(tomethod) :-
+  Reachable(inmethod),
+  StaticMethodInvocation(invocation, tomethod, inmethod).
+CallGraphEdge(invocation, tomethod) :-
+  Reachable(inmethod),
+  StaticMethodInvocation(invocation, tomethod, inmethod).
+
+Reachable(tomethod) :-
+  Reachable(inmethod),
+  Instruction_Method(invocation, inmethod),
+  SpecialMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  MethodInvocation_Method(invocation, tomethod),
+  ThisVar(tomethod, this).
+CallGraphEdge(invocation, tomethod) :-
+  Reachable(inmethod),
+  Instruction_Method(invocation, inmethod),
+  SpecialMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  MethodInvocation_Method(invocation, tomethod),
+  ThisVar(tomethod, this).
+VarPointsTo(heap, this) :-
+  Reachable(inmethod),
+  Instruction_Method(invocation, inmethod),
+  SpecialMethodInvocation_Base(invocation, base),
+  VarPointsTo(heap, base),
+  MethodInvocation_Method(invocation, tomethod),
+  ThisVar(tomethod, this).
+
+Reachable(method) :-
+  MainMethodDeclaration(method).
+
+// ---------------------------------------------------------------------------
+// RelationSizes (.printsize relations from FlowLog)
+// ---------------------------------------------------------------------------
+output relation RelationSizes(rel: string, size: bit<64>)
+
+RelationSizes("MainClass", size) :- MainClass(class), var size = (class).group_by(()).count_distinct().
+RelationSizes("Method_SimpleName", size) :- Method_SimpleName(method, simpleName), var size = (method, simpleName).group_by(()).count_distinct().
+RelationSizes("Method_DeclaringType", size) :- Method_DeclaringType(method, declaringType), var size = (method, declaringType).group_by(()).count_distinct().
+RelationSizes("Method_Modifier", size) :- Method_Modifier(mod_, method), var size = (mod_, method).group_by(()).count_distinct().
+RelationSizes("Method_ParamTypes", size) :- Method_ParamTypes(method, params), var size = (method, params).group_by(()).count_distinct().
+RelationSizes("Method_ReturnType", size) :- Method_ReturnType(method, returnType), var size = (method, returnType).group_by(()).count_distinct().
+RelationSizes("Method_Descriptor", size) :- Method_Descriptor(method, descriptor), var size = (method, descriptor).group_by(()).count_distinct().
+RelationSizes("MethodLookup", size) :- MethodLookup(simplename, descriptor, type_, method), var size = (simplename, descriptor, type_, method).group_by(()).count_distinct().
+RelationSizes("MethodImplemented", size) :- MethodImplemented(simplename, descriptor, type_, method), var size = (simplename, descriptor, type_, method).group_by(()).count_distinct().
+RelationSizes("DirectSubclass", size) :- DirectSubclass(a, c), var size = (a, c).group_by(()).count_distinct().
+RelationSizes("Subclass", size) :- Subclass(c, a), var size = (c, a).group_by(()).count_distinct().
+RelationSizes("Superclass", size) :- Superclass(c, a), var size = (c, a).group_by(()).count_distinct().
+RelationSizes("Superinterface", size) :- Superinterface(k, c), var size = (k, c).group_by(()).count_distinct().
+RelationSizes("SubtypeOf", size) :- SubtypeOf(subtype, type_), var size = (subtype, type_).group_by(()).count_distinct().
+RelationSizes("SupertypeOf", size) :- SupertypeOf(supertype, type_), var size = (supertype, type_).group_by(()).count_distinct().
+RelationSizes("SubtypeOfDifferent", size) :- SubtypeOfDifferent(subtype, type_), var size = (subtype, type_).group_by(()).count_distinct().
+RelationSizes("MainMethodDeclaration", size) :- MainMethodDeclaration(method), var size = (method).group_by(()).count_distinct().
+RelationSizes("ClassInitializer", size) :- ClassInitializer(type_, method), var size = (type_, method).group_by(()).count_distinct().
+RelationSizes("InitializedClass", size) :- InitializedClass(classOrInterface), var size = (classOrInterface).group_by(()).count_distinct().
+RelationSizes("Assign", size) :- Assign(to, from), var size = (to, from).group_by(()).count_distinct().
+RelationSizes("VarPointsTo", size) :- VarPointsTo(heap, var_), var size = (heap, var_).group_by(()).count_distinct().
+RelationSizes("InstanceFieldPointsTo", size) :- InstanceFieldPointsTo(heap, fld, baseheap), var size = (heap, fld, baseheap).group_by(()).count_distinct().
+RelationSizes("StaticFieldPointsTo", size) :- StaticFieldPointsTo(heap, fld), var size = (heap, fld).group_by(()).count_distinct().
+RelationSizes("CallGraphEdge", size) :- CallGraphEdge(invocation, meth), var size = (invocation, meth).group_by(()).count_distinct().
+RelationSizes("ArrayIndexPointsTo", size) :- ArrayIndexPointsTo(baseheap, heap), var size = (baseheap, heap).group_by(()).count_distinct().
+RelationSizes("Reachable", size) :- Reachable(method), var size = (method).group_by(()).count_distinct().

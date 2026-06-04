@@ -1,0 +1,14 @@
+// DDlog translation of programs/oracle/souffle/sg.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): Arc.csv -> Arc
+// sizes (printsize): Sg
+
+typedef node = signed<32>
+
+input relation Arc(x: node, y: node)
+output relation Sg(x: node, y: node)
+
+Sg(x, y) :- Arc(a, x), Arc(a, y), x != y.
+Sg(x, y) :- Arc(a, x), Sg(a, b), Arc(b, y).
+
+output relation RelationSizes(rel: string, size: bit<64>)
+RelationSizes("Sg", size) :- Sg(x, y), var size = (x, y).group_by(()).count_distinct().

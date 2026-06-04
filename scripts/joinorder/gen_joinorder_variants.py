@@ -51,7 +51,7 @@ PROG_DIR = ROOT / "programs/oracle/flowlog"
 # Programs to generate variants for. Others keep just default.dl on disk.
 SMALL_CORE = [
     "andersen", "cspa", "csda", "sg", "dyck", "tc", "reach", "cc", "sssp",
-    "bipartite", "crdt", "crdt_slow", "galen", "pointsto", "polonius",
+    "bipartite", "crdt", "crdt_slow", "galen", "pointsto", "polonius_str",
     "cvc5", "z3",
     # doop-family static analyses — large rule sets, mostly k=3..5 bodies.
     # `doop.dl` itself excluded by request (still huge; same rule set as
