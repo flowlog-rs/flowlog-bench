@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""FlowLog-vs-Souffle perf charts: execution time + peak RSS.
+"""FlowLog-vs-Souffle perf charts: total runtime + peak RSS.
 
 Reads a benchmark CSV (raw 26-column sweep output OR the curated
 docs/historical/perf-snapshot.csv schema) and writes two figures next
 to it:
 
-  <csv_stem>-time.{pdf,svg}     execution time, log scale, with per-pair
-                                speedup annotations
-  <csv_stem>-memory.{pdf,svg}   peak RSS in GiB, linear scale
+  <csv_stem>-time.{pdf,png,svg}    total runtime, log scale, with per-pair
+                                   speedup annotations
+  <csv_stem>-memory.{pdf,png,svg}  peak RSS in GiB, linear scale
 
 Rows are sorted by speedup (Souffle / FlowLog) so the strongest wins
 read left-to-right. Both figures share the row set, so the i-th bar in
@@ -70,7 +70,8 @@ def load_rows(src):
     figures share the row set."""
     rows = []
     for r in csv.DictReader(src.open()):
-        fl_t = _pick(r, "Compiler_Exec_s", "Compiler_Exec")
+        fl_t = _pick(r, "Compiler_Total_s", "Compiler_Total",
+                     "Compiler_Exec_s", "Compiler_Exec")
         su_t = _pick(r, "Souffle_Total_s", "Souffle_Total")
         fl_m = _pick(r, "Compiler_PeakRss_MB")
         su_m = _pick(r, "Souffle_PeakRss_MB")
@@ -93,7 +94,7 @@ def load_rows(src):
 
 
 def _bar_chart(stem, labels, fl, su, *, ylabel, title, log=False, decorate=None):
-    """Render one paired-bar chart and save as <stem>.{pdf,svg}."""
+    """Render one paired-bar chart and save as <stem>.{pdf,png,svg}."""
     n = len(labels)
     x = np.arange(n)
     fig, ax = plt.subplots(figsize=(max(15, n * 0.55), 6))
@@ -121,7 +122,7 @@ def _bar_chart(stem, labels, fl, su, *, ylabel, title, log=False, decorate=None)
         decorate(ax)
 
     fig.tight_layout()
-    for ext in ("pdf", "svg"):
+    for ext in ("pdf", "png", "svg"):
         fig.savefig(stem.with_suffix(f".{ext}"), bbox_inches="tight")
     plt.close(fig)
 
@@ -135,7 +136,7 @@ def render_time(rows, stem):
     n = len(rows)
     geomean = math.exp(np.mean(np.log(speedups)))
     wins = int((speedups > 1).sum())
-    title = (f"FlowLog vs Soufflé — execution time · {n} workloads · "
+    title = (f"FlowLog vs Soufflé — total runtime · {n} workloads · "
              f"FlowLog wins {wins}/{n} · geomean {geomean:.2f}× · "
              f"range {speedups.min():.2f}× → {speedups.max():.2f}×")
 
@@ -148,7 +149,7 @@ def render_time(rows, stem):
         ax.set_ylim(top=ax.get_ylim()[1] * 2.4)
 
     _bar_chart(stem, labels, fl, su,
-               ylabel="Execution time (s, log scale)",
+               ylabel="Total runtime (s, log scale)",
                title=title, log=True, decorate=annotate)
 
 
@@ -181,7 +182,8 @@ def main():
     mem_stem = src.parent / f"{src.stem}-memory"
     render_time(rows, time_stem)
     render_memory(rows, mem_stem)
-    print(f"wrote {time_stem}.{{pdf,svg}} and {mem_stem}.{{pdf,svg}} "
+    print(f"wrote {time_stem}.{{pdf,png,svg}} and "
+          f"{mem_stem}.{{pdf,png,svg}} "
           f"({len(rows)} workloads)")
     return 0
 

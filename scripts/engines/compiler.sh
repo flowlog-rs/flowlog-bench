@@ -44,12 +44,27 @@ engine_compiler_run() {
     mkdir -p "$LOG_DIR" "$(dirname "$binary")"
 
     # Compile .dl -> standalone executable (once per pair).
+    #
+    # `--str-intern` is on by default. DOOP/Polonius (and every other
+    # string-typed workload here) declare their entities as string/symbol
+    # columns. Without interning, FlowLog stores/compares full strings -- 3-9x
+    # slower and 5-10x heavier RSS, which is exactly what made Soufflé
+    # look faster in the no-intern snapshot (flowlog-bench#3). With
+    # interning FlowLog wins 1.5-6x (flowlog-bench#2). The flag is a
+    # no-op on integer-typed inputs, so default-on is safe. Set
+    # `FL_NO_STR_INTERN=1` to opt out (integer-only ablation).
+    local fl_intern_flag="--str-intern"
+    [[ "${FL_NO_STR_INTERN:-0}" == "1" ]] && fl_intern_flag=""
     local compile_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_build.log"
     rm -f "$binary"
+    # shellcheck disable=SC2206  # intentional word-splitting for flag passthrough
+    local extra_flags=( ${fl_intern_flag} ${FLOWLOG_EXTRA_FLAGS:-} )
     "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
         -o "$binary" \
+        -D - \
         --mode datalog-batch \
+        "${extra_flags[@]}" \
         > "$compile_log" 2>&1 \
         || die "Compilation failed for $prog_file (see $compile_log)"
     [[ -x "$binary" ]] || die "Binary not found: $binary"

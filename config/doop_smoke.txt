@@ -1,0 +1,2 @@
+# Smoke test: single DOOP entry
+doop.dl=avrora

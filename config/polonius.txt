@@ -1,0 +1,7 @@
+# Polonius borrow checker — all available datasets.
+# FlowLog: programs/oracle/flowlog/borrow/default.dl (string-typed, reads integers as strings)
+# Souffle: programs/oracle/souffle/borrow.dl (symbol-typed for parity with FlowLog string interning)
+borrow=clap-rs
+borrow=materialize
+borrow=wgpu
+borrow=scallop
