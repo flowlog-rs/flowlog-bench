@@ -40,16 +40,27 @@ engine_compiler_run() {
     binary="${LOG_DIR}/.bin/${stem}_${dataset_name}"
     best_log="${LOG_DIR}/${stem}_${dataset_name}_compiler.log"
 
-    log "$BLUE" "RUN" "Compiler:  $prog_file + $dataset_name (batch, w=$WORKERS, runs=$NUM_RUNS)"
+    log "$BLUE" "RUN" "Compiler:  $prog_file + $dataset_name (batch, w=$WORKERS, runs=$NUM_RUNS, str-intern=${STR_INTERN:-0})"
     mkdir -p "$LOG_DIR" "$(dirname "$binary")"
 
     # Compile .dl -> standalone executable (once per pair).
+    # -D <out> is required by flowlog batch mode whenever the program has
+    # `.printsize`/`.output` directives (e.g. doop); the dir is baked into
+    # the binary and each run writes per-relation COUNT files there.
+    local out_dir="${binary}.out"
+    rm -rf "$out_dir"; mkdir -p "$out_dir"
     local compile_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_build.log"
     rm -f "$binary"
+    # STR_INTERN=1 adds --str-intern: intern string columns as compact integer
+    # keys at load time. Recommended for string-typed join keys (doop, polonius).
+    local -a intern_flag=()
+    [[ "${STR_INTERN:-0}" == "1" ]] && intern_flag=(--str-intern)
     "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
+        -D "$out_dir" \
         -o "$binary" \
         --mode datalog-batch \
+        "${intern_flag[@]}" \
         > "$compile_log" 2>&1 \
         || die "Compilation failed for $prog_file (see $compile_log)"
     [[ -x "$binary" ]] || die "Binary not found: $binary"
@@ -105,6 +116,21 @@ engine_compiler_run() {
     grep -oE '\[size\]\[[^]]+\] t=\(\) size=[0-9]+' "$median_log" 2>/dev/null \
         | sed -E 's/^\[size\]\[([^]]+)\] t=\(\) size=([0-9]+)$/\1\t\2/' \
         > "${best_log}.sizes" 2>/dev/null
+
+    # Additionally harvest `.printsize`/`.output` COUNT files written to the
+    # baked -D dir (each <Rel>.csv holds a single integer). Needed for
+    # programs like doop that route sizes to files instead of stdout.
+    if [[ -d "$out_dir" ]]; then
+        local cf rel val
+        for cf in "$out_dir"/*.csv; do
+            [[ -f "$cf" ]] || continue
+            rel="$(basename "$cf" .csv)"
+            val="$(head -1 "$cf" 2>/dev/null | tr -d '[:space:]')"
+            [[ "$val" =~ ^[0-9]+$ ]] && printf '%s\t%s\n' "${rel,,}" "$val" >> "${best_log}.sizes"
+        done
+        sort -u -k1,1 -o "${best_log}.sizes" "${best_log}.sizes" 2>/dev/null || true
+    fi
+    rm -rf "$out_dir"
 
     if (( n_succeeded < NUM_RUNS )); then
         log "$YELLOW" "PARTIAL" "Compiler: only $n_succeeded/$NUM_RUNS runs succeeded for $prog_file + $dataset_name (median over $n_succeeded)"

@@ -53,7 +53,7 @@ die() { log "$RED" "ERROR" "$*"; exit 1; }
 FRESH=0
 ENGINES="interpreter"
 TARGET_FILTER=""
-KEEP_DATASETS=0
+KEEP_DATASETS="${KEEP_DATASETS:-0}"
 POSITIONAL_ARGS=()
 while (( $# )); do
     case "$1" in

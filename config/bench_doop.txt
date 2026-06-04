@@ -1,0 +1,22 @@
+# DOOP context-insensitive points-to (string-typed). FlowLog vs Soufflé.
+# 20 DaCapo 23.11-MR2-chopin apps. Ordered small -> large (by VarPointsTo).
+doop.dl=cassandra
+doop.dl=avrora
+doop.dl=graphchi
+doop.dl=kafka
+doop.dl=lusearch
+doop.dl=xalan
+doop.dl=zxing
+doop.dl=jme
+doop.dl=biojava
+doop.dl=tomcat
+doop.dl=luindex
+doop.dl=pmd
+doop.dl=sunflow
+doop.dl=h2o
+doop.dl=spring
+doop.dl=batik
+doop.dl=eclipse
+doop.dl=fop
+doop.dl=h2
+doop.dl=jython

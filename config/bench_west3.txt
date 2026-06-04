@@ -1,0 +1,33 @@
+# [west 3] DOOP + Polonius — FlowLog (--str-intern, 32t) vs Souffle (-j 32).
+# Both string-typed workloads. Run: WORKERS=32 NUM_RUNS=5 STR_INTERN=1
+#                                   ENGINES=souffle KEEP_DATASETS=1.
+#
+# --- DOOP: context-insensitive points-to. 20 DaCapo 23.11 apps,
+#     ordered small -> large (by VarPointsTo). ---
+doop.dl=cassandra
+doop.dl=avrora
+doop.dl=graphchi
+doop.dl=kafka
+doop.dl=lusearch
+doop.dl=xalan
+doop.dl=zxing
+doop.dl=jme
+doop.dl=biojava
+doop.dl=tomcat
+doop.dl=luindex
+doop.dl=pmd
+doop.dl=sunflow
+doop.dl=h2o
+doop.dl=spring
+doop.dl=batik
+doop.dl=eclipse
+doop.dl=fop
+doop.dl=h2
+doop.dl=jython
+
+# --- Polonius: borrow-checker (string program). ---
+polonius.dl=clap-rs
+polonius.dl=clap
+polonius.dl=wgpu
+polonius.dl=materialize
+polonius.dl=scallop

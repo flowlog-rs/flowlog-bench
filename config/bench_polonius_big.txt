@@ -1,0 +1,4 @@
+# Polonius giant inputs (17.7M / 27.4M subset rows). Single attempt;
+# expected to stress / exceed the 503 GB host budget.
+polonius.dl=materialize
+polonius.dl=scallop

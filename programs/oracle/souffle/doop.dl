@@ -1,107 +1,107 @@
 // .in
-.decl DirectSuperclass(class:string, superclass:string)
+.decl DirectSuperclass(class:symbol, superclass:symbol)
 .input DirectSuperclass(IO="file", filename="DirectSuperclass.facts", delimiter="\t")
-.decl DirectSuperinterface(ref:string, interface:string)
+.decl DirectSuperinterface(ref:symbol, interface:symbol)
 .input DirectSuperinterface(IO="file", filename="DirectSuperinterface.facts", delimiter="\t")
-.decl MainClass(class:string)
+.decl MainClass(class:symbol)
 .input MainClass(IO="file", filename="MainClass.facts", delimiter="\t")
-.decl FormalParam(index:int32, method:string, var:string)
+.decl FormalParam(index:number, method:symbol, var:symbol)
 .input FormalParam(IO="file", filename="FormalParam.facts", delimiter="\t")
-.decl ComponentType(arrayType:string, componentType:string)
+.decl ComponentType(arrayType:symbol, componentType:symbol)
 .input ComponentType(IO="file", filename="ComponentType.facts", delimiter="\t")
-.decl AssignReturnValue(invocation:string, to:string)
+.decl AssignReturnValue(invocation:symbol, to:symbol)
 .input AssignReturnValue(IO="file", filename="AssignReturnValue.facts", delimiter="\t")
-.decl ActualParam(index:int32, invocation:string, var:string)
+.decl ActualParam(index:number, invocation:symbol, var:symbol)
 .input ActualParam(IO="file", filename="ActualParam.facts", delimiter="\t")
-.decl Method_Modifier(mod:string, method:string)
+.decl Method_Modifier(mod:symbol, method:symbol)
 .input Method_Modifier(IO="file", filename="Method-Modifier.facts", delimiter="\t")
-.decl Var_Type(var:string, type:string)
+.decl Var_Type(var:symbol, type:symbol)
 .input Var_Type(IO="file", filename="Var-Type.facts", delimiter="\t")
-.decl HeapAllocation_Type(heap:string, type:string)
+.decl HeapAllocation_Type(heap:symbol, type:symbol)
 // HeapAllocation_Type computed from _NormalHeap and _StringConstant (not an EDB)
 
 
 // Main schema
-.decl isType(t:string)
-.decl isReferenceType(t:string)
-.decl isArrayType(t:string)
-.decl isClassType(t:string)
-.decl isInterfaceType(t:string)
-.decl ApplicationClass(ref:string)
-.decl Field_DeclaringType(field:string, declaringClass:string)
-.decl Method_DeclaringType(method:string, declaringType:string)
-.decl Method_ReturnType(method:string, returnType:string)
-.decl Method_SimpleName(method:string, simpleName:string)
-.decl Method_ParamTypes(method:string, params:string)
-.decl ThisVar(method:string, var:string)
-.decl Var_DeclaringMethod(var:string, method:string)
-// .decl HeapAllocation_Type(heap:string, type:string) move into input
-.decl Instruction_Method(insn:string, inMethod:string)
-.decl isVirtualMethodInvocation_Insn(insn:string)
-.decl isStaticMethodInvocation_Insn(insn:string)
-.decl FieldInstruction_Signature(insn:string, sign:string)
-.decl LoadInstanceField_Base(insn:string, var:string)
-.decl LoadInstanceField_To(insn:string, var:string)
-.decl StoreInstanceField_From(insn:string, var:string)
-.decl StoreInstanceField_Base(insn:string, var:string)
-.decl LoadStaticField_To(insn:string, var:string)
-.decl StoreStaticField_From(insn:string, var:string)
-.decl LoadArrayIndex_Base(insn:string, var:string)
-.decl LoadArrayIndex_To(insn:string, var:string)
-.decl StoreArrayIndex_From(insn:string, var:string)
-.decl StoreArrayIndex_Base(insn:string, var:string)
-.decl AssignInstruction_To(insn:string, to:string)
-.decl AssignCast_From(insn:string, from:string)
-.decl AssignCast_Type(insn:string, type:string)
-.decl AssignLocal_From(insn:string, from:string)
-.decl AssignHeapAllocation_Heap(insn:string, heap:string)
-.decl ReturnNonvoid_Var(return:string, var:string)
-.decl MethodInvocation_Method(invocation:string, signature:string)
-.decl VirtualMethodInvocation_Base(invocation:string, base:string)
-.decl VirtualMethodInvocation_SimpleName(invocation:string, simplename:string)
-.decl VirtualMethodInvocation_Descriptor(invocation:string, descriptor:string)
-.decl SpecialMethodInvocation_Base(invocation:string, base:string)
-.decl MethodInvocation_Base(invocation:string, base:string)
+.decl isType(t:symbol)
+.decl isReferenceType(t:symbol)
+.decl isArrayType(t:symbol)
+.decl isClassType(t:symbol)
+.decl isInterfaceType(t:symbol)
+.decl ApplicationClass(ref:symbol)
+.decl Field_DeclaringType(field:symbol, declaringClass:symbol)
+.decl Method_DeclaringType(method:symbol, declaringType:symbol)
+.decl Method_ReturnType(method:symbol, returnType:symbol)
+.decl Method_SimpleName(method:symbol, simpleName:symbol)
+.decl Method_ParamTypes(method:symbol, params:symbol)
+.decl ThisVar(method:symbol, var:symbol)
+.decl Var_DeclaringMethod(var:symbol, method:symbol)
+// .decl HeapAllocation_Type(heap:symbol, type:symbol) move into input
+.decl Instruction_Method(insn:symbol, inMethod:symbol)
+.decl isVirtualMethodInvocation_Insn(insn:symbol)
+.decl isStaticMethodInvocation_Insn(insn:symbol)
+.decl FieldInstruction_Signature(insn:symbol, sign:symbol)
+.decl LoadInstanceField_Base(insn:symbol, var:symbol)
+.decl LoadInstanceField_To(insn:symbol, var:symbol)
+.decl StoreInstanceField_From(insn:symbol, var:symbol)
+.decl StoreInstanceField_Base(insn:symbol, var:symbol)
+.decl LoadStaticField_To(insn:symbol, var:symbol)
+.decl StoreStaticField_From(insn:symbol, var:symbol)
+.decl LoadArrayIndex_Base(insn:symbol, var:symbol)
+.decl LoadArrayIndex_To(insn:symbol, var:symbol)
+.decl StoreArrayIndex_From(insn:symbol, var:symbol)
+.decl StoreArrayIndex_Base(insn:symbol, var:symbol)
+.decl AssignInstruction_To(insn:symbol, to:symbol)
+.decl AssignCast_From(insn:symbol, from:symbol)
+.decl AssignCast_Type(insn:symbol, type:symbol)
+.decl AssignLocal_From(insn:symbol, from:symbol)
+.decl AssignHeapAllocation_Heap(insn:symbol, heap:symbol)
+.decl ReturnNonvoid_Var(return:symbol, var:symbol)
+.decl MethodInvocation_Method(invocation:symbol, signature:symbol)
+.decl VirtualMethodInvocation_Base(invocation:symbol, base:symbol)
+.decl VirtualMethodInvocation_SimpleName(invocation:symbol, simplename:symbol)
+.decl VirtualMethodInvocation_Descriptor(invocation:symbol, descriptor:symbol)
+.decl SpecialMethodInvocation_Base(invocation:symbol, base:symbol)
+.decl MethodInvocation_Base(invocation:symbol, base:symbol)
 
 // Fat schema
-.decl LoadInstanceField(base:string, sig:string, to:string, inmethod:string)
-.decl StoreInstanceField(from:string, base:string, signature:string, inmethod:string)
-.decl LoadStaticField(sig:string, to:string, inmethod:string)
-.decl StoreStaticField(from:string, signature:string, inmethod:string)
-.decl LoadArrayIndex(base:string, to:string, inmethod:string)
-.decl StoreArrayIndex(from:string, base:string, inmethod:string)
-.decl AssignCast(type:string, from:string, to:string, inmethod:string)
-.decl AssignLocal(from:string, to:string, inmethod:string)
-.decl AssignHeapAllocation(heap:string, to:string, inmethod:string)
-.decl ReturnVar(var:string, method:string)
-.decl StaticMethodInvocation(invocation:string, signature:string, inmethod:string)
+.decl LoadInstanceField(base:symbol, sig:symbol, to:symbol, inmethod:symbol)
+.decl StoreInstanceField(from:symbol, base:symbol, signature:symbol, inmethod:symbol)
+.decl LoadStaticField(sig:symbol, to:symbol, inmethod:symbol)
+.decl StoreStaticField(from:symbol, signature:symbol, inmethod:symbol)
+.decl LoadArrayIndex(base:symbol, to:symbol, inmethod:symbol)
+.decl StoreArrayIndex(from:symbol, base:symbol, inmethod:symbol)
+.decl AssignCast(type:symbol, from:symbol, to:symbol, inmethod:symbol)
+.decl AssignLocal(from:symbol, to:symbol, inmethod:symbol)
+.decl AssignHeapAllocation(heap:symbol, to:symbol, inmethod:symbol)
+.decl ReturnVar(var:symbol, method:symbol)
+.decl StaticMethodInvocation(invocation:symbol, signature:symbol, inmethod:symbol)
 
 
 // imports
 // .in
-.decl _ClassType(class:string)
+.decl _ClassType(class:symbol)
 .input _ClassType(IO="file", filename="ClassType.facts", delimiter="\t")
-.decl _ArrayType(arrayType:string)
+.decl _ArrayType(arrayType:symbol)
 .input _ArrayType(IO="file", filename="ArrayType.facts", delimiter="\t")
-.decl _InterfaceType(interface:string)
+.decl _InterfaceType(interface:symbol)
 .input _InterfaceType(IO="file", filename="InterfaceType.facts", delimiter="\t")
-.decl _Var_DeclaringMethod(var:string, method:string)
+.decl _Var_DeclaringMethod(var:symbol, method:symbol)
 .input _Var_DeclaringMethod(IO="file", filename="Var-DeclaringMethod.facts", delimiter="\t")
-.decl _ApplicationClass(type:string)
+.decl _ApplicationClass(type:symbol)
 .input _ApplicationClass(IO="file", filename="ApplicationClass.facts", delimiter="\t")
-.decl _ThisVar(method:string, var:string)
+.decl _ThisVar(method:symbol, var:symbol)
 .input _ThisVar(IO="file", filename="ThisVar.facts", delimiter="\t")
-.decl _NormalHeap(id:string, type:string)
+.decl _NormalHeap(id:symbol, type:symbol)
 .input _NormalHeap(IO="file", filename="NormalHeap.facts", delimiter="\t")
-.decl _StringConstant(id:string)
+.decl _StringConstant(id:symbol)
 .input _StringConstant(IO="file", filename="StringConstant.facts", delimiter="\t")
-.decl _AssignHeapAllocation(instruction:string, index:int32, heap:string, to:string, inmethod:string, linenumber:int32)
+.decl _AssignHeapAllocation(instruction:symbol, index:number, heap:symbol, to:symbol, inmethod:symbol, linenumber:number)
 .input _AssignHeapAllocation(IO="file", filename="AssignHeapAllocation.facts", delimiter="\t")
-.decl _AssignLocal(instruction:string, index:int32, from:string, to:string, inmethod:string)
+.decl _AssignLocal(instruction:symbol, index:number, from:symbol, to:symbol, inmethod:symbol)
 .input _AssignLocal(IO="file", filename="AssignLocal.facts", delimiter="\t")
-.decl _AssignCast(instruction:string, index:int32, from:string, to:string, type:string, inmethod:string)
+.decl _AssignCast(instruction:symbol, index:number, from:symbol, to:symbol, type:symbol, inmethod:symbol)
 .input _AssignCast(IO="file", filename="AssignCast.facts", delimiter="\t")
-.decl _Field(signature:string, declaringClass:string, simplename:string, type:string)
+.decl _Field(signature:symbol, declaringClass:symbol, simplename:symbol, type:symbol)
 .input _Field(IO="file", filename="Field.facts", delimiter="\t")
 
 // .rule
@@ -161,29 +161,29 @@ MethodInvocation_Base(invocation, base) :- SpecialMethodInvocation_Base(invocati
 
 
 // .in
-.decl _StaticMethodInvocation(instruction:string, index:int32, signature:string, method:string)
+.decl _StaticMethodInvocation(instruction:symbol, index:number, signature:symbol, method:symbol)
 .input _StaticMethodInvocation(IO="file", filename="StaticMethodInvocation.facts", delimiter="\t")
-.decl _SpecialMethodInvocation(instruction:string, index:int32, signature:string, base:string, method:string)
+.decl _SpecialMethodInvocation(instruction:symbol, index:number, signature:symbol, base:symbol, method:symbol)
 .input _SpecialMethodInvocation(IO="file", filename="SpecialMethodInvocation.facts", delimiter="\t")
-.decl _VirtualMethodInvocation(instruction:string, index:int32, signature:string, base:string, method:string)
+.decl _VirtualMethodInvocation(instruction:symbol, index:number, signature:symbol, base:symbol, method:symbol)
 .input _VirtualMethodInvocation(IO="file", filename="VirtualMethodInvocation.facts", delimiter="\t")
-.decl _Method(method:string, simplename:string, params:string, declaringType:string, returnType:string, jvmDescriptor:string, arity:int32)
+.decl _Method(method:symbol, simplename:symbol, params:symbol, declaringType:symbol, returnType:symbol, jvmDescriptor:symbol, arity:number)
 .input _Method(IO="file", filename="Method.facts", delimiter="\t")
-.decl Method_Descriptor(method:string, descriptor:string)
+.decl Method_Descriptor(method:symbol, descriptor:symbol)
 // Method_Descriptor computed via cat (not an EDB)
-.decl _StoreInstanceField(instruction:string, index:int32, from:string, base:string, signature:string, method:string)
+.decl _StoreInstanceField(instruction:symbol, index:number, from:symbol, base:symbol, signature:symbol, method:symbol)
 .input _StoreInstanceField(IO="file", filename="StoreInstanceField.facts", delimiter="\t")
-.decl _LoadInstanceField(instruction:string, index:int32, to:string, base:string, signature:string, method:string)
+.decl _LoadInstanceField(instruction:symbol, index:number, to:symbol, base:symbol, signature:symbol, method:symbol)
 .input _LoadInstanceField(IO="file", filename="LoadInstanceField.facts", delimiter="\t")
-.decl _StoreStaticField(instruction:string, index:int32, from:string, signature:string, method:string)
+.decl _StoreStaticField(instruction:symbol, index:number, from:symbol, signature:symbol, method:symbol)
 .input _StoreStaticField(IO="file", filename="StoreStaticField.facts", delimiter="\t")
-.decl _LoadStaticField(instruction:string, index:int32, to:string, signature:string, method:string)
+.decl _LoadStaticField(instruction:symbol, index:number, to:symbol, signature:symbol, method:symbol)
 .input _LoadStaticField(IO="file", filename="LoadStaticField.facts", delimiter="\t")
-.decl _StoreArrayIndex(instruction:string, index:int32, from:string, base:string, method:string)
+.decl _StoreArrayIndex(instruction:symbol, index:number, from:symbol, base:symbol, method:symbol)
 .input _StoreArrayIndex(IO="file", filename="StoreArrayIndex.facts", delimiter="\t")
-.decl _LoadArrayIndex(instruction:string, index:int32, to:string, base:string, method:string)
+.decl _LoadArrayIndex(instruction:symbol, index:number, to:symbol, base:symbol, method:symbol)
 .input _LoadArrayIndex(IO="file", filename="LoadArrayIndex.facts", delimiter="\t")
-.decl _Return(instruction:string, index:int32, var:string, method:string)
+.decl _Return(instruction:symbol, index:number, var:symbol, method:symbol)
 .input _Return(IO="file", filename="Return.facts", delimiter="\t")
 
 // .rule
@@ -220,7 +220,7 @@ Method_ReturnType(method, returnType) :-
   _Method(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
 
 // Method_Descriptor computed via cat
-Method_Descriptor(method, cat(returnType, cat("(", cat(params, ")")))) :-
+Method_Descriptor(method, cat(cat(cat(returnType, "("), params), ")")) :-
   Method_ReturnType(method, returnType),
   Method_ParamTypes(method, params).
 
@@ -337,16 +337,16 @@ VirtualMethodInvocation_Descriptor(invocation, descriptor) :-
   
 // Basic (type-based) analysis
 // .printsize
-.decl MethodLookup(simplename:string, descriptor:string, type:string, method:string)
-.decl MethodImplemented(simplename:string, descriptor:string, type:string, method:string)
-.decl DirectSubclass(a:string, c:string)
-.decl Subclass(c:string, a:string)
-.decl Superclass(c:string, a:string)
-.decl Superinterface(k:string, c:string)
-.decl SubtypeOf(subtype:string, type:string)
-.decl SupertypeOf(supertype:string, type:string)
-.decl SubtypeOfDifferent(subtype:string, type:string)
-.decl MainMethodDeclaration(method:string)
+.decl MethodLookup(simplename:symbol, descriptor:symbol, type:symbol, method:symbol)
+.decl MethodImplemented(simplename:symbol, descriptor:symbol, type:symbol, method:symbol)
+.decl DirectSubclass(a:symbol, c:symbol)
+.decl Subclass(c:symbol, a:symbol)
+.decl Superclass(c:symbol, a:symbol)
+.decl Superinterface(k:symbol, c:symbol)
+.decl SubtypeOf(subtype:symbol, type:symbol)
+.decl SupertypeOf(supertype:symbol, type:symbol)
+.decl SubtypeOfDifferent(subtype:symbol, type:symbol)
+.decl MainMethodDeclaration(method:symbol)
 
 .printsize MainClass
 .printsize Method_SimpleName
@@ -372,16 +372,16 @@ MethodLookup(simplename, descriptor, type, method) :-
 MethodLookup(simplename, descriptor, type, method) :-
   DirectSuperclass(type, supertype),
   MethodLookup(simplename, descriptor, supertype, method),
-  ! MethodImplemented(simplename, descriptor, type, _).
+  !MethodImplemented(simplename, descriptor, type, _).
 MethodLookup(simplename, descriptor, type, method) :-
   DirectSuperinterface(type, supertype),
   MethodLookup(simplename, descriptor, supertype, method),
-  ! MethodImplemented(simplename, descriptor, type, _).
+  !MethodImplemented(simplename, descriptor, type, _).
 MethodImplemented(simplename, descriptor, type, method) :-
   Method_SimpleName(method, simplename),
   Method_Descriptor(method, descriptor),
   Method_DeclaringType(method, type),
-  ! Method_Modifier("abstract", method).
+  !Method_Modifier("abstract", method).
 MainMethodDeclaration(method) :-
   MainClass(type),
   Method_DeclaringType(method, type),
@@ -459,8 +459,8 @@ SubtypeOfDifferent(s, t) :-
 
 // class initialization
 // .printsize
-.decl ClassInitializer(type:string, method:string)
-.decl InitializedClass(classOrInterface:string)
+.decl ClassInitializer(type:symbol, method:symbol)
+.decl InitializedClass(classOrInterface:symbol)
 
 .printsize ClassInitializer
 .printsize InitializedClass
@@ -502,13 +502,13 @@ Reachable(clinit) :-
 
 // Main (value-based) analysis
 // .printsize
-.decl Assign(to:string, from:string)
-.decl VarPointsTo(heap:string, var:string)
-.decl InstanceFieldPointsTo(heap:string, fld:string, baseheap:string)
-.decl StaticFieldPointsTo(heap:string, fld:string)
-.decl CallGraphEdge(invocation:string, meth:string)
-.decl ArrayIndexPointsTo(baseheap:string, heap:string)
-.decl Reachable(method:string)
+.decl Assign(to:symbol, from:symbol)
+.decl VarPointsTo(heap:symbol, var:symbol)
+.decl InstanceFieldPointsTo(heap:symbol, fld:symbol, baseheap:symbol)
+.decl StaticFieldPointsTo(heap:symbol, fld:symbol)
+.decl CallGraphEdge(invocation:symbol, meth:symbol)
+.decl ArrayIndexPointsTo(baseheap:symbol, heap:symbol)
+.decl Reachable(method:symbol)
 
 .printsize Assign
 .printsize VarPointsTo
