@@ -8,8 +8,8 @@ so FlowLog uses string interning (`--str-intern`).
 
 ## Headline
 
-- **FlowLog is faster on all 25/25 pairs.** Speedup (Soufflé ÷ FlowLog):
-  **geomean 3.50×**, median 3.38×, range **1.49× → 5.76×**.
+- **FlowLog is faster on all 24/24 pairs.** Speedup (Soufflé ÷ FlowLog):
+  **geomean 3.53×**, median 3.41×, range **1.49× → 5.76×**.
 - **All outputs match.** Per-relation row counts agree on every pair
   (`match(26)` for DOOP, `match(20)` for Polonius).
 - FlowLog trades memory for speed: peak RSS is higher than Soufflé on most
@@ -48,9 +48,23 @@ so FlowLog uses string interning (`--str-intern`).
 | doop/lusearch | 2.19 | 6.41 | **2.92×** | 1.69 | 0.51 | match(26) |
 | polonius/clap-rs | 49.76 | 139.36 | **2.80×** | 14.76 | 12.43 | match(20) |
 | polonius/wgpu | 50.60 | 139.47 | **2.76×** | 14.84 | 12.43 | match(20) |
-| polonius/clap | 50.95 | 139.30 | **2.73×** | 14.76 | 12.43 | match(20) |
 | doop/eclipse | 9.16 | 21.60 | **2.36×** | 4.65 | 1.76 | match(26) |
 | doop/jython | 289.32 | 430.00 | **1.49×** | 52.25 | 18.58 | match(26) |
+
+## Alignment with west 1 & west 2
+
+This run uses the **same methodology, engine SHA, and host class** as
+[#4 (west 1)](../../pull/4) and [#5 (west 2)](../../pull/5), and reports the
+**identical 24-pair scope**. Results agree within run-to-run variance:
+
+| Metric (24 pairs) | west 3 | west 1 | west 2 |
+| --- | ---: | ---: | ---: |
+| Geomean speedup (Soufflé ÷ FlowLog) | 3.53× | 3.56× | 3.55× |
+| Geomean RSS ratio (Soufflé ÷ FlowLog) | 0.476 | 0.476 | 0.478 |
+| Crosscheck | match(26)/(20) | same | same |
+
+Every shared pair has the **same crosscheck verdict** and tracks within ~1–5%
+on time. FlowLog is ~2.1× heavier in peak RSS across all three runs.
 
 ## Reproduce
 
@@ -64,4 +78,4 @@ python3 plot/plot_perf.py results/benchmark/comparison_results.csv
 
 - **Engine:** flowlog @ `20f2aa0` (main-next; `cat()` builtin + `--str-intern`).
 - **Soufflé:** 2.5, compiled (`-o`, `-j 32`, libgomp-parallel).
-- **Host:** 64-core, 503 GiB RAM. `config/bench_west3.txt` (20 DOOP + 5 Polonius).
+- **Host:** 64-core, 503 GiB RAM. `config/bench_west3.txt` (20 DOOP + 4 Polonius).

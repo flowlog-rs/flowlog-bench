@@ -27,7 +27,6 @@ doop.dl=jython
 
 # --- Polonius: borrow-checker (string program). ---
 polonius.dl=clap-rs
-polonius.dl=clap
 polonius.dl=wgpu
 polonius.dl=materialize
 polonius.dl=scallop
