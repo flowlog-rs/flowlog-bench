@@ -16,7 +16,7 @@
 # Flags:
 #   --engines=<list>            comma list of comparison engines to run
 #                               alongside the FlowLog compiler:
-#                               {interpreter, souffle, none}.
+#                               {interpreter, souffle, ddlog, none}.
 #                               Default: interpreter. `none` runs only
 #                               the compiler column.
 #   --target=<stem:ds>          run only one pair (stem = .dl basename without
@@ -75,14 +75,15 @@ while (( $# )); do
 done
 export KEEP_DATASETS
 
-RUN_INTERPRETER=0; RUN_SOUFFLE=0
+RUN_INTERPRETER=0; RUN_SOUFFLE=0; RUN_DDLOG=0
 case ",$ENGINES," in *,interpreter,*) RUN_INTERPRETER=1 ;; esac
 case ",$ENGINES," in *,souffle,*)     RUN_SOUFFLE=1 ;; esac
+case ",$ENGINES," in *,ddlog,*)       RUN_DDLOG=1 ;; esac
 case ",$ENGINES," in
     *,none,*) ;;  # explicit compiler-only mode is fine
     *)
-        (( RUN_INTERPRETER || RUN_SOUFFLE )) \
-            || die "--engines must be 'none' or comma list of {interpreter,souffle} (got: $ENGINES)"
+        (( RUN_INTERPRETER || RUN_SOUFFLE || RUN_DDLOG )) \
+            || die "--engines must be 'none' or comma list of {interpreter,souffle,ddlog} (got: $ENGINES)"
         ;;
 esac
 
@@ -140,12 +141,21 @@ INTERPRETER_PROG_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/
 SOUFFLE_BIN="${SOUFFLE_BIN:-/usr/bin/souffle}"
 SOUFFLE_PROG_DIR="${SOUFFLE_PROG_DIR:-${ROOT_DIR}/programs/oracle/souffle}"
 
+# DDlog (Differential Datalog, compiled). Crates are built with cargo +1.76
+# (modern stable rejects the vendored differential_datalog lib); env.sh
+# installs ddlog + the pinned toolchain.
+DDLOG_HOME="${DDLOG_HOME:-$HOME/ddlog}"
+DDLOG_PROG_DIR="${DDLOG_PROG_DIR:-${ROOT_DIR}/programs/oracle/ddlog}"
+DDLOG_RUST="${DDLOG_RUST:-1.76}"
+DDLOG_BUILD_DIR="${DDLOG_BUILD_DIR:-${LOG_DIR}/ddlog-bin}"
+
 # Dataset URL template:
 DATASET_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main/dataset/csv"
 
 export FLOWLOG_BIN PROG_DIR FACT_DIR LOG_DIR COMPILER_BIN \
        INTERPRETER_DIR INTERPRETER_BIN INTERPRETER_PROG_DIR \
        INTERPRETER_PROG_URL SOUFFLE_BIN SOUFFLE_PROG_DIR \
+       DDLOG_HOME DDLOG_PROG_DIR DDLOG_RUST DDLOG_BUILD_DIR \
        WORKERS NUM_RUNS FLOWLOG_RUN_TIMEOUT TIME_BIN
 
 # --- Library imports -----------------------------------------------------
@@ -154,6 +164,7 @@ source "${ROOT_DIR}/scripts/lib/datasets.sh"
 source "${ROOT_DIR}/scripts/engines/compiler.sh"
 source "${ROOT_DIR}/scripts/engines/interpreter.sh"
 source "${ROOT_DIR}/scripts/engines/souffle.sh"
+source "${ROOT_DIR}/scripts/engines/ddlog.sh"
 
 # --- Reproducibility manifest --------------------------------------------
 RUN_INFO_BENCH_ROOT="$ROOT_DIR"
@@ -167,6 +178,7 @@ source "${ROOT_DIR}/scripts/lib/run_info.sh"
 # separated by whitespace. Recognised tags:
 #   [interp:skip]     skip the interpreter run (vldb26 limitations)
 #   [souffle:skip]    skip the Souffle run
+#   [ddlog:skip]      skip the DDlog run
 parse_config_line() {
     local raw="$1"
     local line="${raw%%#*}"
@@ -220,11 +232,12 @@ cleanup_dataset_for_pair() {
 }
 
 # --- CSV writer ----------------------------------------------------------
-# 20 columns: timing (interp/comp) + speedups + peak RSS + souffle +
-# crosscheck + per-engine RunsSucceeded counters. Empty *_RunsSucceeded
-# = engine wasn't requested for this pair. Header is byte-stable;
-# downstream consumers (plot/) parse by column name.
-CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded"
+# 25 columns: timing (interp/comp) + speedups + peak RSS + souffle + ddlog +
+# crosschecks + per-engine RunsSucceeded counters. Empty *_RunsSucceeded
+# = engine wasn't requested for this pair. New engine columns are appended
+# at the end so the header stays append-only; downstream consumers (plot/)
+# parse by column name.
+CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded,Ddlog_Total,Ddlog_PeakRss_MB,Ddlog_vs_Compiler_Total,Crosscheck_Ddlog,Ddlog_RunsSucceeded"
 
 init_csv() {
     mkdir -p "$(dirname "$CSV_FILE")"
@@ -286,11 +299,18 @@ else:
 PY
 }
 
+# Same verdict logic, compiler vs DDlog. (The verdict function is generic over
+# two <relation>\t<size> files; in the PARTIAL case the labels still read
+# "souffle-only/flowlog-only" — the relation names listed are what matter.
+# Note: DDlog's RelationSizes idiom omits size-0 relations, so programs with
+# empty outputs (e.g. polonius errors/loan_live_at) read as PARTIAL.)
+crosscheck_compiler_vs_ddlog() { crosscheck_compiler_vs_souffle "$@"; }
+
 # Append one CSV row from the median sidecars + log files left by the
 # engine adapters.
 append_csv_row() {
     local stem="$1" dataset="$2"
-    local interp_log="$3" comp_log="$4" sf_log="$5"
+    local interp_log="$3" comp_log="$4" sf_log="$5" dd_log="${6:-}"
 
     # Median timings (both compiler + interpreter emit Load + Total log lines).
     local i_total i_load i_exec c_total c_load c_exec
@@ -323,6 +343,16 @@ append_csv_row() {
         sf_vs_comp_total=$(speedup_ratio "$sf_total" "$c_total")
     fi
 
+    # DDlog (optional).
+    local dd_total="N/A" dd_rss_mb="N/A" dd_vs_comp_total="N/A"
+    if [[ -n "${dd_log:-}" && -s "${dd_log}.median_total_s" ]]; then
+        dd_total=$(cat "${dd_log}.median_total_s")
+        local dd_rss_kb
+        dd_rss_kb=$(cat "${dd_log}.median_rss_kb" 2>/dev/null || echo "N/A")
+        dd_rss_mb=$(kib_to_mib "$dd_rss_kb")
+        dd_vs_comp_total=$(speedup_ratio "$dd_total" "$c_total")
+    fi
+
     # Crosscheck (free if both sides wrote a .sizes sidecar this pair).
     local crosscheck="n/a"
     if [[ "$sf_total" != "N/A" ]]; then
@@ -332,13 +362,22 @@ append_csv_row() {
             MISMATCH*) log "$RED"   "XCHECK" "compiler vs souffle: $crosscheck" ;;
         esac
     fi
+    local crosscheck_dd="n/a"
+    if [[ "$dd_total" != "N/A" ]]; then
+        crosscheck_dd=$(crosscheck_compiler_vs_ddlog "${comp_log}.sizes" "${dd_log}.sizes")
+        case "$crosscheck_dd" in
+            match*)    log "$GREEN" "XCHECK" "compiler vs ddlog: $crosscheck_dd" ;;
+            MISMATCH*) log "$RED"   "XCHECK" "compiler vs ddlog: $crosscheck_dd" ;;
+        esac
+    fi
 
-    local i_n c_n s_n
+    local i_n c_n s_n d_n
     i_n=$(cat "${interp_log}.n_runs_succeeded" 2>/dev/null || true)
     c_n=$(cat "${comp_log}.n_runs_succeeded"   2>/dev/null || true)
     s_n=$(cat "${sf_log}.n_runs_succeeded"     2>/dev/null || true)
+    d_n=$(cat "${dd_log}.n_runs_succeeded"     2>/dev/null || true)
 
-    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n}" \
+    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n},${dd_total},${dd_rss_mb},${dd_vs_comp_total},${crosscheck_dd},${d_n}" \
         >> "$CSV_FILE"
 
     log "$GREEN" "CSV" "Appended ${stem}_${dataset} to $CSV_FILE"
@@ -357,7 +396,7 @@ fmt_speedup() {
 }
 
 print_pair_summary() {
-    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}"
+    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}" dd_log="${5:-}"
 
     local i_total i_load i_exec c_total c_load c_exec
     i_total=$(extract_total_seconds "$interp_log")
@@ -377,6 +416,12 @@ print_pair_summary() {
         sf_rss_mb=$(kib_to_mib "$(cat "${sf_log}.median_rss_kb" 2>/dev/null || echo)")
     fi
 
+    local dd_total="" dd_rss_mb=""
+    if [[ -n "$dd_log" && -s "${dd_log}.median_total_s" ]]; then
+        dd_total=$(cat "${dd_log}.median_total_s")
+        dd_rss_mb=$(kib_to_mib "$(cat "${dd_log}.median_rss_kb" 2>/dev/null || echo)")
+    fi
+
     echo "----------------------------------------"
     log "$GREEN" "RESULT" "$label"
     log "$GREEN" "  LOAD" "Interp=${i_load}s  Comp=${c_load}s  Speedup=$(fmt_speedup "$i_load" "$c_load")"
@@ -385,6 +430,9 @@ print_pair_summary() {
     log "$GREEN" "   MEM" "Interp=${i_rss_mb}MB  Comp=${c_rss_mb}MB"
     if [[ -n "$sf_total" ]]; then
         log "$GREEN" "SOUFFLE" "Total=${sf_total}s  PeakRss=${sf_rss_mb}MB  Souffle/Comp=$(fmt_speedup "$sf_total" "$c_total")"
+    fi
+    if [[ -n "$dd_total" ]]; then
+        log "$GREEN" "  DDLOG" "Total=${dd_total}s  PeakRss=${dd_rss_mb}MB  DDlog/Comp=$(fmt_speedup "$dd_total" "$c_total")"
     fi
     echo "----------------------------------------"
 }
@@ -423,6 +471,7 @@ print_summary_table() {
         local interp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_interpreter.log"
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
+        local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
 
         # Compiler row: always present (compiler always runs); baseline 1.00x.
         local c_total c_rss_mb
@@ -445,6 +494,15 @@ print_summary_table() {
             fi
             emit_summary_row "" "souffle" "$sf_total" "$sf_rss_mb" "$(fmt_speedup "$sf_total" "$c_total")"
         fi
+
+        if (( RUN_DDLOG )) && ! pair_has_tag "ddlog:skip"; then
+            local dd_total="N/A" dd_rss_mb="N/A"
+            if [[ -s "${dd_log}.median_total_s" ]]; then
+                dd_total=$(cat "${dd_log}.median_total_s")
+                dd_rss_mb=$(kib_to_mib "$(cat "${dd_log}.median_rss_kb" 2>/dev/null || echo)")
+            fi
+            emit_summary_row "" "ddlog" "$dd_total" "$dd_rss_mb" "$(fmt_speedup "$dd_total" "$c_total")"
+        fi
     done < "$CONFIG_FILE"
     echo ""
     log "$GREEN" "CSV" "Results saved to: $CSV_FILE"
@@ -456,6 +514,7 @@ main() {
     echo "  Compiler repo : $ROOT_DIR"
     echo "  Interpreter   : $INTERPRETER_DIR  (timed: $RUN_INTERPRETER)"
     echo "  Souffle       : $SOUFFLE_BIN  (timed: $RUN_SOUFFLE)"
+    echo "  DDlog         : $DDLOG_HOME  (timed: $RUN_DDLOG)"
     echo "  Config        : $CONFIG_FILE"
     [[ -n "$TARGET_FILTER" ]] && echo "  Target filter : $TARGET_FILTER"
     echo "  Workers       : $WORKERS  (applied identically to every engine)"
@@ -465,6 +524,7 @@ main() {
     (( RUN_INTERPRETER )) && engine_interpreter_setup
     setup_compiler
     (( RUN_SOUFFLE )) && engine_souffle_setup
+    (( RUN_DDLOG )) && engine_ddlog_setup
 
     if (( FRESH )); then
         rm -rf "$LOG_DIR"
@@ -507,14 +567,16 @@ main() {
         local interp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_interpreter.log"
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
+        local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
 
         # Clear stale sidecars so this iteration's CSV row is clean.
         rm -f "${interp_log}" "${interp_log}.median_rss_kb" "${interp_log}.n_runs_succeeded" \
               "${comp_log}.n_runs_succeeded" "${comp_log}.sizes" \
-              "${sf_log}" "${sf_log}.median_rss_kb" "${sf_log}.median_total_s" "${sf_log}.n_runs_succeeded"
+              "${sf_log}" "${sf_log}.median_rss_kb" "${sf_log}.median_total_s" "${sf_log}.n_runs_succeeded" "${sf_log}.sizes" \
+              "${dd_log}" "${dd_log}.median_rss_kb" "${dd_log}.median_total_s" "${dd_log}.n_runs_succeeded" "${dd_log}.sizes"
 
-        local rc_interp=0 rc_compiler=0 rc_souffle=0
-        local interp_required=0 souffle_required=0
+        local rc_interp=0 rc_compiler=0 rc_souffle=0 rc_ddlog=0
+        local interp_required=0 souffle_required=0 ddlog_required=0
 
         if (( RUN_INTERPRETER )) && ! pair_has_tag "interp:skip"; then
             interp_required=1
@@ -532,6 +594,13 @@ main() {
             log "$YELLOW" "SKIP" "Souffle: $PROG_NAME + $DATASET_NAME (per [souffle:skip] tag)"
         fi
 
+        if (( RUN_DDLOG )) && ! pair_has_tag "ddlog:skip"; then
+            ddlog_required=1
+            engine_ddlog_run "$PROG_NAME" "$DATASET_NAME" || rc_ddlog=$?
+        elif pair_has_tag "ddlog:skip"; then
+            log "$YELLOW" "SKIP" "DDlog: $PROG_NAME + $DATASET_NAME (per [ddlog:skip] tag)"
+        fi
+
         # Gate: a pair is "complete" iff every required engine produced
         # at least one valid sample. Otherwise skip the CSV row so resume
         # can retry on a future invocation. Recording N/A here would mask
@@ -542,6 +611,8 @@ main() {
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }interpreter"; }
         (( souffle_required && rc_souffle != 0 )) \
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }souffle"; }
+        (( ddlog_required && rc_ddlog != 0 )) \
+            && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }ddlog"; }
 
         if (( pair_failed )); then
             log "$RED" "PAIR-FAIL" \
@@ -552,9 +623,9 @@ main() {
         fi
 
         print_pair_summary "${_display_stem}_${DATASET_NAME}" \
-            "$interp_log" "$comp_log" "$sf_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log"
         append_csv_row "$_display_stem" "$DATASET_NAME" \
-            "$interp_log" "$comp_log" "$sf_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log"
         cleanup_dataset_for_pair "$DATASET_NAME"
     done < "$CONFIG_FILE"
 
