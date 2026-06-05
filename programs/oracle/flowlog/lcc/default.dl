@@ -1,0 +1,88 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// LDBC Graphalytics — Local Clustering Coefficient (LCC)
+//
+// Spec (Graphalytics §3.4): for each vertex v with undirected degree d >= 2,
+//
+//     LCC(v) = 2 * T(v) / (d * (d - 1))
+//
+// where T(v) is the number of undirected triangles incident to v. Vertices
+// with degree < 2 have LCC = 0 by convention.
+//
+// Integer-scaled encoding (no float type in FlowLog mainline):
+//   LCC_scaled(v) = TriThruV(v) * SCALE / (d * (d - 1))
+// with SCALE = 1_000_000_000. Divide externally by SCALE for the [0,1] value.
+//
+// The graph is taken as undirected: every Arc(a,b) contributes both (a,b)
+// and (b,a) to UndirEdge.
+//
+// Pair encoding: TriPair(v,u,w) is produced as ordered pairs of distinct
+// neighbours of v with edge(u,w). Each unordered triangle through v is
+// double-counted (as (u,w) and (w,u)), which is exactly what 2*T(v) wants.
+//
+// Inputs:
+//   Arc.csv     — directed edges (existing dataset convention)
+//   Vertex.csv  — vertex IDs (one per line; needed so isolated vertices
+//                 still appear in the output). Generate with
+//                 `tools/graphalytics_prep.py vertex`.
+// ══════════════════════════════════════════════════════════════════════════════
+
+.decl Arc(src: int64, dst: int64)
+.input Arc(IO="file", filename="Arc.csv", delimiter=",")
+
+.decl Vertex(v: int64)
+.input Vertex(IO="file", filename="Vertex.csv", delimiter=",")
+
+// ── Undirected view (symmetric, no self-loops) ───────────────────────────────
+.decl UndirEdge(u: int64, v: int64)
+UndirEdge(u, v) :- Arc(u, v), u != v.
+UndirEdge(v, u) :- Arc(u, v), u != v.
+
+// ── Undirected degree per vertex ─────────────────────────────────────────────
+.decl Deg(v: int64, d: int64)
+Deg(v, count(u)) :- UndirEdge(v, u).
+
+// ── Triangle witnesses through v: ordered (u, w) pairs ───────────────────────
+// distinct (v, u, w) tuples; each undirected triangle (v, u, w) is enumerated
+// twice (as (u, w) and (w, u)) — see double-counting note above.
+.decl TriPair(v: int64, u: int64, w: int64)
+TriPair(v, u, w) :-
+    UndirEdge(v, u),
+    UndirEdge(v, w),
+    UndirEdge(u, w),
+    u != w.
+
+// ── Encode (u, w) into a single int64 so we can count distinct neighbour
+//    pairs with a plain count(var). Code = u + w * P where P > max vertex id.
+//    P = 100_000_007 (prime) safely covers every current FlowLog/LDBC
+//    graph dataset (twitter-2010 has max id ≈ 4.2e7). With u, w ≤ 1e8
+//    the encoded value is ≤ 1e16, well within int64.
+.decl TriPairCode(v: int64, code: int64)
+// FlowLog arithmetic is left-to-right with no parens/precedence, so write
+// the multiplication first: `w * P + u` == w*P + u (the intended u + w*P).
+TriPairCode(v, w * 100000007 + u) :- TriPair(v, u, w).
+
+// ── Count of triangle witnesses per vertex ───────────────────────────────────
+.decl TriThruV(v: int64, t: int64)
+TriThruV(v, count(code)) :- TriPairCode(v, code).
+
+// ── Degree denominator d*(d-1). FlowLog has no parens, but `d * d - d`
+//    evaluates left-to-right as (d*d)-d = d*(d-1). Only defined for d >= 2.
+.decl DegDen(v: int64, dd: int64)
+DegDen(v, d * d - d) :- Deg(v, d), d >= 2.
+
+// ── LCC (scaled by 10^9) ─────────────────────────────────────────────────────
+.decl LCC(v: int64, lcc_scaled: int64)
+
+// vertices with no edges at all
+LCC(v, 0) :- Vertex(v), !Deg(v, _).
+// vertices with degree < 2
+LCC(v, 0) :- Vertex(v), Deg(v, d), d < 2.
+// vertices with degree >= 2 but no triangles
+LCC(v, 0) :- Vertex(v), Deg(v, d), d >= 2, !TriThruV(v, _).
+// vertices with at least one triangle: t * 1e9 / (d*(d-1)), left-to-right
+// = (t*1e9)/dd, with dd from DegDen.
+LCC(v, t * 1000000000 / dd) :-
+    Vertex(v), TriThruV(v, t), DegDen(v, dd).
+
+.printsize LCC
+.output LCC
