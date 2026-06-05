@@ -84,7 +84,7 @@ def main():
                 if line == "":
                     continue
                 fields = line.split(delim)
-                args = [quote(fields[i]) if (i < len(str_cols) and str_cols[i])
+                args = [quote(fields[i]) if str_cols[i]
                         else (fields[i] if i < len(fields) else "")
                         for i in range(len(types))]
                 out.write(f"insert {rel}({', '.join(args)});\n")

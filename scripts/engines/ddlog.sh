@@ -69,15 +69,22 @@ _ddlog_compile() {
     echo "$bin"
 }
 
-# Record per-relation sizes from RelationSizes dump lines to <sizes_sidecar>
-# as "relation\tN" (lowercased, matching the souffle/compiler crosscheck).
+# Record per-relation sizes to <sizes_sidecar> as "relation\tN" (lowercased,
+# matching the souffle/compiler crosscheck). DDlog's RelationSizes dump omits
+# 0-size relations (a group_by over an empty relation yields no row), so we
+# seed every relation named in a RelationSizes rule at 0 and overlay the
+# dumped values — declared-but-empty relations then appear as <rel>\t0, like
+# souffle, so the compiler crosscheck stays honest.
 _ddlog_record_sizes() {
-    local sizes_sidecar="$1" run_log="$2"
+    local sizes_sidecar="$1" run_log="$2" dl_src="$3"
     [[ -s "$sizes_sidecar" ]] && return 0
-    grep -oE 'rel = "[^"]+", \.size = [0-9]+' "$run_log" 2>/dev/null \
-        | sed -E 's/rel = "([^"]+)", \.size = ([0-9]+)/\1\t\2/' \
-        | awk '{ printf "%s\t%s\n", tolower($1), $2 }' \
-        | sort -u -k1,1 > "$sizes_sidecar"
+    {
+        grep -oE 'RelationSizes\("[^"]+"' "$dl_src" 2>/dev/null \
+            | sed -E 's/.*"([^"]+)".*/\1\t0/'
+        grep -oE 'rel = "[^"]+", \.size = [0-9]+' "$run_log" 2>/dev/null \
+            | sed -E 's/rel = "([^"]+)", \.size = ([0-9]+)/\1\t\2/'
+    } | awk -F'\t' '{ v[tolower($1)] = $2 } END { for (k in v) printf "%s\t%s\n", k, v[k] }' \
+      | sort -k1,1 > "$sizes_sidecar"
 }
 
 # Run ddlog NUM_RUNS times. Returns 1 if all runs failed or program missing.
@@ -101,13 +108,17 @@ engine_ddlog_run() {
         return 1
     }
 
-    # Build the command stream once (schema-aware quoting).
+    # Build the command stream once per (program, dataset); reuse if still
+    # current (cheap on resume — regenerating streams the whole dataset).
     dat="${DDLOG_BUILD_DIR}/${stem}_${dataset_name}.dat"
-    if ! python3 "${_DDLOG_DIR}/ddlog_gen_dat.py" "$dl_src" "$fact_path" \
-            > "$dat" 2> "${dat}.gen.log"; then
-        log "$YELLOW" "WARN" "DDlog: command-stream generation failed for $stem + $dataset_name (see ${dat}.gen.log)"
-        rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"; : > "$best_log"
-        return 1
+    if [[ ! -s "$dat" || "$fact_path" -nt "$dat" || "$dl_src" -nt "$dat" \
+            || "${_DDLOG_DIR}/ddlog_gen_dat.py" -nt "$dat" ]]; then
+        if ! python3 "${_DDLOG_DIR}/ddlog_gen_dat.py" "$dl_src" "$fact_path" \
+                > "$dat" 2> "${dat}.gen.log"; then
+            log "$YELLOW" "WARN" "DDlog: command-stream generation failed for $stem + $dataset_name (see ${dat}.gen.log)"
+            rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"; : > "$best_log"
+            return 1
+        fi
     fi
 
     log "$BLUE" "RUN" "DDlog:     $prog_file + $dataset_name (compiled, w=$WORKERS, runs=$NUM_RUNS)"
@@ -141,7 +152,7 @@ engine_ddlog_run() {
             continue
         fi
 
-        _ddlog_record_sizes "$sizes_sidecar" "$run_log"
+        _ddlog_record_sizes "$sizes_sidecar" "$run_log" "$dl_src"
 
         t=$(python3 -c "print(f'{${t_end}-${t_start}:.9f}')")
         r=$(extract_peak_rss_kb "$rss_log")

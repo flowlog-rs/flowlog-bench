@@ -299,11 +299,11 @@ else:
 PY
 }
 
-# Same verdict logic, compiler vs DDlog. (The verdict function is generic over
+# Same verdict logic, compiler vs DDlog. The verdict function is generic over
 # two <relation>\t<size> files; in the PARTIAL case the labels still read
 # "souffle-only/flowlog-only" — the relation names listed are what matter.
-# Note: DDlog's RelationSizes idiom omits size-0 relations, so programs with
-# empty outputs (e.g. polonius errors/loan_live_at) read as PARTIAL.)
+# (DDlog's RelationSizes dump omits 0-size relations; _ddlog_record_sizes seeds
+# them back to 0, so empty outputs don't read as a false PARTIAL.)
 crosscheck_compiler_vs_ddlog() { crosscheck_compiler_vs_souffle "$@"; }
 
 # Append one CSV row from the median sidecars + log files left by the
