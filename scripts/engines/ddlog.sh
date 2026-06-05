@@ -108,17 +108,29 @@ engine_ddlog_run() {
         return 1
     }
 
-    # Build the command stream once per (program, dataset); reuse if still
-    # current (cheap on resume — regenerating streams the whole dataset).
+    # Translate the dataset to a command stream ONCE and cache it. Reuse the
+    # cached .dat whenever it exists: the published datasets are immutable by
+    # name, so a re-downloaded dataset (fresh mtime) doesn't change the stream
+    # — only the program or the generator changing does. So a repeat run skips
+    # the (slow, multi-million-row) translate, and never needs the raw dataset
+    # at all once cached (with --keep-datasets it also skips the re-download).
     dat="${DDLOG_BUILD_DIR}/${stem}_${dataset_name}.dat"
-    if [[ ! -s "$dat" || "$fact_path" -nt "$dat" || "$dl_src" -nt "$dat" \
+    if [[ ! -s "$dat" || "$dl_src" -nt "$dat" \
             || "${_DDLOG_DIR}/ddlog_gen_dat.py" -nt "$dat" ]]; then
+        if [[ ! -d "$fact_path" ]]; then
+            log "$YELLOW" "WARN" "DDlog: no cached .dat for $stem + $dataset_name and dataset $fact_path is absent — cannot translate"
+            rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"; : > "$best_log"
+            return 1
+        fi
+        log "$CYAN" "DAT" "DDlog: translating $dataset_name -> command stream (one-off; cached at $dat)"
         if ! python3 "${_DDLOG_DIR}/ddlog_gen_dat.py" "$dl_src" "$fact_path" \
                 > "$dat" 2> "${dat}.gen.log"; then
             log "$YELLOW" "WARN" "DDlog: command-stream generation failed for $stem + $dataset_name (see ${dat}.gen.log)"
             rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"; : > "$best_log"
             return 1
         fi
+    else
+        log "$GREEN" "DAT" "DDlog: reusing cached command stream ($dat)"
     fi
 
     log "$BLUE" "RUN" "DDlog:     $prog_file + $dataset_name (compiled, w=$WORKERS, runs=$NUM_RUNS)"
