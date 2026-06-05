@@ -1,0 +1,106 @@
+// DDlog translation of programs/oracle/souffle/crdt.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): Insert_input.csv -> Insert_input, Remove_input.csv -> Remove_input
+// sizes (printsize): NextSiblingAnc, CurrentValue, HasValue, ValueStep, BlankStep, Value_blank_star, NextVisible, ResultP
+
+typedef node = signed<32>
+
+input relation Insert_input(a: node, b: node, c: node, d: node)
+input relation Remove_input(a: node, b: node)
+
+// definition of insertion into an ordered list (defines NextElem):
+output relation Insert(a: node, b: node, c: node, d: node)
+output relation Remove(idCtr: node, idN: node)
+output relation HasChild(parentCtr: node, parentN: node)
+output relation Assign(idCtr: node, idN: node, elemCtr: node, elemN: node, value: node)
+output relation LaterChild(parentCtr: node, parentN: node, childCtr: node, childN: node)
+output relation FirstChild(parentCtr: node, parentN: node, childCtr: node, childN: node)
+output relation Sibling(childCtr1: node, childN1: node, childCtr2: node, childN2: node)
+output relation LaterSibling(sibCtr1: node, sibN1: node, sibCtr2: node, sibN2: node)
+output relation LaterSibling2(sibCtr1: node, sibN1: node, sibCtr3: node, sibN3: node)
+output relation NextSibling(sibCtr1: node, sibN1: node, sibCtr2: node, sibN2: node)
+output relation HasNextSibling(sibCtr1: node, sibN1: node)
+output relation NextSiblingAnc(startCtr: node, startN: node, nextCtr: node, nextN: node)
+output relation NextElem(prevCtr: node, prevN: node, nextCtr: node, nextN: node)
+output relation CurrentValue(elemCtr: node, elemN: node, value: node)
+output relation HasValue(elemCtr: node, elemN: node)
+output relation ValueStep(fromCtr: node, fromN: node, toCtr: node, toN: node)
+output relation BlankStep(fromCtr: node, fromN: node, toCtr: node, toN: node)
+output relation Value_blank_star(fromCtr: node, fromN: node, toCtr: node, toN: node)
+output relation NextVisible(prevCtr: node, prevN: node, nextCtr: node, nextN: node)
+output relation ResultP(ctr1: node, ctr2: node, value: node)
+
+// .rule
+Insert(a, b, c, d) :- Insert_input(a, b, c, d).
+Remove(a, b) :- Remove_input(a, b).
+Assign(ctr, n, ctr, n, n) :- Insert(ctr, n, _, _).
+HasChild(parentCtr, parentN) :- Insert(_, _, parentCtr, parentN).
+
+LaterChild(parentCtr, parentN, ctr2, n2) :-
+  Insert(ctr1, n1, parentCtr, parentN),
+  Insert(ctr2, n2, parentCtr, parentN),
+  ctr1 * 10 + n1 > ctr2 * 10 + n2.
+
+FirstChild(parentCtr, parentN, childCtr, childN) :-
+  Insert(childCtr, childN, parentCtr, parentN),
+  not LaterChild(parentCtr, parentN, childCtr, childN).
+
+Sibling(childCtr1, childN1, childCtr2, childN2) :-
+  Insert(childCtr1, childN1, parentCtr, parentN),
+  Insert(childCtr2, childN2, parentCtr, parentN).
+
+LaterSibling(ctr1, n1, ctr2, n2) :-
+  Sibling(ctr1, n1, ctr2, n2),
+  ctr1 * 10 + n1 > ctr2 * 10 + n2.
+
+LaterSibling2(ctr1, n1, ctr3, n3) :-
+  Sibling(ctr1, n1, ctr2, n2),
+  Sibling(ctr1, n1, ctr3, n3),
+  ctr1 * 10 + n1 > ctr2 * 10 + n2,
+  ctr2 * 10 + n2 > ctr3 * 10 + n3.
+
+NextSibling(ctr1, n1, ctr2, n2) :-
+  LaterSibling(ctr1, n1, ctr2, n2),
+  not LaterSibling2(ctr1, n1, ctr2, n2).
+
+HasNextSibling(sibCtr1, sibN1) :- LaterSibling(sibCtr1, sibN1, _, _).
+
+NextSiblingAnc(startCtr, startN, nextCtr, nextN) :- NextSibling(startCtr, startN, nextCtr, nextN).
+NextSiblingAnc(startCtr, startN, nextCtr, nextN) :-
+    Insert(startCtr, startN, parentCtr, parentN),
+    NextSiblingAnc(parentCtr, parentN, nextCtr, nextN),
+    not HasNextSibling(startCtr, startN).
+
+NextElem(prevCtr, prevN, nextCtr, nextN) :- FirstChild(prevCtr, prevN, nextCtr, nextN).
+NextElem(prevCtr, prevN, nextCtr, nextN) :- NextSiblingAnc(prevCtr, prevN, nextCtr, nextN), not HasChild(prevCtr, prevN).
+
+// Assigning values to list elements.
+CurrentValue(elemCtr, elemN, value) :- Assign(idCtr, idN, elemCtr, elemN, value), not Remove(idCtr, idN).
+
+HasValue(elemCtr, elemN) :- CurrentValue(elemCtr, elemN, _).
+ValueStep(fromCtr, fromN, toCtr, toN) :- HasValue(fromCtr, fromN), NextElem(fromCtr, fromN, toCtr, toN).
+BlankStep(fromCtr, fromN, toCtr, toN) :-
+  NextElem(fromCtr, fromN, toCtr, toN),
+  not ValueStep(fromCtr, fromN, toCtr, toN).
+
+Value_blank_star(fromCtr, fromN, toCtr, toN) :- ValueStep(fromCtr, fromN, toCtr, toN).
+Value_blank_star(fromCtr, fromN, toCtr, toN) :- Value_blank_star(fromCtr, fromN, viaCtr, viaN), BlankStep(viaCtr, viaN, toCtr, toN).
+
+NextVisible(prevCtr, prevN, nextCtr, nextN) :-
+  Value_blank_star(prevCtr, prevN, nextCtr, nextN),
+  HasValue(nextCtr, nextN).
+
+ResultP(ctr1, ctr2, value) :-
+    NextVisible(ctr1, _, ctr2, n2),
+    CurrentValue(ctr2, n2, value).
+
+// sizes (printsize)
+output relation RelationSizes(rel: string, size: bit<64>)
+
+RelationSizes("NextSiblingAnc", size) :- NextSiblingAnc(startCtr, startN, nextCtr, nextN), var size = (startCtr, startN, nextCtr, nextN).group_by(()).count_distinct().
+RelationSizes("CurrentValue", size) :- CurrentValue(elemCtr, elemN, value), var size = (elemCtr, elemN, value).group_by(()).count_distinct().
+RelationSizes("HasValue", size) :- HasValue(elemCtr, elemN), var size = (elemCtr, elemN).group_by(()).count_distinct().
+RelationSizes("ValueStep", size) :- ValueStep(fromCtr, fromN, toCtr, toN), var size = (fromCtr, fromN, toCtr, toN).group_by(()).count_distinct().
+RelationSizes("BlankStep", size) :- BlankStep(fromCtr, fromN, toCtr, toN), var size = (fromCtr, fromN, toCtr, toN).group_by(()).count_distinct().
+RelationSizes("Value_blank_star", size) :- Value_blank_star(fromCtr, fromN, toCtr, toN), var size = (fromCtr, fromN, toCtr, toN).group_by(()).count_distinct().
+RelationSizes("NextVisible", size) :- NextVisible(prevCtr, prevN, nextCtr, nextN), var size = (prevCtr, prevN, nextCtr, nextN).group_by(()).count_distinct().
+RelationSizes("ResultP", size) :- ResultP(ctr1, ctr2, value), var size = (ctr1, ctr2, value).group_by(()).count_distinct().

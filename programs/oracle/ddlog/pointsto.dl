@@ -1,0 +1,36 @@
+// DDlog translation of programs/oracle/souffle/pointsto.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): AssignAlloc.csv -> AssignAlloc, PrimitiveAssign.csv -> PrimitiveAssign, Load.csv -> Load, Store.csv -> Store
+// sizes (printsize): Assign
+
+typedef node = signed<32>
+
+input relation AssignAlloc(var_: node, heap: node)
+input relation PrimitiveAssign(source: node, dest: node)
+input relation Load(base: node, dest: node, field: node)
+input relation Store(source: node, base: node, field: node)
+
+output relation VarPointsTo(var_: node, heap: node)
+output relation Alias(x: node, y: node)
+output relation Assign(source: node, destination: node)
+
+Assign(var1, var2) :-
+  PrimitiveAssign(var1, var2).
+
+Alias(instanceVar, iVar) :-
+  VarPointsTo(instanceVar, instanceHeap),
+  VarPointsTo(iVar, instanceHeap).
+
+VarPointsTo(var_, heap) :-
+  AssignAlloc(var_, heap).
+
+VarPointsTo(var1, heap) :-
+  Assign(var2, var1),
+  VarPointsTo(var2, heap).
+
+Assign(var1, var2) :-
+  Store(var1, instanceVar2, field),
+  Alias(instanceVar2, instanceVar1),
+  Load(instanceVar1, var2, field).
+
+output relation RelationSizes(rel: string, size: bit<64>)
+RelationSizes("Assign", size) :- Assign(a, b), var size = (a, b).group_by(()).count_distinct().

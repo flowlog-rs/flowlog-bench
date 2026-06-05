@@ -1,0 +1,25 @@
+// DDlog translation of programs/oracle/souffle/dyck.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): Arc.csv -> Arc
+// sizes (printsize): Zero, One, Dyck
+
+typedef node = signed<32>
+
+input relation Arc(x:node, y:node, l:node)
+
+output relation Zero(x:node, y:node)
+output relation One(x:node, y:node)
+output relation Dyck(x:node, y:node)
+
+Zero(x, y) :- Arc(x, y, 0).
+One(x, y) :- Arc(x, y, 1).
+
+Dyck(x, y) :- Zero(x, z), Zero(z, y).
+Dyck(x, y) :- One(x, z), One(z, y).
+Dyck(x, y) :- Zero(x, z), Dyck(z, w), Zero(w, y).
+Dyck(x, y) :- One(x, z), Dyck(z, w), One(w, y).
+Dyck(x, y) :- Dyck(x, z), Dyck(z, y).
+
+output relation RelationSizes(rel: string, size: bit<64>)
+RelationSizes("Zero", size) :- Zero(x, y), var size = (x, y).group_by(()).count_distinct().
+RelationSizes("One", size) :- One(x, y), var size = (x, y).group_by(()).count_distinct().
+RelationSizes("Dyck", size) :- Dyck(x, y), var size = (x, y).group_by(()).count_distinct().

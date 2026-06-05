@@ -1,0 +1,20 @@
+// DDlog translation of programs/oracle/souffle/andersen.dl  (join order preserved; idioms per reference repo)
+// inputs (csv -> relation): addressOf.csv -> AddressOf, assign.csv -> Assign, load.csv -> Load, store.csv -> Store
+// sizes (printsize): PointsTo
+
+typedef node = signed<32>
+
+input relation AddressOf(y: node, x: node)
+input relation Assign(y: node, x: node)
+input relation Load(y: node, x: node)
+input relation Store(y: node, x: node)
+
+output relation PointsTo(y: node, x: node)
+
+PointsTo(y, x) :- AddressOf(y, x).
+PointsTo(y, x) :- Assign(y, z), PointsTo(z, x).
+PointsTo(y, w) :- Load(y, x), PointsTo(x, z), PointsTo(z, w).
+PointsTo(z, w) :- Store(y, x), PointsTo(y, z), PointsTo(x, w).
+
+output relation RelationSizes(rel: string, size: bit<64>)
+RelationSizes("PointsTo", size) :- PointsTo(y, x), var size = (y, x).group_by(()).count_distinct().
