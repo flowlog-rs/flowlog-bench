@@ -43,13 +43,29 @@ engine_compiler_run() {
     log "$BLUE" "RUN" "Compiler:  $prog_file + $dataset_name (batch, w=$WORKERS, runs=$NUM_RUNS)"
     mkdir -p "$LOG_DIR" "$(dirname "$binary")"
 
-    # Compile .dl -> standalone executable (once per pair).
+    # Compile .dl -> standalone executable (once per pair). Pass `-D -`
+    # so `.printsize` directives surface on the binary's stdout (which
+    # the per-run logger captures) — without this, programs that use
+    # .printsize (e.g. doop, polonius) fail with "output_dir is unset".
+    #
+    # `--str-intern` is on by default: FlowLog's own help text recommends
+    # it for "symbol/string-typed" workloads, and the bench harness's
+    # cross-engine comparison is meaningless without it on DOOP/Polonius
+    # (3-9× slower / 5-10× heavier RSS, see flowlog-bench#3 closing
+    # comment). The flag is a no-op on integer-typed inputs, so default-on
+    # is safe. Set `FL_NO_STR_INTERN=1` to opt out (rare; integer-only
+    # ablation).
+    local fl_intern_flag="--str-intern"
+    [[ "${FL_NO_STR_INTERN:-0}" == "1" ]] && fl_intern_flag=""
     local compile_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_build.log"
     rm -f "$binary"
     "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
+        -D - \
         -o "$binary" \
         --mode datalog-batch \
+        ${fl_intern_flag} \
+        ${EXTRA_FL_FLAGS:-} \
         > "$compile_log" 2>&1 \
         || die "Compilation failed for $prog_file (see $compile_log)"
     [[ -x "$binary" ]] || die "Binary not found: $binary"

@@ -158,7 +158,7 @@ Method_SimpleName(method, simplename) :- _Method(method, simplename, params, dec
 Method_ParamTypes(method, params) :- _Method(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
 Method_DeclaringType(method, declaringType) :- _Method(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
 Method_ReturnType(method, returnType) :- _Method(method, simplename, params, declaringType, returnType, jvmDescriptor, arity).
-Method_Descriptor(method, returnType cat "(" cat params cat ")") :- Method_ReturnType(method, returnType), Method_ParamTypes(method, params).
+Method_Descriptor(method, cat(cat(cat(returnType, "("), params), ")")) :- Method_ReturnType(method, returnType), Method_ParamTypes(method, params).
 Instruction_Method(instruction, method) :- _StoreInstanceField(instruction, index, from, base, signature, method).
 FieldInstruction_Signature(instruction, signature) :- _StoreInstanceField(instruction, index, from, base, signature, method).
 StoreInstanceField_Base(instruction, base) :- _StoreInstanceField(instruction, index, from, base, signature, method).
