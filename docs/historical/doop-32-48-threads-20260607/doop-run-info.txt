@@ -1,0 +1,33 @@
+DOOP context-insensitive — FlowLog vs Soufflé, 32 & 48 threads
+================================================================
+Date (UTC)        : 2026-06-07
+Host              : flowlog-west2
+CPU               : AMD EPYC 7763 — 32 physical cores, 2 threads/core (64 logical)
+Kernel            : 6.8.0-1052-azure
+
+FlowLog
+  SHA             : a13a41590b1bd5b6c396d87f4dc2011568666fde  (branch main-next; == feat/doop-end-to-end, PR #130)
+  program         : example/program_analysis/doop.dl  (652 lines, 8 .plan join orders, 26 .printsize)
+  compile         : flowlog-compiler <prog> -F <facts> -o <bin> -D - --mode datalog-batch --str-intern
+  run             : <bin> -w {32,48}
+
+Soufflé
+  version         : 2.5
+  program         : programs/oracle/souffle/doop.dl  (matched: 8 .plan, 26 .printsize)
+  compile         : souffle -o <bin> -p /dev/null -j {32,48} -F <facts> <prog>   (-j at COMPILE time wires up parallel pfor; binary linked against libgomp)
+  run             : <bin> -j {32,48} -F <facts>
+
+Method
+  threads         : 32 and 48 (box has 32 physical cores; 64t was avoided — it
+                    oversubscribes HT and starves co-resident agents. 48 leaves
+                    ~16 logical cores of headroom.)
+  reps            : 1 timed run per (engine × dataset × thread count); end-to-end
+                    wall clock incl. fact load + compute + .printsize.
+  measurement     : /usr/bin/time -v  → Elapsed wall clock + Maximum resident set size.
+  isolation       : runs executed sequentially (one engine at a time) for clean peak-RSS attribution.
+  datasets        : 20 DaCapo 23.11-MR2-chopin apps; facts from /datasets/facts/<app>
+                    via a single repointed symlink (ln -sfnT) per dataset.
+  correctness     : cross-checked on batik — all 26 .printsize relations identical
+                    (VarPointsTo 37,237,353 on both engines).
+
+Reproduce plots   : python3 make_plots.py doop-results-raw.csv .
