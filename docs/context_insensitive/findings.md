@@ -12,15 +12,18 @@ Reproduce: `make` n/a — `bash scripts/context_insensitive_compare.sh` (reads
 
 ## TL;DR
 
-- **Correctness: identical on all 20.** Every output relation agrees on
-  cardinality *and* tuples, modulo the documented `ord()` heap-representative
-  renaming — and the `HeapRepresentative` **partitions are identical** on every
-  dataset (244 classes on tomcat, …). No genuine divergence anywhere.
+- **Correctness: identical on all 19 cross-checked datasets.** Every output
+  relation agrees on cardinality *and* tuples, modulo the documented `ord()`
+  heap-representative renaming — and the `HeapRepresentative` **partitions are
+  identical** on every one (244 classes on tomcat, …). No genuine divergence.
+  (jython is the 20th: too dense to cross-check in budget — see below.)
 - **Performance: 14 wins (up to 2.5×), 5 regressions.** FlowLog wins on
   solve-heavy apps (batik, h2, spring, eclipse, …); it regresses on the denser
   ones — **h2o 2.11×**, graphchi / xalan / kafka **1.28×**, biojava **1.24×**.
-- **jython** is pathological for *both* engines (~150–180 GB); FlowLog OOMs at
-  `-w32` (knife-edge 178 GB) but **completes at `-w16` / `-w8`** (171 GB).
+- **jython** is pathological for *both* engines (~150–180 GB). FlowLog OOMs at
+  `-w32` (knife-edge 178 GB) but **completes at `-w16` / `-w8`** (171 GB); the
+  matched Soufflé run was still going at 150 GB / 22 min when stopped, so jython
+  is **not yet cross-checked** (it is the one dataset without a MATCH verdict).
 - **Root cause of the regressions** (FlowLog `-P` profile): the **recursive
   points-to fixpoint** — 66 % of time is inside the iterative scope, dominated
   by two large joins (~50 iterations) plus **~21 % rebuilding arrangements**.
@@ -106,11 +109,13 @@ cardinality, `HeapRepresentative` partition identical, 0 missing.
 | spring | MATCH | 52.0 | 127.4 | 0.41× | 13.2 | 15.3 |
 | batik | MATCH | 56.9 | 141.4 | 0.40× | 13.1 | 15.2 |
 | h2 | MATCH | 46.6 | 116.6 | 0.40× | 13.6 | 16.5 |
-| jython | MATCH* | 171 (`-w16`) | ~180+ | — | 167 | ~150+ |
+| jython | n/a\* | 171 (`-w16`) | ~180+ (killed) | — | 167 | ~150+ |
 
-\* jython OOMs FlowLog at `-w32` (knife-edge); completes at `-w16`. Both engines
-need ~150–180 GB. Single-run timings carry run-to-run noise (the `ord()`
-heap-representative non-determinism), but the win/loss pattern is stable.
+\* jython OOMs FlowLog at `-w32` (knife-edge ~178 GB) and **completes at `-w16`**
+(171 GB); the Soufflé side was still running (~150 GB, 22 min) when stopped, so
+this row is **not a verified MATCH** — it is the one dataset left un-cross-checked.
+Single-run timings elsewhere carry run-to-run noise (the `ord()` heap-representative
+non-determinism), but the win/loss pattern is stable.
 
 ## Methodology
 
