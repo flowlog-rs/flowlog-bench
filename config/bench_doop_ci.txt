@@ -1,0 +1,30 @@
+# [west3] DOOP context-insensitive (NON-TOY) — FlowLog (--str-intern, 32t) vs Souffle (-j 32).
+# The full doop-flowlog `context-insensitive` analysis (components + aggregates,
+# ~3.2k lines), not the toy `doop.dl`. Same 20 DaCapo 23.11 fact DBs.
+# Run: WORKERS=32 STR_INTERN=1 ENGINES=souffle KEEP_DATASETS=1
+# Correctness via full tuple-set compare (doop-flowlog compare-flowlog-souffle.py),
+# NOT the .printsize-size path. See docs/historical/west3-doop-ci.md.
+#
+# Ordered small -> large by VarPointsTo. jython is the densest by ~13x and needs
+# `sysctl vm.max_map_count=4194304` for FlowLog (DD allocates many mappings; the
+# default 65530 cap aborts it at ~165 GB with RAM to spare — it is NOT an OOM).
+context-insensitive.dl=xalan
+context-insensitive.dl=avrora
+context-insensitive.dl=cassandra
+context-insensitive.dl=tomcat
+context-insensitive.dl=biojava
+context-insensitive.dl=jme
+context-insensitive.dl=pmd
+context-insensitive.dl=zxing
+context-insensitive.dl=kafka
+context-insensitive.dl=graphchi
+context-insensitive.dl=luindex
+context-insensitive.dl=lusearch
+context-insensitive.dl=sunflow
+context-insensitive.dl=h2o
+context-insensitive.dl=eclipse
+context-insensitive.dl=fop
+context-insensitive.dl=h2
+context-insensitive.dl=spring
+context-insensitive.dl=batik
+context-insensitive.dl=jython

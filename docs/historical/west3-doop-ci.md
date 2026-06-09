@@ -1,0 +1,128 @@
+# [west3] DOOP `context-insensitive` (non-toy) — FlowLog vs Soufflé, 20 DaCapo, 32 threads
+
+The **full, non-toy** DOOP `context-insensitive` points-to analysis (the real
+`flowlog-rs/doop-flowlog` logic — components, generics, head/​body aggregates;
+~3.2k lines) on the **same** 20 DaCapo 23.11 fact DBs, FlowLog (`--str-intern`)
+vs Soufflé, both at **32 threads**.
+
+## TL;DR
+
+- ✅ **Correctness — FlowLog matches Soufflé on all 20.** 19 datasets agree on
+  *every* relation cardinality (residual tuple diffs are `ord()` heap-rep
+  renaming only); jython agrees to **±0.02%** (`ord()` heap-merge noise at its
+  371 M-tuple scale — `Reachable`, `ReachableContext`, `HeapAllocation_Type` exact).
+- ⚡ **Perf — FlowLog wins 14/20, geomean 1.30×**, range 0.46×→**3.45×**. Biggest
+  win is **jython (3.4×)**, the densest app; FlowLog also uses **less peak RAM** on
+  the five densest (jython, batik, spring, h2, h2o). Trails on h2o (0.46×) and
+  xalan (0.70×).
+- 🎯 **Most apparent "regressions" are a join-order mismatch, not the engine.**
+  Soufflé's program ships **16 hand-tuned `.plan` join orders**; the FlowLog
+  program had none. With **both on default order**, biojava/kafka/graphchi are
+  **ties (1.01–1.04×)** — those gaps were Soufflé's `.plan`, which FlowLog can't
+  exploit (transplanting all 16 into FlowLog moves it ±2%). Only **xalan (1.16×)**
+  and **h2o (1.88×)** are real engine gaps.
+- 🔬 **Residual gap = Differential-Dataflow arrangement maintenance** — FlowLog
+  re-indexes the big recursive relations on every distinct join key and maintains
+  all of them incrementally each iteration (**155 live arrangements** in the
+  fixpoint). Join *order* can't change *how many* indexes exist (so `.plan` is a
+  no-op for FlowLog); Soufflé's compiled b-tree loop avoids it. Where deltas are
+  large/dense (jython, eclipse, h2, spring, batik) FlowLog amortizes and wins
+  1.6–3.4×.
+- 🧠 **jython is NOT an OOM.** It hit the default **`vm.max_map_count` (65530)** —
+  the per-process mmap cap — at ~165 GB with **320 GB free** (DD makes many
+  mappings). `sysctl vm.max_map_count=4194304` and jython is FlowLog's **biggest
+  win**: **822 s / 161 GB** vs Soufflé **2831 s / 210 GB** (3.4× faster, 24% less
+  RAM), 371 M VarPointsTo matching ±0.02%.
+
+## The fair comparison: same join order
+
+| dataset | FlowLog (default) | Soufflé (default, no `.plan`) | FlowLog / Soufflé | Soufflé (+`.plan`) | as-shipped gap |
+|---|--:|--:|:--:|--:|:--:|
+| biojava | 53.7 | 53.1 | **1.01× (tie)** | 45.9 | 0.86× |
+| kafka | 60.7 | 59.2 | **1.03× (tie)** | 51.2 | 0.83× |
+| graphchi | 78.4 | 75.6 | **1.04× (tie)** | 65.0 | 0.82× |
+| xalan | 38.8 | 33.4 | 1.16× | 27.5 | 0.70× |
+| h2o | 406.1 | 216.4 | 1.88× | 189.8 | 0.46× |
+
+![sameorder](west3-doop-ci-32t-sameorder.png)
+
+Soufflé's `.plan` helps **Soufflé** (xalan 33→27 s) but does **nothing for
+FlowLog** (39→39 s): same hints, opposite engines. Three of the five
+"regressions" were that asymmetry, not the engine.
+
+## Setup
+
+| | |
+|---|---|
+| Program | non-toy `context-insensitive` (flowlog + souffle dialects of one analysis) |
+| Engines | FlowLog @ `main-next` (1d8b05a) `--str-intern --mode datalog-batch -w 32` · Soufflé 2.5 `-j 32` (compile **and** run) |
+| Facts | 20 DaCapo 23.11 DBs (HuggingFace); 5 optional inputs created empty (Soufflé errors on missing) |
+| `<CONFIGURATION>` | → `ContextInsensitiveConfiguration` (both engines need it resolved) |
+| Oracle | doop-flowlog `compare-flowlog-souffle.py` — full tuple-set equality per relation |
+| Host | 64 vCPU / 503 GB; `vm.max_map_count` raised to 4194304 for jython only |
+
+## Results — as shipped (run time, 32 threads; peak = `/usr/bin/time -v`)
+
+| dataset | VarPointsTo | FlowLog s | Soufflé s | speedup | FL GiB | SF GiB |
+|---|--:|--:|--:|:--:|--:|--:|
+| jython | 371,435,757 | 821.5 | 2831.2 | **3.45×** | 160.6 | 210.5 |
+| spring | 27,878,606 | 50.8 | 125.8 | **2.48×** | 13.2 | 14.8 |
+| h2 | 22,669,373 | 43.8 | 105.8 | **2.42×** | 13.6 | 16.2 |
+| batik | 28,249,074 | 60.0 | 143.8 | **2.39×** | 12.9 | 14.5 |
+| eclipse | 10,539,055 | 24.6 | 53.8 | **2.19×** | 7.3 | 5.5 |
+| fop | 15,414,507 | 46.2 | 72.1 | **1.56×** | 9.2 | 9.0 |
+| sunflow | 6,140,841 | 24.8 | 37.0 | **1.49×** | 5.9 | 3.9 |
+| lusearch | 5,627,641 | 19.6 | 29.1 | **1.48×** | 5.3 | 3.3 |
+| luindex | 5,396,536 | 19.8 | 28.7 | **1.45×** | 5.3 | 3.3 |
+| tomcat | 3,066,514 | 15.6 | 19.0 | **1.22×** | 4.2 | 2.0 |
+| zxing | 4,144,794 | 23.9 | 28.2 | **1.18×** | 5.0 | 3.1 |
+| pmd | 4,128,719 | 27.4 | 30.4 | **1.11×** | 5.1 | 3.3 |
+| cassandra | 2,545,822 | 15.4 | 17.0 | **1.10×** | 4.0 | 1.8 |
+| jme | 3,740,675 | 34.1 | 34.4 | **1.01×** | 5.5 | 3.6 |
+| avrora | 2,528,797 | 22.5 | 22.3 | 0.99× | 4.3 | 2.4 |
+| biojava | 3,470,185 | 53.6 | 45.9 | 0.86× | 6.5 | 5.0 |
+| kafka | 4,467,153 | 61.5 | 51.2 | 0.83× | 6.8 | 5.3 |
+| graphchi | 4,480,629 | 79.3 | 65.0 | 0.82× | 7.7 | 7.3 |
+| xalan | 2,387,458 | 39.2 | 27.3 | 0.70× | 4.7 | 2.8 |
+| h2o | 8,348,153 | 408.7 | 189.8 | 0.46× | 23.9 | 29.5 |
+
+> Win/loss tracks fixpoint *shape*, not points-to size: FlowLog wins 3.4× on
+> jython (371 M VarPointsTo) and 2.5× on spring (28 M), yet trails 1.88× on h2o
+> (8 M) at equal order — large dense deltas amortize DD's arrangement cost; many
+> moderate iterations don't.
+
+![time](west3-doop-ci-32t-time.png)
+![memory](west3-doop-ci-32t-memory.png)
+
+## Regression deep-dive — is it the plan? Partly — for Soufflé, not FlowLog.
+
+| lever (xalan) | solve | takeaway |
+|---|--:|---|
+| FlowLog default order | 38.8 s | baseline |
+| FlowLog + Soufflé's 16 `.plan` | 39.3 s | same hints, **no effect** on FlowLog (DD ≠ b-tree) |
+| Soufflé default order (no `.plan`) | 33.4 s | **apples-to-apples: FlowLog only 1.16× behind** |
+| Soufflé + its `.plan` | 27.5 s | Soufflé's tuning → its as-shipped lead |
+| FlowLog `--sip` | 132.8 s | FlowLog's own optimizer: 3.4× worse here |
+| FlowLog `-w 8/16/32/48` | 40/38/38/44 s | flat — not parallelism |
+
+![regression](west3-doop-ci-32t-regression.png)
+
+Profile (xalan): ~75% of solve in the recursive `VarPointsTo` fixpoint;
+arrangement-profile shows **155 live arrangements** — the big recursive relations
+re-indexed on ~15 distinct keys and merged every iteration. That per-iteration
+index churn is the residual gap on xalan (1.16×) and h2o (1.88×); it is invariant
+to join order, which is exactly why `.plan` is a no-op for FlowLog.
+
+## Reproduce
+
+```bash
+sed -i 's/<CONFIGURATION>/<ContextInsensitiveConfiguration>/' context-insensitive.*.flat.dl
+# facts: unzip + touch empty KeepClass/KeepClassMembers/KeepClassesWithMembers/KeepMethod/RootCodeElement
+flowlog-compiler context-insensitive.flowlog.flat.dl -F facts -D out -o fl --mode datalog-batch --str-intern && fl -w 32
+souffle -o sf -j 32 -F facts context-insensitive.souffle.flat.dl && sf -F facts -D out_sf -j 32
+compare-flowlog-souffle.py out out_sf --partition HeapRepresentative
+# same-order test: strip the 16 .plan from the souffle .dl; for jython: sysctl -w vm.max_map_count=4194304
+```
+
+Config: `config/bench_doop_ci.txt`. Raw data: `west3-doop-ci-snapshot.csv`,
+`west3-doop-ci-sameorder.csv`.

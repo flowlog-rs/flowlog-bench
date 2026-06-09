@@ -1,0 +1,6 @@
+dataset,flowlog_default_s,souffle_default_s,fl_over_sf_same_order,souffle_plan_s,as_shipped_fl_over_sf
+xalan,38.8,33.4,1.16,27.5,1.44
+biojava,53.7,53.1,1.01,45.9,1.17
+kafka,60.7,59.2,1.03,51.2,1.20
+graphchi,78.4,75.6,1.04,65.0,1.22
+h2o,406.1,216.4,1.88,189.8,2.15

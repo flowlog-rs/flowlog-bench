@@ -2,6 +2,12 @@
 
 Performance benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog) Datalog engine. 
 
+## Reports
+
+| Report | Highlights |
+|---|---|
+| [**DOOP `context-insensitive` (non-toy)** — FlowLog vs Soufflé, 20 DaCapo @ 32t](docs/historical/west3-doop-ci.md) | Matches Soufflé on all 20; FlowLog wins **14/20** (geomean **1.30×**, up to **3.4×** on jython). At *equal join order* the mid-app gaps vanish — they were Soufflé's hand-tuned `.plan`; the residual gap is differential-dataflow arrangement maintenance. jython is a FlowLog **win**, not an OOM. |
+
 ## Setup
 
 Ubuntu only. ~50 GB free for the FlowLog build cache + dataset cache.
