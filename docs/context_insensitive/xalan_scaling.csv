@@ -1,0 +1,13 @@
+# xalan scaling, SAME syntactic join order (souffle .plan stripped; default SIPS==syntactic for these chain joins).
+# wall-clock seconds.
+threads,flowlog_s,souffle_s
+8,42.5,50.8
+16,40.3,42.7
+32,40.7,41.2
+48,64.6,
+64,70.2,60.7
+# FlowLog -P per-worker diagnostics (why it stops scaling):
+# w,wall_s,sum_active_work_s,util_pct,shuffle_arrange_s,activations_M,skew_max_over_mean
+# 16,40.7,182.6,28.0,38.6,21.4,3.24
+# 32,41.5,345.3,26.0,65.1,41.2,3.46
+# 64,72.9,1018.4,21.8,159.8,84.8,4.04

@@ -77,6 +77,54 @@ So the regression list is two different things: **mostly the planner** (closeabl
 — FlowLog *supports* `.plan`, the orders just aren't emitted by the mirror), plus
 **one true engine gap at h2o scale**.
 
+## xalan deep-dive — why it's "slow", and why it doesn't scale
+
+Using xalan as the lightweight probe (40 s, 2.4 M VarPointsTo over ~50 fixpoint
+iterations), on the **same syntactic plan** (souffle `.plan` stripped — and
+souffle's *default* SIPS already equals syntactic order for these chain joins, so
+"just no `.plan`" suffices):
+
+![xalan_scaling](plots/xalan_scaling.png)
+
+- **At the sweet spot it's a tie, not slow.** 16–32 threads: FlowLog ~40 s ≈
+  Soufflé ~41 s. The "slowness" was the `.plan` tuning, not the engine.
+- **Neither scales past ~32 threads; FlowLog degrades a bit earlier/harder**
+  (40→65→70 s at 32→48→64; Soufflé 41→61 s at 32→64). xalan is small, so there's
+  little work to parallelise and a lot of per-iteration coordination.
+
+**Why FlowLog stops scaling** — from the `-P` per-worker profile at -w16/32/64:
+
+![xalan_scaling_diag](plots/xalan_scaling_diag.png)
+
+| -w | wall | Σ active work | util % | shuffle (arrange) | activations | skew (max/mean) |
+|----|------|---------------|--------|-------------------|-------------|------------------|
+| 16 | 40.7 s | 183 s | 28 % | 38.6 s | 21.4 M | 3.24× |
+| 32 | 41.5 s | 345 s | 26 % | 65.1 s | 41.2 M | 3.46× |
+| 64 | 72.9 s | **1018 s** | 22 % | **159.8 s** | **84.8 M** | 4.04× |
+
+1. **Adding workers *creates* work, not just splits it.** Total active work
+   **182 → 345 → 1018 s** — ≈2× per worker-doubling. Throughput can't keep up, so
+   wall time *rises*.
+2. **The cross-worker shuffle is the culprit.** The recursive fixpoint
+   re-`Arrange`s (all-to-all exchanges) the points-to deltas **every** one of ~50
+   iterations; that arrange time grows **~4×** (38.6 → 159.8 s). Soufflé updates
+   shared in-memory B-trees in place — no per-round exchange.
+3. **Utilisation is low and falling (28 → 22 %).** Workers idle most of the time,
+   blocked on per-iteration progress barriers and on exchange.
+4. **Scheduler overhead explodes.** 21 → 85 M operator activations — more workers
+   ⇒ smaller per-worker batches ⇒ more wake-ups for the same tuples.
+5. **Key skew (3.2 → 4.0×).** A few hot points-to keys (heavily-pointed vars/heaps)
+   overload some workers while the rest sit off the critical path, so extra
+   workers don't shorten the longest worker.
+
+**Bottom line:** FlowLog's differential-dataflow model pays an *exchange +
+barrier* tax **per iteration**. On a low-arithmetic-intensity, skewed, ~50-round
+fixpoint like xalan, that tax is hidden at 16–32 threads (tie with Soufflé) but
+dominates past them — and is exactly the cost that makes h2o a real engine gap.
+Actionable: cap workers at ~16 here; engine-side, the wins are fewer/cheaper
+re-arrangements in the recursive scope (delta-arrangement reuse) and skew-aware
+key distribution.
+
 ## Peak memory — comparable
 
 ![memory](plots/memory.png)
