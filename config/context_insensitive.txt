@@ -1,0 +1,14 @@
+# DOOP context-insensitive analysis (non-toy) — FlowLog vs Soufflé correctness.
+# Same 20 DaCapo fact datasets as doop.dl (config/default.txt). The full
+# context-insensitive points-to analysis is heavy; this list is the subset
+# run for the correctness comparison. Add more app names (any dir under
+# /datasets/facts with DOOP facts) to widen coverage.
+#
+# Program pair (same analysis, two dialects):
+#   programs/oracle/flowlog/context_insensitive/default.dl  (head aggregates)
+#   programs/oracle/souffle/context_insensitive.dl          (body aggregates, ?-vars)
+context_insensitive.dl=tomcat
+context_insensitive.dl=cassandra
+context_insensitive.dl=luindex
+context_insensitive.dl=lusearch
+context_insensitive.dl=batik
