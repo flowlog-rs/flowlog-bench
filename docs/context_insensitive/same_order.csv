@@ -1,0 +1,7 @@
+# Pure-engine comparison: SAME (syntactic) join order. -w/-j 32.
+# FlowLog: default (no --sip, no .plan; syntactic). str-intern (mandatory).
+# Souffle-same: .plan stripped + .pragma "SIPS" "strict" (syntactic).
+# Souffle-tuned: original DOOP .plan + default SIPS.
+dataset,flowlog_s,flowlog_mb,souffle_same_s,souffle_same_mb,souffle_tuned_s,note
+xalan,39.8,4821,43.0,3114,36.1,tie at equal order — regression was .plan tuning
+h2o,389.0,24489,236.0,29929,204.5,genuine ~1.65x engine gap at equal order

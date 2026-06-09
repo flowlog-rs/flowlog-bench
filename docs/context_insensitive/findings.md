@@ -17,23 +17,29 @@ Reproduce: `make` n/a — `bash scripts/context_insensitive_compare.sh` (reads
   heap-representative renaming — and the `HeapRepresentative` **partitions are
   identical** on every one (244 classes on tomcat, …). No genuine divergence.
   (jython is the 20th: too dense to cross-check in budget — see below.)
-- **Performance: 14 wins (up to 2.5×), 5 regressions.** FlowLog wins on
-  solve-heavy apps (batik, h2, spring, eclipse, …); it regresses on the denser
-  ones — **h2o 2.11×**, graphchi / xalan / kafka **1.28×**, biojava **1.24×**.
+- **Performance (default settings): 14 wins (up to 2.5×), 5 regressions** —
+  **h2o 2.11×**, graphchi / xalan / kafka **1.28×**, biojava **1.24×**. *But the
+  default comparison is unfair:* Soufflé runs DOOP's hand-tuned `.plan` join
+  orders on the hot recursive rules; FlowLog runs syntactic order (no `.plan`).
+- **Pure-engine, SAME join order** (Soufflé `.plan` stripped + strict SIPS;
+  FlowLog already syntactic): the moderate regressions **vanish** — xalan is a
+  **tie** (FlowLog 39.8 s vs Soufflé 41–45 s). They were Soufflé's *optimizer*,
+  not its engine. **h2o is the exception**: a genuine **~1.65× engine gap** even
+  at equal order (389 vs 236 s) — the largest/densest workload — though FlowLog
+  there uses **less** memory (24.5 vs 29.9 GB).
 - **jython** is pathological for *both* engines (~150–180 GB). FlowLog OOMs at
   `-w32` (knife-edge 178 GB) but **completes at `-w16` / `-w8`** (171 GB); the
   matched Soufflé run was still going at 150 GB / 22 min when stopped, so jython
   is **not yet cross-checked** (it is the one dataset without a MATCH verdict).
-- **Root cause of the regressions** (FlowLog `-P` profile): the **recursive
-  points-to fixpoint** — 66 % of time is inside the iterative scope, dominated
-  by two large joins (~50 iterations) plus **~21 % rebuilding arrangements**.
-  Differential-dataflow re-arranges dense relations every iteration; Soufflé's
-  semi-naïve B-tree joins are cheaper on those workloads.
-- **No user flag closes the gap.** `--str-intern` is **mandatory** (the program's
-  `ord()` heap-merge requires it); `--sip` is **3–4× worse**; the worker knee is
-  **~16** (>32 degrades; 48/64 are pathological). `-w16` is the best operating
-  point and shrinks h2o from 2.11× to ~1.9×. The real fix is engine-side
-  (arrangement sharing / less re-arrangement), not a knob.
+- **Where FlowLog's time goes** (FlowLog `-P` profile, xalan): **66 %** inside
+  the recursive fixpoint — joins + **~21 % rebuilding arrangements** each
+  iteration. That overhead is what costs at h2o scale; below it, FlowLog's
+  parallel integer-key joins win.
+- **Actionable.** `--sip` is **3–4× worse** and `--str-intern` is **mandatory**
+  (`ord()` needs it), so neither is the answer. **FlowLog *supports* `.plan`** —
+  porting DOOP's join-order hints should close the moderate regressions; the h2o
+  engine gap (arrangement churn) is the one real engine target. `-w16` is a free
+  win (the `-w32` "fairness" setting is past FlowLog's scaling knee).
 
 ---
 
@@ -46,6 +52,30 @@ Reproduce: `make` n/a — `bash scripts/context_insensitive_compare.sh` (reads
 FlowLog wins where the solve dominates and its parallel integer-key joins pay off
 (batik 0.40×, h2 0.40×, spring 0.41×). It loses on denser fixpoints where
 per-iteration arrangement maintenance dominates.
+
+## Pure-engine — the same join order
+
+The runtime chart above is **unfair to FlowLog**: Soufflé runs DOOP's hand-tuned
+`.plan` join orders on the hot recursive rules (16 `.plan` directives in the
+`.dl`), while FlowLog has none and runs syntactic order. To isolate the *engine*
+from the *optimizer*, re-run with the **same join order** on both — Soufflé with
+`.plan` stripped + `.pragma "SIPS" "strict"` (syntactic), FlowLog as-is
+(syntactic by default). Outputs are byte-identical (VarPointsTo matches).
+
+![same_order](plots/same_order.png)
+
+- **xalan: a tie.** FlowLog 39.8 s vs Soufflé-same-order 41–45 s (Soufflé-tuned
+  36.1 s). The 1.28× "regression" was **entirely Soufflé's `.plan` tuning** — at
+  equal join order FlowLog's engine is as fast or faster. The other 1.24–1.28×
+  regressions (kafka, graphchi, biojava) are the same shape.
+- **h2o: a real engine gap.** Even at equal order Soufflé is **1.65× faster**
+  (236 vs 389 s) — differential-dataflow's per-iteration re-arrangement genuinely
+  costs on the largest, densest workload. FlowLog does use **less** memory here
+  (24.5 vs 29.9 GB).
+
+So the regression list is two different things: **mostly the planner** (closeable
+— FlowLog *supports* `.plan`, the orders just aren't emitted by the mirror), plus
+**one true engine gap at h2o scale**.
 
 ## Peak memory — comparable
 
@@ -74,12 +104,16 @@ propagation — the cost is re-arranging large recursive relations each round.
 | `--sip` | **3–4× worse** (xalan 38 s → 132–153 s); SIP plans backfire here |
 | workers | knee ≈ **16**; `-w32` slightly past it; `-w48/64` pathological (1.6×) |
 | `-w16` vs `-w32` | xalan 38.2 vs 39.3 s; **h2o 396 vs 432 s** (helps the worst case) |
+| **`.plan` join order** | the real lever — see *Pure-engine* above; at equal order the moderate regressions disappear |
 
-**Takeaway:** the regressions are intrinsic to differential-dataflow's
-evaluation of these dense points-to fixpoints, not a misconfiguration. Lowering
-workers to ~16 is a cheap, safe win (the `-w32` "fairness" setting is past
-FlowLog's scaling knee); the durable fix is reducing arrangement churn in the
-recursive scope.
+**Takeaway:** the 1.24–1.28× regressions are **not** an engine deficit — they are
+Soufflé's `.plan` join-order tuning, and they vanish at equal join order. The
+actionable fix is to **emit DOOP's `.plan` hints into the FlowLog program**
+(FlowLog already supports `.plan`); `--sip` is not it, and `--str-intern` is
+mandatory. Two things remain genuinely engine-side: the **h2o-scale ~1.65× gap**
+(arrangement churn in the recursive scope) and FlowLog's higher memory on small
+apps. `-w16` is a free win (the `-w32` "fairness" setting is past FlowLog's
+scaling knee).
 
 ---
 
