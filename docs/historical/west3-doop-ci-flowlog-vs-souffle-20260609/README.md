@@ -21,11 +21,11 @@ aggregates), not the curated `doop/default.dl`. Soufflé runs the equivalent
 FlowLog completes it in **13 m 43 s** at **167 GiB** peak. It needs a memory-mapped-heavy
 runtime: `vm.max_map_count` raised above the 65 530 default (FlowLog issues >65 k `mmap`s and
 otherwise aborts with a spurious "allocation failed") and `vm.overcommit_memory=1`. Soufflé with
-**left-to-right** join order (no `.plan`) is still grinding through jython's recursive points-to —
-no result yet well past FlowLog's 10 min solve — consistent with the trend that the unscheduled
-order hurts Soufflé most on the densest inputs (cf. spring 4.40×, batik 4.75×). jython is
-therefore excluded from the perf/mem table above; its FlowLog result is reported here for
-completeness, with the FlowLog↔Soufflé tuple comparison pending Soufflé completion.
+**left-to-right** join order (no `.plan`) **did not finish jython's recursive points-to within a
+1 h cap** — vs FlowLog's 10 min solve — consistent with the trend that the unscheduled order hurts
+Soufflé most on the densest inputs (cf. spring 4.40×, batik 4.75×). jython is therefore excluded
+from the perf/mem table above; its FlowLog result is reported here for completeness, and the
+FlowLog↔Soufflé tuple comparison could not be completed because Soufflé produced no output.
 
 ## Same join order, pure engine (no optimiser)
 
