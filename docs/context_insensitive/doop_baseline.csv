@@ -1,0 +1,38 @@
+# Controlled doop.dl vs context-insensitive comparison.
+# SAME flowlog binary (1d8b05a), SAME flags (--str-intern, -w32), SAME facts.
+# doop.dl = flowlog/example/program_analysis/doop.dl (hand-written, arity-2 VarPointsTo).
+# ctx     = programs/oracle/flowlog/context_insensitive/default.dl (flattened DOOP, arity-4).
+# FlowLog times = this session's single -w32 run (solve stamp). Souffle doop = historical
+# perf-snapshot (xalan 9.36s); Souffle ctx = summary.csv / same_order.csv.
+dataset,program,fl_seconds,fl_peak_gb,fl_varpointsto,fl_vpt_arity,sf_seconds,sf_peak_gb
+xalan,doop.dl,3.1,2.2,2741586,2,9.36,0.35
+xalan,context_insensitive,39.2,4.7,2387458,4,36.1,3.3
+h2o,doop.dl,12.0,8.3,17911631,2,NA,NA
+h2o,context_insensitive,410,24.0,8348153,4,204.5,30.0
+# Derived: FlowLog doop->ctx slowdown  xalan 12.6x,  h2o 34x.
+# Derived: Souffle doop->ctx slowdown  xalan 3.9x.
+# Note: ctx VarPointsTo is SMALLER than doop's (heap merging) yet 12-34x slower.
+#
+# Experiment A — rule count is NOT FlowLog-specific (recursive TC, identical 2.78M answer):
+#   rules,flowlog_solve_s,souffle_solve_s
+#   1,1.43,1.34
+#   3,3.89,NA
+#   9,12.73,8.84        <- FlowLog 7.2x, Souffle 6.6x: BOTH scale ~the same with rule count
+#   arity_2to4_at_1rule,1.43->1.64   <- dead context cols: +15% time / +37% RSS (minor)
+#   arity_2to4_at_9rule,12.73->14.73
+# Worker sweep (1->9 rule penalty): -w1 10.1x, -w8 9.5x, -w32 7.2x. Persists at -w1
+#   (no cross-worker shuffle) => compute/index, not exchange.
+#
+# Experiment B — read the generated Rust (--save-temps). Recursive-SCC operator census
+# (every operator stepped EVERY round, ~50 rounds), doop.dl vs context-insensitive:
+#   operator,doop,ctx,ratio
+#   recursive_relations(Variable),8,73,9x
+#   arrangements(arrange_by_*),61,440,7x
+#   joins(join_core),77,439,6x
+#   dedups(threshold),8,89,11x
+# Codegen CSEs arrangements (438/440 distinct) and emits ONE shared dedup per relation,
+# so it is NOT per-rule indexing. The driver is SCC SIZE: ctx points-to fixpoint is one
+# iterative scope ~7x bigger than doop.dl's, all maintained per round. cost ~= SCC_ops x
+# rounds, so ~7x ops ~= the ~12x. hctx,ctx are constant singletons.
+# Souffle only 3.9x: flat current-set B-trees (vs differential per-iteration traces) +
+# DOOP .plan tuning; also the tiny doop.dl baseline flatters FlowLog (lead closes at scale).

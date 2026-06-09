@@ -27,6 +27,18 @@ Reproduce: `make` n/a — `bash scripts/context_insensitive_compare.sh` (reads
   not its engine. **h2o is the exception**: a genuine **~1.65× engine gap** even
   at equal order (389 vs 236 s) — the largest/densest workload — though FlowLog
   there uses **less** memory (24.5 vs 29.9 GB).
+- **vs the old `doop.dl` baseline, the slowdown is the recursive-SCC *size*, not the
+  engine and not rule count.** On the *same* binary/flags/facts, xalan goes doop.dl
+  **3.1 s → 39.2 s (12.6×)** and h2o **12 s → ~410 s (34×)**, while Soufflé only slows
+  3.9×. Yet context-insensitive computes a **smaller** VarPointsTo (heap merging). Two
+  controlled experiments + reading the generated Rust isolate the cause: (i) rule count
+  is **not** FlowLog-specific — a 1→9-rule micro-benchmark scales FlowLog **7.2×** and
+  Soufflé **6.6×** alike; (ii) the artifact shows the real driver — the context-
+  insensitive VarPointsTo fixpoint is **one iterative scope with 73 co-recursive
+  relations / 440 arrangements / 439 joins, vs doop.dl's 8 / 61 / 77 (~7×)**, all
+  stepped **every round** (~50). FlowLog's cost ≈ SCC-operators × rounds, so ~7× more
+  operators ≈ the ~12×. Arity-4 dead columns add only ~15 % (mostly memory); the new
+  aggregates are one-shot. See *Why slower than the old `doop.dl`* below + plots.
 - **jython** is pathological for *both* engines (~150–180 GB). FlowLog OOMs at
   `-w32` (knife-edge 178 GB) but **completes at `-w16` / `-w8`** (171 GB); the
   matched Soufflé run was still going at 150 GB / 22 min when stopped, so jython
@@ -125,6 +137,97 @@ Actionable: cap workers at ~16 here; engine-side, the wins are fewer/cheaper
 re-arrangements in the recursive scope (delta-arrangement reuse) and skew-aware
 key distribution.
 
+## Why slower than the old `doop.dl`? — the recursive-SCC size, not the engine
+
+The earlier `doop.dl` benchmark had FlowLog **3× faster** than Soufflé on xalan
+(3.1 s vs 9.4 s, historical perf-snapshot). Context-insensitive flips that to a
+tie/slight-loss. To isolate *why*, run **both programs on the same FlowLog binary,
+same `--str-intern -w32`, same facts** — the only variable is the `.dl`:
+
+| dataset | program | FlowLog | peak | VarPointsTo | Soufflé |
+|---------|---------|---------|------|-------------|---------|
+| xalan | `doop.dl` | **3.1 s** | 2.2 GB | 2.74 M (arity-2) | 9.4 s |
+| xalan | context-insensitive | **39.2 s** | 4.7 GB | 2.39 M (arity-4) | 36.1 s |
+| h2o | `doop.dl` | **12.0 s** | 8.3 GB | 17.9 M (arity-2) | — |
+| h2o | context-insensitive | **~410 s** | 24 GB | 8.35 M (arity-4) | 205 s |
+
+FlowLog's `doop→ctx` slowdown is **12.6× (xalan) / 34× (h2o)**; Soufflé's is **3.9×**.
+
+**It is not "more work," and it is not rule count alone.** Context-insensitive
+computes a **smaller** VarPointsTo on both datasets (it merges heaps), yet runs
+12–34× slower. Two controlled experiments plus **reading the generated Rust**
+(`flowlog-compiler --save-temps`) pin down the cause.
+
+**Experiment A — rule count is NOT FlowLog-specific.** A micro-benchmark (recursive
+transitive-closure, **identical 2.78 M-row answer, same rounds**) where the only knob
+is the number of rules deriving the recursive relation:
+
+| recursive relation | 1 rule | 9 rules | engine |
+|--------------------|--------|---------|--------|
+| arity-2 `(x,y)` | 1.43 s | **12.73 s** (7.2×) | FlowLog -w32 |
+| arity-2 `(x,y)` | 1.34 s | **8.84 s** (6.6×) | **Soufflé -j32** |
+| arity-4 `(0,x,0,y)` (2 dead cols) | 1.64 s | 14.73 s | FlowLog -w32 |
+
+![rulecount](plots/rulecount_scaling.png)
+
+Both engines scale ~**7× the same way** with rule count — so "more rules" explains
+Soufflé's 3.9× but **cannot** be FlowLog's extra penalty. (A worker sweep shows the
+1→9 penalty is **10.1× even at `-w1`** — no cross-worker shuffle — so it is
+compute/index, not exchange.) ![worker_sweep](plots/worker_sweep.png)
+
+**Experiment B — read the artifact (the real driver).** The generated Rust shows each
+recursive relation compiles to **one shared arrangement and one dedup**: the codegen
+CSEs arrangements (438/440 distinct — no per-rule rebuild) and emits a single
+`threshold_semigroup` after `concat`-ing all a relation's rules. (So an earlier
+"per-rule index" guess was wrong.) What actually explodes is the **size of the
+recursive SCC**. Census of the generated VarPointsTo fixpoint — every operator is
+stepped **every round** (~50):
+
+| per-round operator | doop.dl | context-insensitive | ratio |
+|--------------------|---------|---------------------|-------|
+| recursive relations (`Variable`) | 8 | 73 | 9× |
+| arrangements (indexes) | 61 | 440 | 7× |
+| joins (`join_core`) | 77 | 439 | 6× |
+| dedups (`threshold`) | 8 | 89 | 11× |
+
+![scc](plots/scc_operator_census.png)
+
+The context-insensitive points-to fixpoint is **one iterative scope with 73
+co-recursive relations, 440 indexes, and 439 joins — ~7× doop.dl's — all maintained
+every round**. FlowLog's solve ≈ (SCC operators) × rounds × per-operator cost, so a
+~7× bigger SCC ≈ the ~12× (the rest from bigger relations / more rounds / the +15 %
+width). This is the real answer: not rule count, not the answer size — the **operator
+count of the recursive scope**.
+
+**Why Soufflé only 3.9×.** It runs the same ~7× more rules, but (a) keeps flat
+current-set B-trees instead of differential dataflow's per-iteration arrangement
+**traces** (lower per-operator constant), and (b) uses DOOP's hand-tuned `.plan` join
+orders. At doop scale FlowLog's parallel joins win 3×; at context-insensitive scale
+the per-round cost of ~7× more differential operators erases the lead. (Honest caveat:
+the tiny `doop.dl` baseline *flatters* FlowLog — much of the "regression" is the 3×
+lead closing at scale, not FlowLog getting worse in absolute terms.)
+
+**Ruled out:** arity-4 dead columns (~15 %, mostly memory — Experiment A row 3); the
+12 `min(ord(heap))`/`count` aggregates (one-shot heap-merge/stats, none reference the
+recursive relations); redundant arrangements (CSE'd by the codegen).
+
+**Optimization opportunities for FlowLog** (artifact-grounded, highest leverage first):
+
+1. **SCC decomposition / stratification.** 73 relations sit in **one** iterative scope.
+   Many (`lambda*`, `invokedynamic*`, `methodhandle*`, `runningthread`, `boxtypeconversion`…)
+   look only weakly connected to the VarPointsTo core; if FlowLog's SCC detection is
+   coarse, splitting them into their own smaller strata lets sub-fixpoints converge in
+   a few rounds instead of iterating ~50× alongside the whole 440-arrangement loop.
+2. **Lighter arrangements/dedup in `datalog-batch` mode.** Batch only needs the final
+   set, yet the generated loop uses differential's per-iteration trace machinery for
+   all 440 arrangements + 89 `threshold`s. A flat "current-set" index/distinct for
+   batch mode would cut the per-operator constant that the SCC size multiplies.
+3. **Emit DOOP's `.plan` join-order hints** (FlowLog supports `.plan`) — closes
+   Soufflé's tuning advantage at equal engine.
+4. **Drop the two constant context columns** (arity-4 → arity-2) — ~15 %, mostly memory.
+
+Data + repro: `doop_baseline.csv`.
+
 ## Peak memory — comparable
 
 ![memory](plots/memory.png)
@@ -132,6 +235,13 @@ key distribution.
 Peak RSS is in the same ballpark; FlowLog is higher on small apps (the resident
 str-intern table) and comparable-to-lower on the big ones (batik 13.4 vs 15.5 GB).
 `jython` is the exception — dense enough to need ~170–180 GB on *both* engines.
+
+Note the contrast with the old `doop.dl`, where FlowLog was ~**6×** heavier than
+Soufflé (xalan 2.2 vs 0.35 GB) — it bought its 3× speed *with* memory. On
+context-insensitive that gap collapses to ~1.4× (and goes negative on the big
+apps): `--str-intern` compacts the wide arity-4 tuples, so FlowLog's relative
+memory position actually **improves** even as its time regresses — confirming the
+bottleneck is per-iteration *exchange time*, not resident footprint.
 
 ## What's actually slow (xalan `-P` profile)
 
