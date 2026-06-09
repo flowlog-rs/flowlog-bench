@@ -1,0 +1,13 @@
+# Thorough no-regression A/B for the DOOP gap-fill PRs (#126/#127).
+# Compile-time-only source-to-source passes: these existing oracle
+# programs don't use the new syntax, so identical runtime IR is expected.
+# Pairs are all from shipped configs (known-good on both refs); sizes
+# vary to surface any compile-time / planning drift.
+tc.dl=G5K-0.001
+tc.dl=G10K-0.001
+tc.dl=G20K-0.001
+sg.dl=G5K-0.001
+sg.dl=G10K-0.001
+sg.dl=G20K-0.001
+galen.dl=galen
+crdt.dl=crdt

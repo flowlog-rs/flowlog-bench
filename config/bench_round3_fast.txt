@@ -1,0 +1,8 @@
+# Round-3 (empty-EDB) vs baseline — fast subset (no G20K) to confirm the
+# compile-time-only fix introduces no regression on programs that don't use it.
+tc.dl=G5K-0.001
+tc.dl=G10K-0.001
+sg.dl=G5K-0.001
+sg.dl=G10K-0.001
+galen.dl=galen
+crdt.dl=crdt
