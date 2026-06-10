@@ -372,6 +372,49 @@ adding cores can't help while 94 % of CPU is control overhead):
    8-relation SCC and few rounds, has almost no floor — which is exactly why it scales
    and wins.)
 
+### Is this a *fundamental* DD/TD limit? — No: it scales with the compiled graph
+
+A controlled test settles it: run the **same FlowLog engine** on a **small** graph
+(doop.dl: 8-relation / 77-join SCC, few rounds) vs the **large** one (context-insensitive:
+73-relation / 439-join SCC, ~50 rounds), and sweep workers.
+
+![fundamental](plots/dd_fundamental.png)
+
+| -w | doop.dl CPU | ctx CPU | doop wall | ctx wall |
+|----|-------------|---------|-----------|----------|
+| 1 | 12.1 s | 72 s | 12.5 s | 74.7 s |
+| 16 | 41.2 s | 603 s | 2.78 s | 38.4 s |
+| 32 | 72.3 s | 1262 s | **2.52 s** | 40.5 s |
+
+The per-worker overhead **slope is ~1.9 s/worker for doop.dl vs ~38 s/worker for ctx — a
+19× difference**, which matches the ~(operators × rounds) ratio between the two programs.
+On the small graph the slope is so small that **doop.dl keeps scaling all the way to
+`-w32`** (wall 12.5 → 2.5 s, near-ideal early); the *identical engine* only saturates on
+the large graph. So this is **not** "DD/TD doesn't parallelize."
+
+What *is* fundamental to Timely/Differential is the **execution model**: every worker
+instantiates the **whole** operator graph (SPMD) and the runtime runs a **global
+progress-tracking protocol every round**. That makes the per-worker overhead grow with
+**operators × rounds × workers** — inherent, and the price of TD's generality and
+incrementality. DD therefore shines on *few operators / large data-per-operator / few
+rounds* (PageRank, big transitive closures) and struggles on *many tiny operators /
+small deltas / many rounds* — which is exactly the shape of a flattened 592-rule DOOP
+analysis.
+
+What is **not** fundamental is the *magnitude*, which is set by the **compiled graph**:
+439 separate joins + 440 arrangements over ~50 rounds is a FlowLog codegen artifact, not a
+law. Fusing operators, sharing arrangements, inlining the ~62 copy relations, and
+stratifying the SCC (levers 1–4 above) shrink `operators × rounds` and would *raise the
+scaling knee* well past 16 — all **within** DD/TD.
+
+The contrast with Soufflé is architectural, not a bug: Soufflé keeps **one** control flow
+over shared B-trees and parallelizes **inside** each operator (parallel-for over a
+relation's tuples), so its overhead does **not** scale with operator count. TD's "shard
+the data, replicate the graph" beats Soufflé when data-per-operator is large; Soufflé's
+"one graph, parallel inner loops" beats TD on big-program / small-delta / many-round
+Datalog. FlowLog inherits TD's trade-off — favourable on doop.dl, unfavourable on the
+flattened context-insensitive program until the graph is made leaner.
+
 ## Peak memory — comparable
 
 ![memory](plots/memory.png)

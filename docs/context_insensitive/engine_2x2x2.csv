@@ -43,3 +43,14 @@ souffle,context_insensitive,h2o,213.53,2100.30,1005,28.93,NA,8348153
 # Parallel efficiency at w16 = 72/(38.4*16) = ~12% (overhead-bound, not compute-bound).
 # Scale-up levers: shrink operator graph (fusion/arrangement-sharing/inline 62 copy rels),
 #   stratify the 72-relation SCC (fewer rounds), skip empty-delta operators, coarsen batches.
+#
+# IS IT FUNDAMENTAL TO DD/TD? Same engine, small vs large graph, xalan worker sweep:
+# FL-doop (8-rel/77-join SCC, few rounds) CPU by w: 1:12.06, 2:17.80, 4:22.89, 8:29.74, 16:41.24, 32:72.31
+# FL-doop wall by w: 1:12.53, 2:9.20, 4:5.95, 8:3.93, 16:2.78, 32:2.52  => KEEPS scaling to 32.
+# FL-ctx (73-rel/439-join SCC, ~50 rounds) CPU by w: 1:72.33 ... 32:1262  => saturates at 16.
+# Per-worker overhead slope: doop ~1.9 s/w vs ctx ~38 s/w = 19x ~= (operators x rounds) ratio.
+# Verdict: NOT a universal DD/TD limit. Fundamental = SPMD graph replication + per-round global
+# progress tracking (overhead ~ operators x rounds x workers). Magnitude is set by the compiled
+# graph (439 joins/440 arrangements/50 rounds) -> fusion/sharing/inlining/SCC-stratification raise
+# the knee, within DD/TD. Souffle differs architecturally (one control flow, intra-operator
+# parallel-for over shared B-trees) so its overhead does not scale with operator count.
