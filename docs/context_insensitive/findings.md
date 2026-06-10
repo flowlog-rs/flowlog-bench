@@ -549,6 +549,27 @@ pass, (3) WCOJ to shrink the join/arrangement graph, and (4) batch-mode trace co
 for memory — plus the free operational win of capping workers at the knee. doop.dl needs
 none of this (it already wins 4–5×); these target the large flattened-DOOP class.
 
+### Tried & ruled out — the cheap build/env levers don't move it
+
+Before the structural passes, the two zero/near-zero-effort levers were measured (xalan
+`-w16`, best of 2) — **both neutral**, which is itself a useful result:
+
+| lever | doop solve | ctx solve | verdict |
+|-------|-----------|-----------|---------|
+| baseline (cargo default release) | 2.77 s | 37.5 s | — |
+| **fat LTO + `codegen-units=1`** (generated `Cargo.toml`) | 2.99 s | n/a\* | **neutral→worse** |
+| **mimalloc huge pages** (`MIMALLOC_*_LARGE_OS_PAGES=1`) | — | 37.2 s | neutral |
+
+\* doop's regression + the mechanism made the (10×-slower) ctx LTO build not worth
+finishing. **Why LTO doesn't help:** differential-dataflow / timely's hot operators
+(`join_core`, `arrange`, the progress loop) are **generic**, so they are already
+monomorphised into the generated crate and inlined by the normal optimiser — there is
+little non-generic cross-crate code left for LTO to inline. **Why huge pages don't help:**
+the per-round cost is operator *scheduling/coordination*, not TLB pressure. Both confirm
+the bottleneck is **structural** (operators × rounds), not codegen/build quality — so the
+real wins are the passes above (fewer operators / fewer rounds / empty-delta gating), not
+a compiler flag. The `Cargo.toml` profile change was reverted (no gain, 10× build cost).
+
 ## Methodology
 
 - Programs: `programs/oracle/{flowlog,souffle}/context_insensitive*.dl` — the same
