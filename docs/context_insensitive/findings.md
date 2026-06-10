@@ -306,6 +306,72 @@ operator fusion to cut the per-operator constant the 72-relation SCC multiplies;
 a smaller dataflow; (4) `.plan` hints and dropping the 2 constant context columns are
 minor here. doop.dl needs nothing — FlowLog already wins it 4–5×.
 
+## Why it over-parallelizes — and how to scale it (diagnosis)
+
+The worker sweep above raised the question: *why* does adding workers stop helping (and
+then hurt)? A pinning/onset study on FL-ctx xalan answers it — and rules out every
+hardware explanation.
+
+**Hardware is not the cause.** The box is one AMD EPYC 7763 socket (1 NUMA node, 32
+physical cores × 2 SMT = 64 vCPUs, L3 split into chiplet domains of 16 vCPUs).
+
+- **L3/chiplet locality doesn't matter.** Same 8 workers, pinned L3-local (1 chiplet) vs
+  spread across all 4 chiplets vs default: **43.2 / 43.4 / 42.8 s, CPU 337 / 339 / 338 s**
+  — identical. So it is *not* cross-chiplet cache traffic.
+- **SMT doesn't matter.** `-w32` pinned to 32 distinct physical cores (no SMT siblings)
+  vs default: **40.4 s / 1256 s** vs **40.7 s / 1269 s** — identical. Not an SMT effect.
+
+**The cause is timely's per-worker control plane, replicated SPMD.** The onset study
+decomposes total CPU work cleanly:
+
+![overparallel](plots/overparallel_diagnosis.png)
+
+| -w | 1 | 2 | 4 | 8 | 16 | 32 | 48 |
+|----|---|---|---|---|----|----|----|
+| CPU work (s) | **72** | 114 | 192 | 337 | 603 | 1262 | 2869 |
+| wall (s) | 74.7 | 58.5 | 48.4 | 42.8 | 38.4 | 40.5 | 61.1 |
+
+**Total CPU work ≈ 72 + 36·(workers−1).** The intrinsic computation is only **~72 s**
+(the `-w1` number, no exchange); every added worker contributes a **~constant ~36 s of
+overhead**. At `-w32`, **1262 s = 72 s real work + ~1190 s overhead (94 %)**. Because the
+overhead is constant *per worker* and independent of data placement, it is timely's
+**control plane**, not data movement: each worker runs the *entire* dataflow graph
+(~1000 operators — 439 joins, 440 arrangements) and **schedules every operator and
+maintains its frontier on every one of ~50 fixpoint rounds**. That cost is replicated
+across workers (SPMD), not divided. Wall-clock is therefore `72/w` (useful, shrinks) plus
+a **~38 s per-worker overhead floor** (the serial progress-barrier + scheduling part that
+can't be parallelized away). Past `-w16` the useful slice is already `< 5 s` so the floor
+dominates; `-w48` adds SMT contention and superlinear cross-worker progress messaging
+(~58 s/worker) → it regresses. Parallel efficiency at `-w16` is **~12 %**
+(`72 / (38.4·16)`) — the workload is overhead-bound, not compute-bound.
+
+**Why Soufflé doesn't have this.** Soufflé's compiled semi-naïve loop fires only the
+rules whose body deltas are non-empty in a round and updates shared B-trees in place —
+no per-operator-per-round scheduling/progress protocol replicated per thread. Its ~10–13
+active cores reflect the genuinely available parallelism; it doesn't manufacture
+coordination work.
+
+**How to actually scale it up** (reduce the `operators × rounds × workers` overhead —
+adding cores can't help while 94 % of CPU is control overhead):
+
+1. **Shrink the operator graph (biggest lever).** The floor scales with operator count.
+   Operator/rule **fusion** (collapse map/filter/project chains and the 439 joins where
+   possible), **arrangement sharing** across joins that key the same relation, and
+   **inlining** the ~62 copy/projection relations Soufflé eliminates — each removed
+   operator is removed from *every* worker's *every* round.
+2. **Cut the round count.** **Stratify the 72-relation SCC** into smaller sub-fixpoints
+   (many relations are only weakly coupled) so each converges in far fewer than ~50
+   rounds; fewer rounds = proportionally less replicated scheduling.
+3. **Skip empty operators cheaply.** Most of the 439 joins have an empty delta in any
+   given round, yet are still scheduled. Cheap "no new input → don't schedule" gating
+   (closer to Soufflé's delta firing) would cut the per-round floor directly.
+4. **Coarsen granularity.** Larger timely batch/buffer sizes amortize per-batch
+   bookkeeping; fewer, bigger progress updates lower the protocol cost.
+5. **Operationally: run at `-w8–16`.** Until the above land, this workload's useful
+   parallelism saturates by ~16; `-w32` only burns CPU and RAM. (doop.dl, with an
+   8-relation SCC and few rounds, has almost no floor — which is exactly why it scales
+   and wins.)
+
 ## Peak memory — comparable
 
 ![memory](plots/memory.png)
