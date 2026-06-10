@@ -570,6 +570,43 @@ the bottleneck is **structural** (operators × rounds), not codegen/build qualit
 real wins are the passes above (fewer operators / fewer rounds / empty-delta gating), not
 a compiler flag. The `Cargo.toml` profile change was reverted (no gain, 10× build cost).
 
+### Tried & ruled out — the two recommended passes, prototyped and measured
+
+Both were prototyped against the engine and **verified for correctness** (VarPointsTo =
+2 387 458 on every variant), then benchmarked (xalan `-w16`). **Both fail to help — for
+the same root reason: the cost is the irreducible recursive SCC, and neither touches it.**
+
+**(1) Empty-delta / per-round dedup removal — infeasible.** The per-round
+`threshold_semigroup` in `codegen/dedup.rs::dedup_recursive` looked like removable overhead
+(under `Present`, `P+P=P` is already idempotent). Gating it off made the **generated crate
+fail to compile**: `type mismatch resolving <Present as Multiply<i32>> … expected Present,
+found i32`. The operator is **load-bearing for the diff-type plumbing**, not just dedup — it
+normalises the recursive collection's difference type. Removing it minimally is impossible;
+doing it properly is a diff-type rework, not a small change. Reverted.
+
+**(2) Relation inlining — correct but zero benefit.** The program has **71** safely-inlinable
+non-recursive relations (44 exact aliases like `isClassType(c) :- _ClassType(c)` + 26
+projections). Inlining all 44 exact aliases (decls + defining rules removed, references
+rewritten to the source) and re-running:
+
+| ctx (xalan -w16) | solve | CPU work | peak RSS | VarPointsTo |
+|------------------|-------|----------|----------|-------------|
+| baseline | 36.93 s | 589 s | 3.62 GB | 2 387 458 |
+| **44 aliases inlined** | 36.92 s | 589 s | **3.69 GB** | 2 387 458 ✓ |
+
+**Identical** (RSS even ticks up). The inlinable relations are all **non-recursive** EDB
+renames — small, computed once, already arrangement-CSE'd — so eliminating them changes
+neither the per-round cost nor the resident footprint (which is the recursive SCC's
+arrangements). doop.dl is the same story (non-recursive renames; already 4–5× ahead).
+
+**Conclusion.** (1) is impossible without a diff-type rework; (2) is correct but a no-op
+because non-recursive inlining can't shrink the recursive SCC — and the SCC is identical in
+Souffle (72 relations), so it is genuinely irreducible at the rule level. **The only lever
+left that attacks the per-round SCC cost is WCOJ** (collapse the binary-join chains, cutting
+the 434 joins / 387 arrangements maintained every round) — deferred by request — or a
+timely-level change to the per-operator progress/scheduling cost. The rule-level passes are
+exhausted.
+
 ## Methodology
 
 - Programs: `programs/oracle/{flowlog,souffle}/context_insensitive*.dl` — the same
