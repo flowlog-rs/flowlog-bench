@@ -496,6 +496,59 @@ this row is **not a verified MATCH** — it is the one dataset left un-cross-che
 Single-run timings elsewhere carry run-to-run noise (the `ord()` heap-representative
 non-determinism), but the win/loss pattern is stable.
 
+## Engine optimization roadmap (code-anchored)
+
+Synthesis of the whole study, cross-referenced against the FlowLog source
+(`crates/flowlog-build`). **Already harvested** (don't re-suggest): `Present` boolean
+semiring for `datalog-batch` (`codegen/ty/diff.rs`), arrangement CSE/sharing via a
+fingerprint map (`codegen/flow/transformation.rs` `register_arrangement`), stratum-based
+iterative codegen (`codegen/flow/recursive.rs`), u32 `Spur` interned keys, dead-relation
+pruning. The remaining wins are harder engine work, ordered by leverage.
+
+**Perf** (root cause = differential's per-round work over the SCC, replicated per worker;
+FlowLog spends 2.7–5.8× Soufflé's CPU on context-insensitive):
+
+1. **Empty-delta operator gating — the biggest gap vs Soufflé.** Soufflé fires only rules
+   whose body deltas are non-empty in a round; FlowLog/DD schedules all **439** joins
+   every one of ~50 rounds even when their input frontier didn't advance. Short-circuiting
+   no-new-input operators attacks the dominant CPU cost (and the over-parallelization
+   floor) directly.
+2. **Add a relation-inlining / copy-elimination pass (verified missing).** `parser/inliner.rs`
+   inlines only `.comp`/`.init`; there is **no** single-use/projection-relation elimination,
+   so FlowLog materialises **437** relations where Soufflé inlines to **375**. Inlining the
+   ~62 copy/projection relations removes their arrange+join+materialise from every round —
+   helps perf *and* memory.
+3. **Multi-way / worst-case-optimal joins.** A k-atom rule compiles to k−1 **binary**
+   `join_core`s, each with its own intermediate arrangement (`transformation.rs`). Leapfrog/
+   Free-join (or DD delta-queries) collapse these to fewer operators and avoid intermediate
+   blow-up — a structural cut to the 439-join / 440-arrangement SCC.
+4. **Auto worker-count selection (cheap, immediate).** Cost ≈ intrinsic + ~k·workers with
+   k ∝ (recursive operators × rounds). A heuristic on that product can cap workers at the
+   knee for SCC-heavy programs (ctx ≈ 8–16) while using all cores for small-SCC ones
+   (doop scales to 32) — a free win the `-w32` default currently forfeits.
+
+**Memory** (root cause = arrangement trace Spines + the resident interner; FlowLog is
+1.5–2.3× heavier on small workloads but already ≤ Soufflé on h2o ctx):
+
+1. **Compact arrangement traces in batch mode (biggest memory lever).** Batch needs only the
+   final fixpoint, yet each arrangement keeps a differential `Spine` of historical batches.
+   Aggressively merging each Spine to a single batch as frontiers advance drops the retained
+   history — this is where FlowLog's small-program overhead lives.
+2. **Relation inlining** (perf #2) — 62 fewer materialised relations = fewer resident
+   arrangements.
+3. **Compress the interner reverse table.** Keys are already u32 (`Spur`); the cost is the
+   string arena holding full DOOP signatures (`<java.lang...: void m(...)>`). Front-code /
+   prefix-compress the arena (these identifiers share long prefixes), or build the
+   id→string map only at output time.
+4. **Specialise away the 2 constant context columns** (arity-4 → arity-2) — ~15 %, mostly
+   memory (verified).
+
+**Bottom line.** FlowLog already does the easy DD optimisations; the high-value engine work
+is (1) empty-delta gating to close the per-round scheduling gap, (2) a relation-inlining
+pass, (3) WCOJ to shrink the join/arrangement graph, and (4) batch-mode trace compaction
+for memory — plus the free operational win of capping workers at the knee. doop.dl needs
+none of this (it already wins 4–5×); these target the large flattened-DOOP class.
+
 ## Methodology
 
 - Programs: `programs/oracle/{flowlog,souffle}/context_insensitive*.dl` — the same
