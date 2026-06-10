@@ -24,15 +24,17 @@ h2o,context_insensitive,410,24.0,8348153,4,204.5,30.0
 #   (no cross-worker shuffle) => compute/index, not exchange.
 #
 # Experiment B — read the generated Rust (--save-temps). Recursive-SCC operator census
-# (every operator stepped EVERY round, ~50 rounds), doop.dl vs context-insensitive:
+# (static operators counted strictly inside the iterative(|inner|..) closure):
 #   operator,doop,ctx,ratio
 #   recursive_relations(Variable),8,73,9x
-#   arrangements(arrange_by_*),61,440,7x
+#   arrangement_operators,61,440,7x
 #   joins(join_core),77,439,6x
 #   dedups(threshold),8,89,11x
 # Codegen CSEs arrangements (438/440 distinct) and emits ONE shared dedup per relation,
 # so it is NOT per-rule indexing. The driver is SCC SIZE: ctx points-to fixpoint is one
-# iterative scope ~7x bigger than doop.dl's, all maintained per round. cost ~= SCC_ops x
-# rounds, so ~7x ops ~= the ~12x. hctx,ctx are constant singletons.
+# iterative scope ~7x bigger than doop.dl's. Of the 440 arrangement ops, ~200 are
+# loop-invariant (entered once); the delta-driven subset re-sorted every round is ~155
+# (= PR #11's "live arrangements" figure -- same scope, different cut). cost ~= live_SCC_ops
+# x rounds, so ~7x ops ~= the ~12x. hctx,ctx are constant singletons.
 # Souffle only 3.9x: flat current-set B-trees (vs differential per-iteration traces) +
 # DOOP .plan tuning; also the tiny doop.dl baseline flatters FlowLog (lead closes at scale).

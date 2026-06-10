@@ -35,10 +35,13 @@ Reproduce: `make` n/a — `bash scripts/context_insensitive_compare.sh` (reads
   is **not** FlowLog-specific — a 1→9-rule micro-benchmark scales FlowLog **7.2×** and
   Soufflé **6.6×** alike; (ii) the artifact shows the real driver — the context-
   insensitive VarPointsTo fixpoint is **one iterative scope with 73 co-recursive
-  relations / 440 arrangements / 439 joins, vs doop.dl's 8 / 61 / 77 (~7×)**, all
-  stepped **every round** (~50). FlowLog's cost ≈ SCC-operators × rounds, so ~7× more
-  operators ≈ the ~12×. Arity-4 dead columns add only ~15 % (mostly memory); the new
-  aggregates are one-shot. See *Why slower than the old `doop.dl`* below + plots.
+  relations / 440 arrangement operators / 439 joins, vs doop.dl's 8 / 61 / 77 (~7×)**.
+  Of those, the **delta-driven subset re-sorted every round (~50)** is what #11's
+  profiler counts as **~155 live arrangements** (the rest are loop-invariant indexes
+  `enter()`ed once); both numbers describe the same ~7× bloated recursive scope.
+  FlowLog's cost ≈ (live SCC operators) × rounds, so the ~7× ≈ the ~12×. Arity-4 dead
+  columns add only ~15 % (mostly memory); the new aggregates are one-shot. See *Why
+  slower than the old `doop.dl`* below + plots.
 - **jython** is pathological for *both* engines (~150–180 GB). FlowLog OOMs at
   `-w32` (knife-edge 178 GB) but **completes at `-w16` / `-w8`** (171 GB); the
   matched Soufflé run was still going at 150 GB / 22 min when stopped, so jython
@@ -180,22 +183,25 @@ recursive relation compiles to **one shared arrangement and one dedup**: the cod
 CSEs arrangements (438/440 distinct — no per-rule rebuild) and emits a single
 `threshold_semigroup` after `concat`-ing all a relation's rules. (So an earlier
 "per-rule index" guess was wrong.) What actually explodes is the **size of the
-recursive SCC**. Census of the generated VarPointsTo fixpoint — every operator is
-stepped **every round** (~50):
+recursive SCC**. Census of the generated VarPointsTo fixpoint — static operator count
+in the recursive scope (lines counted strictly inside the `iterative(|inner| …)`
+closure):
 
-| per-round operator | doop.dl | context-insensitive | ratio |
+| operator in recursive scope | doop.dl | context-insensitive | ratio |
 |--------------------|---------|---------------------|-------|
 | recursive relations (`Variable`) | 8 | 73 | 9× |
-| arrangements (indexes) | 61 | 440 | 7× |
+| arrangement operators | 61 | 440 | 7× |
 | joins (`join_core`) | 77 | 439 | 6× |
 | dedups (`threshold`) | 8 | 89 | 11× |
 
 ![scc](plots/scc_operator_census.png)
 
-The context-insensitive points-to fixpoint is **one iterative scope with 73
-co-recursive relations, 440 indexes, and 439 joins — ~7× doop.dl's — all maintained
-every round**. FlowLog's solve ≈ (SCC operators) × rounds × per-operator cost, so a
-~7× bigger SCC ≈ the ~12× (the rest from bigger relations / more rounds / the +15 %
+The context-insensitive points-to fixpoint is **one iterative scope ~7× bigger than
+doop.dl's**. Not all 440 arrangement operators are re-sorted each round: ~200 are
+loop-invariant indexes `enter()`ed once and reused, while the **delta-driven subset
+re-sorted every iteration is ~155** (the number #11's profiler reports as "live
+arrangements" — consistent, just a different cut of the same scope). FlowLog's solve ≈
+(live SCC operators) × rounds × per-operator cost, so a ~7× bigger SCC ≈ the ~12× (the rest from bigger relations / more rounds / the +15 %
 width). This is the real answer: not rule count, not the answer size — the **operator
 count of the recursive scope**.
 
@@ -220,8 +226,9 @@ recursive relations); redundant arrangements (CSE'd by the codegen).
    a few rounds instead of iterating ~50× alongside the whole 440-arrangement loop.
 2. **Lighter arrangements/dedup in `datalog-batch` mode.** Batch only needs the final
    set, yet the generated loop uses differential's per-iteration trace machinery for
-   all 440 arrangements + 89 `threshold`s. A flat "current-set" index/distinct for
-   batch mode would cut the per-operator constant that the SCC size multiplies.
+   the ~155 delta-driven arrangements + 89 `threshold`s (out of 440 total). A flat
+   "current-set" index/distinct for batch mode would cut the per-operator constant that
+   the SCC size multiplies.
 3. **Emit DOOP's `.plan` join-order hints** (FlowLog supports `.plan`) — closes
    Soufflé's tuning advantage at equal engine.
 4. **Drop the two constant context columns** (arity-4 → arity-2) — ~15 %, mostly memory.
