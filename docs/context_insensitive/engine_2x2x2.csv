@@ -1,0 +1,32 @@
+# 2x2x2 controlled study: {FlowLog,Souffle} x {doop.dl,context-insensitive} x {xalan,h2o}.
+# FlowLog: --str-intern, -w32 (left-to-right, .plan commented out in doop.dl, none in ctx).
+# Souffle: -j32 compile AND run (libgomp parallel), .plan stripped from both programs (left-to-right).
+# Same overlay facts (symlinks + empty keep-spec defaults). /usr/bin/time -v for wall + max RSS.
+# user_s = total CPU work (user-time) = the key metric. VPT cross-checked equal where output.
+engine,program,dataset,wall_s,user_cpu_s,cpu_pct,peak_rss_gb,solve_s,varpointsto
+flowlog,doop,xalan,2.51,72.16,2998,2.18,2.47,2741586
+souffle,doop,xalan,10.91,106.62,983,0.96,NA,2741586
+flowlog,doop,h2o,12.72,359.16,2950,8.15,12.54,17911631
+souffle,doop,h2o,63.16,406.08,649,5.49,NA,17911631
+flowlog,context_insensitive,xalan,38.54,1203.69,3141,4.81,37.98,2387458
+souffle,context_insensitive,xalan,32.88,439.13,1347,2.64,NA,2387458
+flowlog,context_insensitive,h2o,387.92,12275.91,3177,24.04,385.67,8348153
+souffle,context_insensitive,h2o,213.53,2100.30,1005,28.93,NA,8348153
+#
+# Derived (FlowLog/Souffle): doop wall 0.20-0.23x (FL 4-5x FASTER), ctx wall 1.17-1.82x (FL slower).
+# CPU work FL/SF: doop 0.68-0.88x (FL <= SF), ctx 2.74x (xalan) / 5.84x (h2o) -- the regression is CPU WORK.
+# Memory FL/SF: doop 1.5-2.3x more; ctx xalan 1.8x more; ctx h2o 0.83x (FL LESS at scale, str-intern).
+#
+# FL-ctx xalan worker sweep (wall saturates at 16; -w32 doubles CPU+mem for 0 wall gain; -w48 regresses):
+# workers,wall_s,user_cpu_s,rss_gb
+# 4,48.42,191.58,2.57
+# 8,41.01,324.29,2.90
+# 16,38.36,603.28,3.61
+# 32,38.70,1210.02,4.77
+# 48,61.07,2869.30,5.87
+#
+# Structural (read from generated Rust + souffle --show): recursive SCC is the SAME size in both
+# engines (FlowLog 73 Variable, Souffle 72 relations). Souffle inlines 602->375 relations; FlowLog
+# prunes 602->437 (keeps ~62 MORE, all NON-recursive). So .comp/inlining is minor (1.17x relations);
+# the CPU-work gap is differential-dataflow per-round arrangement/trace maintenance over the shared
+# ~72-relation SCC x ~50 rounds, amplified by over-parallelization.

@@ -235,6 +235,77 @@ recursive relations); redundant arrangements (CSE'd by the codegen).
 
 Data + repro: `doop_baseline.csv`.
 
+## Engine vs engine — the 2×2×2 (the CPU-work view)
+
+`{FlowLog, Soufflé} × {doop.dl, context-insensitive} × {xalan, h2o}`, **both at 32
+threads, left-to-right** (FlowLog `--str-intern -w32`; Soufflé `-j32` compile **and**
+run, `.plan` stripped). VarPointsTo cross-checks equal (xalan 2.39 M, h2o 8.35 M).
+Data: `engine_2x2x2.csv`.
+
+![engine](plots/engine_wall_vs_cpu.png)
+
+| program | dataset | wall FL/SF | **CPU-work FL/SF** | mem FL/SF |
+|---------|---------|-----------|--------------------|-----------|
+| doop.dl | xalan | **0.23×** (FL 4.3× faster) | 0.68× | 2.3× |
+| doop.dl | h2o | **0.20×** (FL 5.0× faster) | 0.88× | 1.5× |
+| context-insensitive | xalan | 1.17× | **2.74×** | 1.8× |
+| context-insensitive | h2o | 1.82× | **5.84×** | **0.83×** |
+
+The headline metric is **total CPU work (user-time), not wall-clock.** It removes the
+parallelism confound and shows exactly what happens:
+
+- **doop.dl: FlowLog does *less* total work than Soufflé** (0.68–0.88×) *and* lights up
+  ~30 cores vs Soufflé's ~7–10 → it wins wall **4–5×**. Differential dataflow's
+  parallel integer-key joins are simply more efficient here.
+- **context-insensitive: FlowLog's total work *explodes* to 2.74× (xalan) / 5.84×
+  (h2o)** Soufflé's. Even pinning 32 cores it can't outrun a ~6× work deficit, so it
+  loses wall 1.2–1.8×. The `doop→ctx` swing in *relative CPU work* is **4.1× (xalan) /
+  6.6× (h2o)** — that is the regression, and it is **compute, not a scheduling artifact**.
+- **Per output tuple**, FlowLog spends **504 µs (xalan) / 1470 µs (h2o)** of CPU on
+  context-insensitive vs Soufflé's 184 / 252 µs.
+
+**Where the extra work comes from (and where it doesn't).** It is *not* a bigger
+recursive core or `.comp` non-reuse: the recursive SCC is the **same size in both
+engines** — FlowLog 73 `Variable`s, Soufflé **72 relations** (computed from
+`souffle --show=scc-graph`). Soufflé's optimiser inlines **602 → 375** relations;
+FlowLog prunes only unreachable ones (**602 → 437**), so it materialises ~62 more — but
+those are all **non-recursive** (evaluated once), worth the ~1.17× relation count, not
+the ~6× work. The work gap is **differential dataflow's per-round arrangement/trace
+maintenance over the shared ~72-relation SCC × ~50 rounds**: 439 `join_core` + ~155
+delta-driven arrangements are scheduled and their traces merged every iteration, a
+higher per-operator constant than Soufflé's in-place semi-naïve B-tree update. doop.dl's
+8-relation SCC is too small for that constant to matter; the 72-relation SCC makes it dominate.
+
+**Memory.** FlowLog is heavier on the small/doop cases (1.5–2.3×: resident str-intern
+table + arrangement traces) but **lower on the largest workload** (h2o ctx **24.0 vs
+28.9 GB, 0.83×**) — `--str-intern` compacts the arity-4 tuples while Soufflé's B-trees
+balloon. So memory is *not* FlowLog's problem at scale; CPU work is.
+
+**The one obvious, free optimisation — stop over-parallelising.** FL-ctx xalan worker sweep:
+
+![sweep](plots/engine_worker_sweep.png)
+
+| -w | wall | CPU work | peak RSS |
+|----|------|----------|----------|
+| 8 | 41.0 s | 324 s | 2.90 GB |
+| **16** | **38.4 s** | **603 s** | **3.61 GB** |
+| 32 | 38.7 s | 1210 s | 4.77 GB |
+| 48 | 61.1 s | 2869 s | 5.87 GB |
+
+Wall **saturates at `-w16`**; `-w32` *doubles* CPU work (603 → 1210 s) and adds 32 %
+memory for **zero** wall gain; `-w48` regresses. **`-w16` gives the same wall as `-w32`
+at half the CPU and 24 % less RAM** — and closes the Soufflé CPU-work gap from 2.74× to
+~1.37×. Adding workers *creates* coordination work rather than splitting it (CPU grows
+~linearly with `-w`), the classic differential all-to-all-exchange tax.
+
+**Optimisation summary for these workloads:** (1) **bench/run context-insensitive at
+`-w8–16`, not `-w32`** — free CPU+memory win, no wall cost; (2) engine: **lighter
+batch-mode arrangements** (drop per-iteration trace retention in `datalog-batch`) and
+operator fusion to cut the per-operator constant the 72-relation SCC multiplies;
+(3) **inline copy/projection relations** (the 62 FlowLog keeps but Soufflé doesn't) for
+a smaller dataflow; (4) `.plan` hints and dropping the 2 constant context columns are
+minor here. doop.dl needs nothing — FlowLog already wins it 4–5×.
+
 ## Peak memory — comparable
 
 ![memory](plots/memory.png)
