@@ -48,6 +48,7 @@ def xc(cell):
 
 with open(path) as fh:
     rows = list(csv.DictReader(fh))
+rows.sort(key=lambda r: (r["Program"], r["Dataset"]))
 
 print("## Wall time (seconds, median of runs; slowdown vs FlowLog; load+exec split)\n")
 print("| Program/Dataset | FlowLog | FL load+exec | Soufflé | Sf load+exec "
