@@ -1,0 +1,68 @@
+# Reproducibility manifest for docs/historical/perf-snapshot.{csv,svg,png}
+# (AGENTS.md principle 6). FlowLog (compiler) vs Soufflé, 32 threads, 49 workloads.
+
+date              : 2026-06-12 (UTC)
+host              : flowlog-west3 (64 cores, 503 GiB RAM)
+os                : Linux 6.8.0-1052-azure x86_64
+flowlog_ref       : main
+flowlog_sha       : 4bc8410fcfe1b75be8fb709a1db63c482f14fc6b   # flowlog-compiler 0.4.2,
+                                                               # incl. #148 arrangement sharing
+souffle_version   : 2.5
+cargo_version     : cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+workers           : 32   (FlowLog -w 32; Soufflé -j 32 at BOTH compile and runtime)
+num_runs          : non-DOOP = 3 (median kept); DOOP context_insensitive = 1
+flowlog_str_intern: on (--str-intern; recommended for symbol-typed workloads)
+
+# --- Both engines get 32-way parallelism --------------------------------------
+# FlowLog: compiled batch binary run with `-w 32`.
+# Soufflé: COMPILED (not interpreted). `-j 32` is passed at BOTH:
+#   * compile time  — `souffle -o bin -j 32 -F <facts> prog.dl`  (gates the pfor
+#                     macro / libgomp linkage; without it the binary is serial)
+#   * run time      — `bin -F <facts> -D <out> -j 32`
+# Every Soufflé binary in this run was verified `ldd`-linked against libgomp.
+
+# --- Metric (identical across all 49 rows) ------------------------------------
+# Compiler_Exec_s    FlowLog solve time = "Dataflow executed" stamp minus the
+#                    last "Data loaded for" stamp (scripts/lib/measure.sh).
+# Souffle_Total_s    Soufflé wall-clock (GNU /usr/bin/time -v elapsed).
+# *_PeakRss_MB       Maximum resident set size (GNU /usr/bin/time -v).
+# Speedup_vs_Souffle Souffle_Total_s / Compiler_Exec_s.
+
+# --- How to reproduce ---------------------------------------------------------
+# (1) NON-DOOP (30 pairs: graph, knowledge, points-to, borrow/Polonius):
+#     WORKERS=32 NUM_RUNS=3 \
+#       bash scripts/cross_engine.sh --fresh --keep-datasets --engines=souffle \
+#            config/cross_engine_souffle_32t.txt
+#
+# (2) DOOP context-insensitive points-to (20 DaCapo apps): run via the dedicated
+#     overlay harness — its Soufflé program aborts on the keep-spec input files
+#     the corpus omits (FlowLog treats them as empty), and it uses `.output`
+#     (multi-GB relations) rather than `.printsize`, so it needs the tmpfs
+#     overlay + output-dir harness rather than the generic cross_engine path:
+#       WORKERS=32 STR_INTERN=1 bash scripts/context_insensitive_compare.sh
+#     (This script + its programs land via the west3 context-insensitive line,
+#      flowlog-bench PRs #10 / #11.)
+#
+# (3) Merge the DOOP rows into the comparison CSV with the same metric:
+#       scripts/merge_ci_into_comparison.py \
+#         --ci-dir results/context_insensitive \
+#         --csv    results/benchmark/comparison_results.csv
+#
+# (4) Curate to this snapshot schema + render the two bar charts:
+#       python3 plot/plot_perf.py docs/historical/perf-snapshot.csv
+
+# --- Coverage / notes ---------------------------------------------------------
+# 49 workloads total = 30 non-DOOP + 19 DOOP context-insensitive apps.
+#   * Excluded (FlowLog-only, no Soufflé comparison): cc, sssp, reach=twitter
+#     (Soufflé cannot run these — tagged [souffle:skip] in config/default.txt).
+#   * DOOP context-insensitive: 19/20 DaCapo apps. jython is omitted — FlowLog's
+#     context-insensitive analysis of jython exceeded available memory (Rust
+#     allocation failure at ~145 GiB RSS); it was likewise absent from the prior
+#     snapshot. All 19 included apps were correctness-cross-checked MATCH
+#     (row counts equal modulo the documented ord()/heap-representative renaming).
+
+# --- Headline result ----------------------------------------------------------
+# Execution time : FlowLog wins 45/49 · geomean 3.81× · range 0.48× → 60.30×.
+# Peak memory    : geomean Soufflé/FlowLog RSS 0.70× — FlowLog trades memory for
+#                  speed on the graph workloads (e.g. bipartite/mag 38 vs 21 GiB)
+#                  but is leaner on the heaviest DOOP apps (h2o 23.7 vs 30.7 GiB).

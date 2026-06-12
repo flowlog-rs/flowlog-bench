@@ -121,8 +121,8 @@ def _bar_chart(stem, labels, fl, su, *, ylabel, title, log=False, decorate=None)
         decorate(ax)
 
     fig.tight_layout()
-    for ext in ("pdf", "svg"):
-        fig.savefig(stem.with_suffix(f".{ext}"), bbox_inches="tight")
+    for ext in ("pdf", "svg", "png"):
+        fig.savefig(stem.with_suffix(f".{ext}"), bbox_inches="tight", dpi=150)
     plt.close(fig)
 
 
