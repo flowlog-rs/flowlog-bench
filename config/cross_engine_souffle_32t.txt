@@ -1,0 +1,66 @@
+# =============================================================================
+# config/cross_engine_souffle_32t.txt
+#
+# Comprehensive FlowLog (compiler) vs Souffle (compiled, parallel) sweep —
+# NON-DOOP workloads. Every pair has BOTH a flowlog program
+# (programs/oracle/flowlog/<stem>/default.dl) AND a souffle program
+# (programs/oracle/souffle/<stem>.dl), so each yields a real side-by-side bar
+# (time + peak RSS).
+#
+# Run:  WORKERS=32 NUM_RUNS=3 \
+#         bash scripts/cross_engine.sh --fresh --keep-datasets \
+#              --engines=souffle config/cross_engine_souffle_32t.txt
+#
+# Both engines get 32 threads: FlowLog `-w 32`; Souffle `-j 32` at BOTH compile
+# (`souffle -o bin -j 32`, gates the pfor/libgomp expansion) and runtime
+# (`bin -j 32`). See scripts/engines/souffle.sh.
+#
+# DOOP context-insensitive points-to (the 20 DaCapo apps) is run SEPARATELY via
+# scripts/context_insensitive_compare.sh: its souffle program aborts on the
+# keep-spec input files the corpus omits (FlowLog treats them as empty), and it
+# uses `.output` (full relations, multi-GB) rather than `.printsize`, so it needs
+# the dedicated overlay + tmpfs output-dir harness. Those rows are merged into
+# the same comparison CSV afterwards (same metric: FlowLog solve-time vs Souffle
+# wall, peak RSS via /usr/bin/time -v).
+#
+# Excluded on purpose: pairs Souffle can't run (cc/sssp/reach=twitter — flowlog-
+# only, [souffle:skip]) since there is nothing to compare against.
+# =============================================================================
+
+# --- Graph analysis ----------------------------------------------------------
+tc.dl=G5K-0.001
+tc.dl=G10K-0.001
+sg.dl=G5K-0.001
+sg.dl=G10K-0.001
+reach.dl=livejournal
+reach.dl=orkut
+reach.dl=arabic
+bipartite.dl=mind
+bipartite.dl=netflix
+bipartite.dl=mag
+bipartite.dl=roadNet-CA
+dyck.dl=kernel
+dyck.dl=postgre
+
+# --- Knowledge reasoning -----------------------------------------------------
+crdt.dl=crdt
+galen.dl=galen
+
+# --- Program analysis: points-to (integer-typed) -----------------------------
+andersen.dl=medium
+andersen.dl=large
+pointsto.dl=pointsto
+cspa.dl=cspa-httpd
+cspa.dl=cspa-linux
+cspa.dl=cspa-postgresql
+csda.dl=csda-httpd
+csda.dl=csda-linux
+csda.dl=csda-postgresql
+cvc5.dl=cvc5
+z3.dl=z3
+
+# --- Program analysis: Polonius borrow checker (integer-typed) ---------------
+polonius_int.dl=clap-rs
+polonius_int.dl=wgpu
+polonius_int.dl=materialize
+polonius_int.dl=scallop
