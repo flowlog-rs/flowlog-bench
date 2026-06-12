@@ -66,6 +66,13 @@ def main():
     rel2file = {r: f for f, r in file2rel.items()}
 
     out = sys.stdout
+    # `timestamp;` prints "Timestamp: <ns since CLI start>" — three markers
+    # bracket the insert phase (T0..T1 = stream parse + feed, ~"load") and
+    # the commit (T1..T2 = differential synchronizes to fixpoint, ~"exec").
+    # ddlog.sh parses these into the load/exec split sidecars. Approximate by
+    # construction: differential computes asynchronously during inserts, so
+    # some compute overlaps the load window.
+    out.write("timestamp;\n")
     out.write("start;\n")
     for rel, types in inputs.items():
         candidates = []
@@ -88,7 +95,9 @@ def main():
                         else (fields[i] if i < len(fields) else "")
                         for i in range(len(types))]
                 out.write(f"insert {rel}({', '.join(args)});\n")
+    out.write("timestamp;\n")
     out.write("commit;\n")
+    out.write("timestamp;\n")
     out.write("dump RelationSizes;\n")
 
 

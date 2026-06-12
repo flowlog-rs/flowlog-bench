@@ -87,6 +87,59 @@ _souffle_record_sizes() {
     sort -u -k1,1 -o "$sizes_sidecar" "$sizes_sidecar" 2>/dev/null || true
 }
 
+# Load/exec split via ONE extra profiled run (the timed runs stay clean:
+# profiling instruments the binary, ~2-8% overhead measured, so it must not
+# replace them). A second binary is compiled with -p (cached like the main
+# one), run once untimed, and the JSON profile parsed: load = Σ per-relation
+# loadtime, exec = total runtime - load. Best-effort — any failure leaves the
+# split sidecars absent and the CSV cells N/A.
+_souffle_profile_split() {
+    local stem="$1" sf_src="$2" fact_path="$3" best_log="$4"
+    local prof_bin="${LOG_DIR}/sf-bin/${stem}-w${WORKERS}-prof"
+    local prof_log="${best_log}.profile.json"
+    local out_dir="${LOG_DIR}/sf_${stem}_prof_out"
+
+    if [[ ! -x "$prof_bin" || "$sf_src" -nt "$prof_bin" ]]; then
+        log "$BLUE" "BUILD" "Souffle: compiling profiled $stem for the load/exec split (one-off)"
+        "$SOUFFLE_BIN" -o "$prof_bin" -p "${prof_bin}.compile-profile" -j "$WORKERS" \
+                -F "$fact_path" "$sf_src" \
+                > "${prof_bin}.compile.log" 2>&1 \
+            || { log "$YELLOW" "WARN" "Souffle: profiled compile failed (split unavailable; see ${prof_bin}.compile.log)"; return 0; }
+    fi
+
+    mkdir -p "$out_dir"
+    log "$YELLOW" "RUN" "  Souffle profiled run (untimed, for load/exec split)"
+    if ! timeout "$FLOWLOG_RUN_TIMEOUT" \
+            "$prof_bin" -F "$fact_path" -D "$out_dir" -j "$WORKERS" -p "$prof_log" \
+            > /dev/null 2>&1; then
+        log "$YELLOW" "WARN" "Souffle: profiled run failed (split unavailable)"
+        rm -rf "$out_dir"
+        return 0
+    fi
+    rm -rf "$out_dir"
+
+    python3 - "$prof_log" "$best_log" <<'PY' || true
+import json, sys
+prof, best_log = sys.argv[1], sys.argv[2]
+try:
+    prog = json.load(open(prof))["root"]["program"]
+except Exception:
+    sys.exit(0)
+load_us = sum(
+    rel["loadtime"]["end"] - rel["loadtime"]["start"]
+    for rel in prog.get("relation", {}).values()
+    if "loadtime" in rel
+)
+rt = prog.get("runtime")
+if rt is None:
+    sys.exit(0)
+total_us = rt["end"] - rt["start"]
+exec_us = max(total_us - load_us, 0)
+open(best_log + ".median_load_s", "w").write(f"{load_us/1e6:.9f}")
+open(best_log + ".median_exec_s", "w").write(f"{exec_us/1e6:.9f}")
+PY
+}
+
 # Run souffle NUM_RUNS times. Returns 1 if all runs failed or program
 # is missing.
 engine_souffle_run() {
@@ -167,6 +220,7 @@ engine_souffle_run() {
     median_rss=$(median_int "${rss_values[@]}")
     n_succeeded=$(echo "$entries" | wc -w)
     write_engine_sidecars "$best_log" "$median_log" "$median_rss" "$n_succeeded" "$median_time"
+    _souffle_profile_split "$stem" "$sf_src" "$fact_path" "$best_log"
 
     if (( n_succeeded < NUM_RUNS )); then
         log "$YELLOW" "PARTIAL" "Souffle: only $n_succeeded/$NUM_RUNS succeeded for $prog_file + $dataset_name"

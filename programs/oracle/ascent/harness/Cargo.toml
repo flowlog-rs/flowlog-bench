@@ -1,0 +1,10 @@
+[package]
+name = "harness"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rayon = { workspace = true }
+dashmap = { workspace = true }
+boxcar = { workspace = true }
+ahash = { workspace = true }

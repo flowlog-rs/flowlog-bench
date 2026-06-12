@@ -1,0 +1,24 @@
+# programs/oracle/ascent — Ascent (Rust embedded Datalog) translations of the
+# oracle suite. One bin crate per program + a shared `harness` lib that owns
+# ALL fact-reading/timing/printsize logic, so each program is just the
+# ascent_par! rules and a load line per input relation (column types are
+# inferred from the relation declarations — the load calls carry no types).
+#
+# Build: cargo build --release -p <stem>   (engine adapter caches binaries)
+# Run:   target/release/<stem> <fact_dir>  (WORKERS env sets rayon threads)
+[workspace]
+members = [
+    "harness",
+    "andersen", "bipartite", "borrow", "cc", "csda", "cspa", "crdt",
+    "crdt_slow", "cvc5", "doop", "dyck", "galen", "pointsto",
+    "polonius_int", "polonius_str", "reach", "sg", "sssp", "tc", "z3",
+]
+resolver = "2"
+
+[workspace.dependencies]
+ascent = "0.8"
+rayon = "1"
+dashmap = "6"
+boxcar = "0.1"
+ahash = "0.8"
+harness = { path = "harness" }

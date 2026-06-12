@@ -103,4 +103,4 @@ RelationSizes("ValueStep", size) :- ValueStep(fromCtr, fromN, toCtr, toN), var s
 RelationSizes("BlankStep", size) :- BlankStep(fromCtr, fromN, toCtr, toN), var size = (fromCtr, fromN, toCtr, toN).group_by(()).count_distinct().
 RelationSizes("Value_blank_star", size) :- Value_blank_star(fromCtr, fromN, toCtr, toN), var size = (fromCtr, fromN, toCtr, toN).group_by(()).count_distinct().
 RelationSizes("NextVisible", size) :- NextVisible(prevCtr, prevN, nextCtr, nextN), var size = (prevCtr, prevN, nextCtr, nextN).group_by(()).count_distinct().
-RelationSizes("ResultP", size) :- ResultP(ctr1, ctr2, value), var size = (ctr1, ctr2, value).group_by(()).count_distinct().
+RelationSizes("Result", size) :- ResultP(ctr1, ctr2, value), var size = (ctr1, ctr2, value).group_by(()).count_distinct().

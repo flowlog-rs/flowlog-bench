@@ -1,0 +1,2 @@
+# Cargo.lock is tracked: pinned deps keep engine timings comparable across machines.
+target/

@@ -1,0 +1,43 @@
+# 4-engine sweep phase 1 (everything except the doop block) — 2026-06-11,
+# WORKERS=32 NUM_RUNS=3 --engines=souffle,ddlog,ascent.
+# Deviations from default.txt:
+#   - polonius_int pairs first (config/polonius_int.txt merged in).
+#   - borrow=* dropped: no flowlog oracle program in this corpus
+#     (programs/oracle/flowlog/borrow/ absent — compiler.sh would die).
+#   - reach.dl=twitter dropped: dataset too large for the 24G free disk.
+#   - cc/sssp tagged [ddlog:skip]: no DDlog translation (recursive min);
+#     souffle skips them upstream for the same reason.
+polonius_int=clap-rs
+polonius_int=wgpu
+polonius_int=materialize
+polonius_int=scallop
+tc.dl=G5K-0.001
+tc.dl=G10K-0.001
+sg.dl=G5K-0.001
+sg.dl=G10K-0.001
+reach.dl=livejournal
+reach.dl=orkut
+reach.dl=arabic
+cc.dl=livejournal [souffle:skip] [ddlog:skip]
+cc.dl=arabic [souffle:skip] [ddlog:skip]
+cc.dl=orkut [souffle:skip] [ddlog:skip]
+sssp.dl=livejournal-sssp [interp:skip] [souffle:skip] [ddlog:skip]
+sssp.dl=orkut-sssp [interp:skip] [souffle:skip] [ddlog:skip]
+bipartite.dl=mind
+bipartite.dl=netflix
+bipartite.dl=mag
+bipartite.dl=roadNet-CA
+dyck.dl=kernel
+dyck.dl=postgre
+crdt.dl=crdt
+galen.dl=galen
+andersen.dl=medium
+andersen.dl=large
+cspa.dl=cspa-httpd
+cspa.dl=cspa-linux
+cspa.dl=cspa-postgresql
+csda.dl=csda-httpd
+csda.dl=csda-linux
+csda.dl=csda-postgresql
+cvc5.dl=cvc5
+z3.dl=z3
