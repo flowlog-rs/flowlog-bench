@@ -178,21 +178,36 @@ fn main() {
     timed_run(|| prog.run());
     printsize("subset", prog.subset.len());
     printsize("origin_live_on_entry", prog.origin_live_on_entry.len());
-    printsize("origin_contains_loan_on_entry", prog.origin_contains_loan_on_entry.len());
+    printsize(
+        "origin_contains_loan_on_entry",
+        prog.origin_contains_loan_on_entry.len(),
+    );
     printsize("loan_live_at", prog.loan_live_at.len());
     printsize("errors", prog.errors.len());
     printsize("placeholder_origin", prog.placeholder_origin.len());
     printsize("subset_error", prog.subset_error.len());
-    printsize("var_maybe_partly_initialized_on_exit", prog.var_maybe_partly_initialized_on_exit.len());
-    printsize("var_maybe_partly_initialized_on_entry", prog.var_maybe_partly_initialized_on_entry.len());
+    printsize(
+        "var_maybe_partly_initialized_on_exit",
+        prog.var_maybe_partly_initialized_on_exit.len(),
+    );
+    printsize(
+        "var_maybe_partly_initialized_on_entry",
+        prog.var_maybe_partly_initialized_on_entry.len(),
+    );
     printsize("var_live_on_entry", prog.var_live_on_entry.len());
     printsize("ancestor_path", prog.ancestor_path.len());
     printsize("path_moved_at", prog.path_moved_at.len());
     printsize("path_assigned_at", prog.path_assigned_at.len());
     printsize("path_accessed_at", prog.path_accessed_at.len());
     printsize("path_begins_with_var", prog.path_begins_with_var.len());
-    printsize("path_maybe_initialized_on_exit", prog.path_maybe_initialized_on_exit.len());
-    printsize("path_maybe_uninitialized_on_exit", prog.path_maybe_uninitialized_on_exit.len());
+    printsize(
+        "path_maybe_initialized_on_exit",
+        prog.path_maybe_initialized_on_exit.len(),
+    );
+    printsize(
+        "path_maybe_uninitialized_on_exit",
+        prog.path_maybe_uninitialized_on_exit.len(),
+    );
     printsize("move_error", prog.move_error.len());
     printsize("cfg_node", prog.cfg_node.len());
     printsize("var_drop_live_on_entry", prog.var_drop_live_on_entry.len());

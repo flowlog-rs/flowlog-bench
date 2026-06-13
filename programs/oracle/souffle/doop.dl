@@ -140,7 +140,7 @@ Instruction_Method(instruction, method) :-
   _AssignLocal(instruction, index, from, to, method).
 AssignLocal_From(instruction, from) :-
   _AssignLocal(instruction, index, from, to, method).
-AssignInstruction_To(instruction, to) :- 
+AssignInstruction_To(instruction, to) :-
   _AssignLocal(instruction, index, from, to, method).
 
 Instruction_Method(instruction, method) :-
@@ -149,7 +149,7 @@ AssignCast_Type(instruction, type) :-
   _AssignCast(instruction, index, from, to, type, method).
 AssignCast_From(instruction, from) :-
   _AssignCast(instruction, index, from, to, type, method).
-AssignInstruction_To(instruction, to) :- 
+AssignInstruction_To(instruction, to) :-
   _AssignCast(instruction, index, from, to, type, method).
 
 Field_DeclaringType(signature, declaringType) :- _Field(signature, declaringType, _, _).
@@ -191,7 +191,7 @@ Instruction_Method(instruction, method) :-
   _StaticMethodInvocation(instruction, index, signature, method).
 isStaticMethodInvocation_Insn(instruction) :-
   _StaticMethodInvocation(instruction, index, signature, method).
-MethodInvocation_Method(instruction, signature) :- 
+MethodInvocation_Method(instruction, signature) :-
   _StaticMethodInvocation(instruction, index, signature, method).
 
 Instruction_Method(instruction, method) :-
@@ -334,7 +334,7 @@ VirtualMethodInvocation_Descriptor(invocation, descriptor) :-
   Method_SimpleName(signature, simplename),
   Method_Descriptor(signature, descriptor).
 
-  
+
 // Basic (type-based) analysis
 // .printsize
 .decl MethodLookup(simplename:symbol, descriptor:symbol, type:symbol, method:symbol)

@@ -211,7 +211,10 @@ pub fn timed_run(run: impl FnOnce()) {
     let t = Instant::now();
     run();
     let load = f64::from_bits(LOAD_SECS_BITS.load(std::sync::atomic::Ordering::Relaxed));
-    println!("Dataflow executed in {:.6}s", t.elapsed().as_secs_f64() + load);
+    println!(
+        "Dataflow executed in {:.6}s",
+        t.elapsed().as_secs_f64() + load
+    );
 }
 
 /// One `.printsize` line; relation name lowercased to match the

@@ -188,7 +188,8 @@ fn main() {
     let mut prog = Ddisasm::default();
     timed_load(|| {
         prog.arch_memory_access = load_rel(&dir, "Arch_memory_access_truncate.csv", ',');
-        prog.arch_reg_reg_arithmetic_operation = load_rel(&dir, "Arch_reg_reg_arithmetic_operation.csv", ',');
+        prog.arch_reg_reg_arithmetic_operation =
+            load_rel(&dir, "Arch_reg_reg_arithmetic_operation.csv", ',');
         prog.arch_return_reg = load_rel(&dir, "Arch_return_reg.csv", ',');
         prog.block_next = load_rel(&dir, "Block_next.csv", ',');
         prog.block_last_instruction = load_rel(&dir, "Block_last_instruction.csv", ',');
@@ -204,9 +205,11 @@ fn main() {
         prog.reg_def_use_used = load_rel(&dir, "Reg_def_use_used.csv", ',');
         prog.reg_def_use_used_in_block = load_rel(&dir, "Reg_def_use_used_in_block.csv", ',');
         prog.reg_used_for = load_rel(&dir, "Reg_used_for.csv", ',');
-        prog.relative_jump_table_entry_candidate = load_rel(&dir, "Relative_jump_table_entry_candidate.csv", ',');
+        prog.relative_jump_table_entry_candidate =
+            load_rel(&dir, "Relative_jump_table_entry_candidate.csv", ',');
         prog.stack_def_use_def = load_rel(&dir, "Stack_def_use_def.csv", ',');
-        prog.stack_def_use_defined_in_block = load_rel(&dir, "Stack_def_use_defined_in_block.csv", ',');
+        prog.stack_def_use_defined_in_block =
+            load_rel(&dir, "Stack_def_use_defined_in_block.csv", ',');
         prog.stack_def_use_live_var_def = load_rel(&dir, "Stack_def_use_live_var_def.csv", ',');
         prog.stack_def_use_ref_in_block = load_rel(&dir, "Stack_def_use_ref_in_block.csv", ',');
         prog.stack_def_use_used_in_block = load_rel(&dir, "Stack_def_use_used_in_block.csv", ',');
@@ -218,14 +221,35 @@ fn main() {
     });
     timed_run(|| prog.run());
     printsize("Stack_def_use_def_used", prog.stack_def_use_def_used.len());
-    printsize("Reg_def_use_return_val_used", prog.reg_def_use_return_val_used.len());
-    printsize("Reg_def_use_live_var_used", prog.reg_def_use_live_var_used.len());
+    printsize(
+        "Reg_def_use_return_val_used",
+        prog.reg_def_use_return_val_used.len(),
+    );
+    printsize(
+        "Reg_def_use_live_var_used",
+        prog.reg_def_use_live_var_used.len(),
+    );
     printsize("Jump_table_target", prog.jump_table_target.len());
     printsize("Reg_def_use_def_used", prog.reg_def_use_def_used.len());
-    printsize("Reg_def_use_live_var_at_prior_used", prog.reg_def_use_live_var_at_prior_used.len());
-    printsize("Reg_def_use_live_var_at_block_end", prog.reg_def_use_live_var_at_block_end.len());
-    printsize("Reg_reg_arithmetic_operation_defs", prog.reg_reg_arithmetic_operation_defs.len());
+    printsize(
+        "Reg_def_use_live_var_at_prior_used",
+        prog.reg_def_use_live_var_at_prior_used.len(),
+    );
+    printsize(
+        "Reg_def_use_live_var_at_block_end",
+        prog.reg_def_use_live_var_at_block_end.len(),
+    );
+    printsize(
+        "Reg_reg_arithmetic_operation_defs",
+        prog.reg_reg_arithmetic_operation_defs.len(),
+    );
     printsize("Def_used_for_address", prog.def_used_for_address.len());
-    printsize("Stack_def_use_live_var_at_block_end", prog.stack_def_use_live_var_at_block_end.len());
-    printsize("Stack_def_use_live_var_at_prior_used", prog.stack_def_use_live_var_at_prior_used.len());
+    printsize(
+        "Stack_def_use_live_var_at_block_end",
+        prog.stack_def_use_live_var_at_block_end.len(),
+    );
+    printsize(
+        "Stack_def_use_live_var_at_prior_used",
+        prog.stack_def_use_live_var_at_prior_used.len(),
+    );
 }
