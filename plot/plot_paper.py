@@ -134,7 +134,7 @@ def render(groups, stem, width, annotate):
     y-axis), separated by a gap + a thin divider and a category header.
     Reads as one clean wide figure rather than disconnected panels."""
     total = sum(len(rows) for _, rows in groups)
-    xfs = float(np.clip(np.interp(total, [4, 24], [12.5, 10.5]), 10.5, 12.5))
+    xfs = float(np.clip(np.interp(total, [4, 24], [14, 13]), 13, 14))
 
     allv = [v for _, rows in groups for r in rows for v in r["t"].values()
             if v and v > 0]
@@ -174,10 +174,10 @@ def render(groups, stem, width, annotate):
 
     handles, lbls = ax.get_legend_handles_labels()
     fig.legend(handles, lbls, loc="lower center", ncol=len(ENGINES),
-               frameon=False, fontsize=11, bbox_to_anchor=(0.5, -0.03),
-               columnspacing=1.8, handlelength=2.4)
+               frameon=False, fontsize=11.5, bbox_to_anchor=(0.5, -0.07),
+               columnspacing=1.8, handlelength=3.4)
 
-    fig.subplots_adjust(top=0.97, bottom=0.24, left=0.06, right=0.995)
+    fig.subplots_adjust(top=0.97, bottom=0.28, left=0.06, right=0.995)
     for ext in ("pdf", "png"):
         fig.savefig(f"{stem}.{ext}", bbox_inches="tight", dpi=200)
     plt.close(fig)
