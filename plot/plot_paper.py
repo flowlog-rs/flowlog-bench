@@ -170,12 +170,12 @@ def render(groups, stem, width, annotate):
     ax.set_axisbelow(True)
     ax.set_xlim(-0.7, ticks[-1] + 0.7)
     ax.set_xticks(ticks)
-    ax.set_xticklabels(labels, rotation=40, ha="right", fontsize=xfs)
+    ax.set_xticklabels(labels, rotation=28, ha="right", fontsize=xfs)
 
     handles, lbls = ax.get_legend_handles_labels()
     fig.legend(handles, lbls, loc="lower center", ncol=len(ENGINES),
                frameon=False, fontsize=11, bbox_to_anchor=(0.5, -0.03),
-               columnspacing=1.8, handlelength=1.3)
+               columnspacing=1.8, handlelength=2.4)
 
     fig.subplots_adjust(top=0.97, bottom=0.24, left=0.06, right=0.995)
     for ext in ("pdf", "png"):
