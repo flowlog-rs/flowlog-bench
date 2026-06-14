@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Paper-ready per-program perf figures: execution time + peak memory.
+"""Paper-ready execution-time figure for the program groups a paper argues
+about (e.g. DOOP + Polonius).
 
 Unlike plot_perf.py (which packs every workload into one strip), this draws
-ONE figure per program group — the workloads a paper actually argues about —
-as two stacked panels sharing the x-axis: execution time (top) and peak RSS
-(bottom). No title (the LaTeX caption carries it), colorblind-safe palette,
-large fonts that survive column-width downscaling.
+the selected groups as side-by-side sub-panels sharing one log y-axis —
+panel widths track each group's dataset count so bar widths match, a gap +
+per-panel header keep the groups distinct. No title (the LaTeX caption
+carries it), colorblind-safe Okabe-Ito palette, embedded TrueType in the PDF.
 
-    python3 plot/plot_paper.py <csv> --group doop
-    python3 plot/plot_paper.py <csv> --group polonius_int --width 6
+    python3 plot/plot_paper.py <csv> --groups polonius_int,doop
+    python3 plot/plot_paper.py <csv> --groups doop --width 13
 
-Writes <csv_stem>-<group>-paper.{pdf,png} next to the CSV.
+Writes <csv_stem>-<groups>-paper.{pdf,png} next to the CSV.
 """
 
 import argparse
@@ -96,7 +97,11 @@ def _geomean(xs):
     return math.exp(sum(math.log(x) for x in xs) / len(xs)) if xs else float("nan")
 
 
-def _panel(ax, rows, key, ylabel, *, annotate, headroom):
+PROG_DISPLAY = {"doop": "DOOP", "polonius_int": "Polonius"}
+
+
+def _panel(ax, rows, key, *, ylim, show_y, ylabel, annotate, xfs):
+    """One program's grouped bars on a shared log y-axis."""
     n = len(rows)
     k = len(ENGINES)
     x = np.arange(n)
@@ -104,13 +109,8 @@ def _panel(ax, rows, key, ylabel, *, annotate, headroom):
     bar_w = group_w / k
     offsets = (np.arange(k) - (k - 1) / 2) * bar_w
 
-    # Explicit log y-limits from the data, so a stray annotation can never
-    # stretch the panel across phantom decades and a "tight" save can't
-    # blow the canvas up. Headroom on top leaves room for the ×-labels.
-    allv = [v for r in rows for v in r[key].values() if v and v > 0]
-    lo, hi = min(allv), max(allv)
     ax.set_yscale("log")
-    ax.set_ylim(10 ** math.floor(math.log10(lo)), hi * headroom)
+    ax.set_ylim(*ylim)
     trans = blended_transform_factory(ax.transData, ax.transAxes)
 
     base = [r[key].get("flowlog") for r in rows]
@@ -118,15 +118,15 @@ def _panel(ax, rows, key, ylabel, *, annotate, headroom):
         vals = np.array([r[key].get(ekey, np.nan) for r in rows], float)
         ax.bar(x + off, vals, bar_w, label=label, color=color,
                edgecolor="white", linewidth=0.3, zorder=3)
-        if not annotate:
-            continue
         for i, v in enumerate(vals):
             if ekey == "flowlog":
                 continue
             if not np.isfinite(v):
-                # engine absent (e.g. DDlog timeout) — mark just above axis.
+                # engine absent (e.g. DDlog timeout) — always mark it.
                 ax.text(i + off, 0.02, "T/O", transform=trans, rotation=90,
-                        ha="center", va="bottom", fontsize=6.5, color=MISS)
+                        ha="center", va="bottom", fontsize=xfs - 1, color=MISS)
+                continue
+            if not annotate:
                 continue
             b = base[i]
             if not b:
@@ -138,45 +138,55 @@ def _panel(ax, rows, key, ylabel, *, annotate, headroom):
 
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=12))
     ax.yaxis.set_minor_locator(NullLocator())
-    ax.set_ylabel(ylabel, fontsize=12.5)
     ax.grid(True, axis="y", color=GRID_FAINT, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
     ax.set_xticks(x)
     ax.set_xlim(-0.5, n - 0.5)
+    if show_y:
+        ax.set_ylabel(ylabel, fontsize=12.5)
+    else:
+        ax.tick_params(labelleft=False)
+        ax.spines["left"].set_visible(False)
+        ax.tick_params(left=False)
 
 
-def render(rows, stem, group, width):
-    fig, (ax_t, ax_m) = plt.subplots(
-        2, 1, figsize=(width, 6.2), sharex=True,
-        gridspec_kw={"hspace": 0.12})
+def render(groups, stem, width, annotate):
+    """One figure, one sub-panel per (name, rows) group, sharing a log
+    y-axis. Panel widths track each group's dataset count so bar widths
+    match across panels; a gap + per-panel header separate the groups."""
+    counts = [len(rows) for _, rows in groups]
+    total = sum(counts)
+    # Shrink the x-tick labels as the apps pack tighter (24 apps in a
+    # figure* width need ~8 pt, 4 apps can afford 11).
+    xfs = float(np.clip(np.interp(total, [4, 24], [11, 8]), 8, 11))
 
-    # Time needs tall headroom (rotated ×-labels above the biggest bar);
-    # memory's ratios are smaller, so it reads tighter with less.
-    _panel(ax_t, rows, "t", "Execution time (s)", annotate=True, headroom=6.0)
-    _panel(ax_m, rows, "m", "Peak memory (GiB)", annotate=True, headroom=3.0)
+    # Common y-limits across all groups (shared axis); headroom above the
+    # tallest bar (more when ×-labels sit on top).
+    allv = [v for _, rows in groups for r in rows for v in r["t"].values()
+            if v and v > 0]
+    ylim = (10 ** math.floor(math.log10(min(allv))),
+            max(allv) * (6.0 if annotate else 2.2))
 
-    ax_m.set_xticklabels([r["label"] for r in rows], rotation=40,
-                         ha="right", fontsize=10.5)
-    ax_t.tick_params(labelbottom=False)
+    fig, axes = plt.subplots(
+        1, len(groups), figsize=(width, 3.7), sharey=True,
+        gridspec_kw={"width_ratios": counts, "wspace": 0.04})
+    if len(groups) == 1:
+        axes = [axes]
 
-    # One legend above both panels.
-    handles, labels = ax_t.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=len(ENGINES),
-               frameon=False, fontsize=11.5, bbox_to_anchor=(0.5, 1.005),
+    for ax, (name, rows) in zip(axes, groups):
+        _panel(ax, rows, "t", ylim=ylim, show_y=(ax is axes[0]),
+               ylabel="Execution time (s)", annotate=annotate, xfs=xfs)
+        ax.set_xticklabels([r["label"] for r in rows], rotation=40,
+                           ha="right", fontsize=xfs)
+        ax.set_title(PROG_DISPLAY.get(name, name), fontsize=12.5,
+                     color=TEXT_DARK, fontweight="600", pad=6)
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=len(ENGINES),
+               frameon=False, fontsize=11, bbox_to_anchor=(0.5, -0.04),
                columnspacing=1.6, handlelength=1.3)
 
-    # Geomean-vs-FlowLog footnote per comparison engine (time panel).
-    gm = []
-    for ekey, label, color, _, _ in ENGINES[1:]:
-        ratios = [r["t"][ekey] / r["t"]["flowlog"]
-                  for r in rows if ekey in r["t"] and "flowlog" in r["t"]]
-        if ratios:
-            gm.append(f"{label} {_geomean(ratios):.1f}×")
-    ax_t.text(0.012, 0.97, "geomean vs FlowLog:  " + "   ".join(gm),
-              transform=ax_t.transAxes, ha="left", va="top",
-              fontsize=9.5, color=TEXT_MUTED)
-
-    fig.subplots_adjust(top=0.93, bottom=0.16, left=0.085, right=0.99)
+    fig.subplots_adjust(top=0.91, bottom=0.30, left=0.07, right=0.995)
     for ext in ("pdf", "png"):
         fig.savefig(f"{stem}.{ext}", bbox_inches="tight", dpi=200)
     plt.close(fig)
@@ -186,25 +196,36 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("csv")
-    ap.add_argument("--group", required=True,
-                    help="Program to plot (e.g. doop, polonius_int)")
+    ap.add_argument("--groups", required=True,
+                    help="Comma list of programs, left→right "
+                         "(e.g. polonius_int,doop)")
     ap.add_argument("--width", type=float, default=None,
                     help="Figure width in inches (default: scaled to #datasets)")
+    ap.add_argument("--no-annotate", action="store_true",
+                    help="Drop the per-bar ×-vs-FlowLog labels (cleaner when "
+                         "many apps are packed into a narrow figure*)")
     args = ap.parse_args()
 
     src = pathlib.Path(args.csv)
     if not src.exists():
         print(f"input not found: {src}", file=sys.stderr)
         return 1
-    rows = load_group(src, args.group)
-    if not rows:
-        print(f"no rows for program {args.group!r} in {src}", file=sys.stderr)
+
+    names = [g.strip() for g in args.groups.split(",") if g.strip()]
+    groups = [(g, load_group(src, g)) for g in names]
+    missing = [g for g, rows in groups if not rows]
+    if missing:
+        print(f"no rows for program(s) {missing} in {src}", file=sys.stderr)
         return 1
 
-    width = args.width or max(5.0, 1.0 + 0.62 * len(rows))
-    stem = src.parent / f"{src.stem}-{args.group}-paper"
-    render(rows, stem, args.group, width)
-    print(f"wrote {stem.name}.{{pdf,png}} ({len(rows)} datasets, width={width:.1f})")
+    total = sum(len(rows) for _, rows in groups)
+    # ~0.62 in/dataset + margins + a slot per inter-group gap.
+    width = args.width or 1.2 + 0.62 * total + 0.5 * (len(groups) - 1)
+    stem = src.parent / f"{src.stem}-{'_'.join(names)}-paper"
+    render(groups, stem, width, annotate=not args.no_annotate)
+    print(f"wrote {stem.name}.{{pdf,png}} "
+          f"({total} datasets in {len(groups)} groups, width={width:.1f}, "
+          f"annotate={not args.no_annotate})")
     return 0
 
 
