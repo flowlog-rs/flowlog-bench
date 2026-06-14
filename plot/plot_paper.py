@@ -160,15 +160,17 @@ def render(groups, stem, width, annotate):
     # figure* width need ~8 pt, 4 apps can afford 11).
     xfs = float(np.clip(np.interp(total, [4, 24], [11, 8]), 8, 11))
 
-    # Common y-limits across all groups (shared axis); headroom above the
-    # tallest bar (more when ×-labels sit on top).
+    # Common y-limits across all groups (shared axis); just enough headroom
+    # to clear the tallest bar (×-labels need more, the clean version little).
     allv = [v for _, rows in groups for r in rows for v in r["t"].values()
             if v and v > 0]
     ylim = (10 ** math.floor(math.log10(min(allv))),
-            max(allv) * (6.0 if annotate else 2.2))
+            max(allv) * (4.0 if annotate else 1.5))
 
+    # Wide-and-flat reads best for figure*; the height only needs to cover
+    # the bars + the rotated x-labels + the legend strip beneath.
     fig, axes = plt.subplots(
-        1, len(groups), figsize=(width, 3.7), sharey=True,
+        1, len(groups), figsize=(width, 2.7), sharey=True,
         gridspec_kw={"width_ratios": counts, "wspace": 0.04})
     if len(groups) == 1:
         axes = [axes]
@@ -178,15 +180,15 @@ def render(groups, stem, width, annotate):
                ylabel="Execution time (s)", annotate=annotate, xfs=xfs)
         ax.set_xticklabels([r["label"] for r in rows], rotation=40,
                            ha="right", fontsize=xfs)
-        ax.set_title(PROG_DISPLAY.get(name, name), fontsize=12.5,
-                     color=TEXT_DARK, fontweight="600", pad=6)
+        ax.set_title(PROG_DISPLAY.get(name, name), fontsize=12,
+                     color=TEXT_DARK, fontweight="600", pad=4)
 
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=len(ENGINES),
-               frameon=False, fontsize=11, bbox_to_anchor=(0.5, -0.04),
-               columnspacing=1.6, handlelength=1.3)
+               frameon=False, fontsize=10.5, bbox_to_anchor=(0.5, -0.02),
+               columnspacing=1.6, handlelength=1.2)
 
-    fig.subplots_adjust(top=0.91, bottom=0.30, left=0.07, right=0.995)
+    fig.subplots_adjust(top=0.9, bottom=0.30, left=0.075, right=0.995)
     for ext in ("pdf", "png"):
         fig.savefig(f"{stem}.{ext}", bbox_inches="tight", dpi=200)
     plt.close(fig)
