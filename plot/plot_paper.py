@@ -145,7 +145,7 @@ def render(groups, stem, width, annotate):
     ax.set_yscale("log")
     ax.set_ylim(ylo, yhi)
 
-    GAP = 0.8                      # small blank gap; a divider line marks it
+    GAP = 0.3                      # just enough to seat the divider line
     ticks, labels = [], []
     cursor = 0.0
     for gi, (name, rows) in enumerate(groups):
@@ -210,9 +210,8 @@ def main():
         return 1
 
     total = sum(len(rows) for _, rows in groups)
-    # ~0.36 in/dataset + margins → a balanced ~3:1 aspect against the 3.1in
-    # height (overridable with --width).
-    width = args.width or 1.0 + 0.36 * total + 0.4 * (len(groups) - 1)
+    # ~0.62 in/dataset + margins (overridable with --width).
+    width = args.width or 1.2 + 0.62 * total + 0.5 * (len(groups) - 1)
     stem = src.parent / f"{src.stem}-{'_'.join(names)}-paper"
     render(groups, stem, width, annotate=not args.no_annotate)
     print(f"wrote {stem.name}.{{pdf,png}} "
