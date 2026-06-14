@@ -153,14 +153,11 @@ def render(groups, stem, width, annotate):
             ax, rows, cursor, first=(gi == 0), annotate=annotate, xfs=xfs)
         ticks += centers
         labels += labs
-        # category header, centred over the group, just under the top edge
-        ax.text((xa + xb) / 2, 0.965, PROG_DISPLAY.get(name, name),
+        # category header, centred over the group, snug under the top line
+        ax.text((xa + xb) / 2, 0.995, PROG_DISPLAY.get(name, name),
                 transform=blended_transform_factory(ax.transData, ax.transAxes),
                 ha="center", va="top", fontsize=12.5, fontweight="700",
                 color=TEXT_DARK)
-        if gi < len(groups) - 1:
-            ax.axvline(xb + (1 + GAP) / 2, color=GRID_FAINT, linewidth=1.0,
-                       ymax=0.9, zorder=1)
         cursor = xb + 1 + GAP
 
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=12))
