@@ -134,7 +134,7 @@ def render(groups, stem, width, annotate):
     y-axis), separated by a gap + a thin divider and a category header.
     Reads as one clean wide figure rather than disconnected panels."""
     total = sum(len(rows) for _, rows in groups)
-    xfs = float(np.clip(np.interp(total, [4, 24], [11, 8.5]), 8.5, 11))
+    xfs = float(np.clip(np.interp(total, [4, 24], [12.5, 10.5]), 10.5, 12.5))
 
     allv = [v for _, rows in groups for r in rows for v in r["t"].values()
             if v and v > 0]
@@ -210,8 +210,9 @@ def main():
         return 1
 
     total = sum(len(rows) for _, rows in groups)
-    # ~0.62 in/dataset + margins + a slot per inter-group gap.
-    width = args.width or 1.2 + 0.62 * total + 0.5 * (len(groups) - 1)
+    # ~0.36 in/dataset + margins → a balanced ~3:1 aspect against the 3.1in
+    # height (overridable with --width).
+    width = args.width or 1.0 + 0.36 * total + 0.4 * (len(groups) - 1)
     stem = src.parent / f"{src.stem}-{'_'.join(names)}-paper"
     render(groups, stem, width, annotate=not args.no_annotate)
     print(f"wrote {stem.name}.{{pdf,png}} "
