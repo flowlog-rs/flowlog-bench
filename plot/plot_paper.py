@@ -170,10 +170,11 @@ def render(groups, stem, width, annotate):
     ax.set_axisbelow(True)
     ax.set_xlim(-0.7, ticks[-1] + 0.7)
     ax.set_xticks(ticks)
-    ax.set_xticklabels(labels, rotation=28, ha="right", fontsize=xfs)
-    # Right-aligned rotated labels anchor their END at the tick (so the name
-    # reads as sitting left of its column); nudge them right to centre better.
-    shift = ScaledTranslation(8 / 72, 0, fig.dpi_scale_trans)
+    # Centre each rotated name under its column (ha="center" + anchor pivot),
+    # rather than anchoring the label's end at the tick.
+    ax.set_xticklabels(labels, rotation=28, ha="center", fontsize=xfs,
+                       rotation_mode="anchor")
+    shift = ScaledTranslation(0, -4 / 72, fig.dpi_scale_trans)
     for lab in ax.get_xticklabels():
         lab.set_transform(lab.get_transform() + shift)
 
