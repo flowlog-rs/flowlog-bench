@@ -145,7 +145,7 @@ def render(groups, stem, width, annotate):
     ax.set_yscale("log")
     ax.set_ylim(ylo, yhi)
 
-    GAP = 1.8                      # blank x-units between groups
+    GAP = 0.8                      # small blank gap; a divider line marks it
     ticks, labels = [], []
     cursor = 0.0
     for gi, (name, rows) in enumerate(groups):
@@ -158,6 +158,9 @@ def render(groups, stem, width, annotate):
                 transform=blended_transform_factory(ax.transData, ax.transAxes),
                 ha="center", va="top", fontsize=12.5, fontweight="700",
                 color=TEXT_DARK)
+        if gi < len(groups) - 1:
+            ax.axvline(xb + (1 + GAP) / 2, color=GRID_FAINT, linewidth=1.0,
+                       ymax=0.92, zorder=1)
         cursor = xb + 1 + GAP
 
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=12))
