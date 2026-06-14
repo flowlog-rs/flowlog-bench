@@ -117,7 +117,7 @@ def _draw_group(ax, rows, x0, *, first, annotate, xfs):
             if not np.isfinite(v):
                 # engine absent (e.g. DDlog timeout) — a cute mathtext × at
                 # the slot base (LaTeX-style glyph, softer than a plot marker).
-                ax.text(c + off, 0.02, r"$\times$", transform=trans,
+                ax.text(c + off, 0.10, r"$\times$", transform=trans,
                         ha="center", va="bottom", fontsize=13, color=RED,
                         zorder=6, clip_on=False)
                 continue
