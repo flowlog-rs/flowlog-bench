@@ -174,7 +174,7 @@ def render(groups, stem, width, annotate):
     # rather than anchoring the label's end at the tick.
     ax.set_xticklabels(labels, rotation=28, ha="center", fontsize=xfs,
                        rotation_mode="anchor")
-    shift = ScaledTranslation(0, -4 / 72, fig.dpi_scale_trans)
+    shift = ScaledTranslation(0, -11 / 72, fig.dpi_scale_trans)
     for lab in ax.get_xticklabels():
         lab.set_transform(lab.get_transform() + shift)
 
