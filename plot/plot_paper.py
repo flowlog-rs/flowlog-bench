@@ -25,6 +25,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.markers import MarkerStyle
 from matplotlib.ticker import LogLocator, NullLocator
 from matplotlib.transforms import blended_transform_factory, ScaledTranslation
 
@@ -115,10 +116,12 @@ def _draw_group(ax, rows, x0, *, first, annotate, xfs):
             if ekey == "flowlog":
                 continue
             if not np.isfinite(v):
-                # engine absent (e.g. DDlog timeout) — always flag, in red.
-                ax.text(c + off, 0.02, "T/O", transform=trans, rotation=90,
-                        ha="center", va="bottom", fontsize=xfs,
-                        color=RED, fontweight="700")
+                # engine absent (e.g. DDlog timeout) — a cute round-capped
+                # red ✗ at the slot base.
+                ax.plot([c + off], [0.035],
+                        marker=MarkerStyle("x", capstyle="round"), color=RED,
+                        markersize=11, markeredgewidth=3.0, transform=trans,
+                        zorder=6, clip_on=False)
                 continue
             if annotate and b:
                 s = v / b
