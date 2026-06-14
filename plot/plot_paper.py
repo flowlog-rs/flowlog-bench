@@ -118,9 +118,9 @@ def _draw_group(ax, rows, x0, *, first, annotate, xfs):
             if not np.isfinite(v):
                 # engine absent (e.g. DDlog timeout) — a cute round-capped
                 # red ✗ at the slot base.
-                ax.plot([c + off], [0.035],
+                ax.plot([c + off], [0.03],
                         marker=MarkerStyle("x", capstyle="round"), color=RED,
-                        markersize=11, markeredgewidth=3.0, transform=trans,
+                        markersize=7, markeredgewidth=2.0, transform=trans,
                         zorder=6, clip_on=False)
                 continue
             if annotate and b:
