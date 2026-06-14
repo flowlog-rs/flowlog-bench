@@ -26,7 +26,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import LogLocator, NullLocator
-from matplotlib.transforms import blended_transform_factory
+from matplotlib.transforms import blended_transform_factory, ScaledTranslation
 
 # Okabe-Ito colorblind-safe palette (also distinct in grayscale).
 ENGINES = [
@@ -171,6 +171,11 @@ def render(groups, stem, width, annotate):
     ax.set_xlim(-0.7, ticks[-1] + 0.7)
     ax.set_xticks(ticks)
     ax.set_xticklabels(labels, rotation=28, ha="right", fontsize=xfs)
+    # Right-aligned rotated labels anchor their END at the tick (so the name
+    # reads as sitting left of its column); nudge them right to centre better.
+    shift = ScaledTranslation(8 / 72, 0, fig.dpi_scale_trans)
+    for lab in ax.get_xticklabels():
+        lab.set_transform(lab.get_transform() + shift)
 
     handles, lbls = ax.get_legend_handles_labels()
     fig.legend(handles, lbls, loc="lower center", ncol=len(ENGINES),
