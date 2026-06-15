@@ -17,6 +17,16 @@ used `a40ecbc60cda` (current `main`), which carries the DOOP `cat`-UDF bridge
 or 1800 s timeout on `reach/arabic`, `bipartite/mag`, `doop/jython`) — same
 coverage gaps as the original sweep.
 
+## At a glance
+
+![Per-program slowdown vs FlowLog](west2-reproduction-summary.png)
+
+*Geometric-mean slowdown of each engine relative to FlowLog (log scale), per
+program. FlowLog is fastest on every program; `cc`/`sssp` show only Ascent
+(Soufflé/DDlog have no recursive-min translation). Across the whole sweep FlowLog
+is faster by **5.2× (Soufflé)**, **4.8× (Ascent)** and **33.6× (DDlog)** in the
+geometric mean. Full per-workload detail below.*
+
 ## Wall time (s, median; slowdown vs FlowLog) + correctness
 
 | Program/Dataset | FlowLog | Soufflé | DDlog | Ascent | Xcheck |
@@ -82,3 +92,10 @@ Absolute times are machine-dependent; the cross-engine **ordering** (FlowLog
 fastest, then Soufflé, then Ascent/DDlog) and the **correctness match** are the
 reproducible signals, and both hold on west2. FlowLog wall times track the
 original sweep closely (e.g. jython 281 s vs 302 s; sg/G10K 20.5 s vs 20.4 s).
+
+## Per-workload execution time (full detail)
+
+![Per-workload execution time, all 52 pairs](west2-reproduction-flsoddas-time.png)
+
+*Every pair, log-scale wall time, four engines side by side; red ✕ marks an
+engine that could not complete (DDlog timeout / no translation).*
