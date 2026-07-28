@@ -18,7 +18,6 @@
 #   gen-joinorder-variants     — regenerate join-order variant .dl files
 #   cross-joinorder            — sweep every join-order variant per (program, ds)
 #   joinorder-summary          — per-pair fastest/median/slowest report
-#   archive-joinorder          — snapshot results/joinorder/ to submission/
 #   ldbc                       — LDBC SNB timing / scaling
 #   plot                       — render time+RSS charts from a cross-engine CSV
 #   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
@@ -52,7 +51,6 @@ PLOT_ENGINES ?= flowlog,souffle
 
 .PHONY: help env get-flowlog cross-engine cross-flowlog-version \
         cross-joinorder gen-joinorder-variants joinorder-summary \
-        archive-joinorder \
         ldbc plot clean distclean
 
 # -----------------------------------------------------------------------------
@@ -139,19 +137,6 @@ cross-joinorder:
 # -----------------------------------------------------------------------------
 joinorder-summary:
 	@python3 $(SCRIPTS)/joinorder/joinorder_summary.py $(FILTER)
-
-# -----------------------------------------------------------------------------
-# archive-joinorder: snapshot results/joinorder/ into submission/.
-# Captures pair CSVs + a regenerated SUMMARY.md + a README with run
-# conditions (flowlog SHA, host, sysctl, workers). Does NOT delete the
-# source or git-add — prints the suggested commit command.
-#
-# Usage:  make archive-joinorder
-#         make archive-joinorder ARCHIVE_FORCE=1   # overwrite existing snapshot
-# -----------------------------------------------------------------------------
-archive-joinorder:
-	@python3 $(SCRIPTS)/joinorder/archive_joinorder.py \
-	    $(if $(filter 1,$(ARCHIVE_FORCE)),--force,)
 
 # -----------------------------------------------------------------------------
 # ldbc: LDBC SNB timing / scaling at one ref. Uses LDBC_CONFIG (NOT

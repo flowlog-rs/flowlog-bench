@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """FlowLog-vs-others perf charts: total time + peak RSS.
 
-Reads a benchmark CSV (the raw cross_engine.sh sweep output OR the curated
-legacy perf-snapshot schema, see submission/splash_2026/) and writes two
-figures next to it:
+Reads a cross_engine.sh benchmark CSV and writes two figures next to it:
 
   <csv_stem>-time.{pdf,svg,png}     total time (load + solve), log scale,
                                     with per-pair slowdown annotations
@@ -54,28 +52,27 @@ GRID_FAINT = "#D0D7DE"
 
 # Per-engine spec: display label, bar color, candidate time columns (first
 # non-empty wins), and peak-RSS column. Every engine plots its TOTAL
-# (load + solve) so the bars compare like for like; FlowLog falls back to
-# Compiler_Exec_s for the curated snapshot schema, which has no total
-# column (FlowLog load is ~0 s, so the two are interchangeable there).
+# (load + solve) so the bars compare like for like (FlowLog falls back to
+# Compiler_Exec for older CSVs — its load is ~0 s, so interchangeable).
 ENGINES = {
     "flowlog": {
         "label": "FlowLog (compiler)", "color": "#1F6FEB",
-        "time": ("Compiler_Total", "Compiler_Exec_s", "Compiler_Exec"),
+        "time": ("Compiler_Total", "Compiler_Exec"),
         "mem": "Compiler_PeakRss_MB",
     },
     "souffle": {
         "label": "Soufflé (compiled)", "color": "#D97706",
-        "time": ("Souffle_Total_s", "Souffle_Total"),
+        "time": ("Souffle_Total",),
         "mem": "Souffle_PeakRss_MB",
     },
     "ddlog": {
         "label": "DDlog (compiled)", "color": "#1A7F37",
-        "time": ("Ddlog_Total_s", "Ddlog_Total"),
+        "time": ("Ddlog_Total",),
         "mem": "Ddlog_PeakRss_MB",
     },
     "ascent": {
         "label": "Ascent (compiled)", "color": "#8250DF",
-        "time": ("Ascent_Total_s", "Ascent_Total"),
+        "time": ("Ascent_Total",),
         "mem": "Ascent_PeakRss_MB",
     },
 }

@@ -27,7 +27,6 @@ FLOWLOG_BASE=v0.5.0 FLOWLOG_HEAD=main \
 
 make cross-joinorder                       # sweep every variant per (program, dataset)
 make joinorder-summary                     # per-pair fastest/median/slowest report
-make archive-joinorder                     # snapshot results/joinorder/ to submission/
 
 make ldbc                                  # LDBC SNB timing / scaling
 make plot                                  # render time + peak-RSS chart
