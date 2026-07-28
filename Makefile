@@ -18,9 +18,8 @@
 #   gen-joinorder-variants     — regenerate join-order variant .dl files
 #   cross-joinorder            — sweep every join-order variant per (program, ds)
 #   joinorder-summary          — per-pair fastest/median/slowest report
-#   archive-joinorder          — snapshot results/joinorder/ to docs/historical/
 #   ldbc                       — LDBC SNB timing / scaling
-#   plot                       — render speedup chart from results/
+#   plot                       — render time+RSS charts from a cross-engine CSV
 #   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
 #   distclean                  — also wipes flowlog/ build cache (forces re-fetch)
 #
@@ -47,11 +46,11 @@ CONFIG      ?= $(CONFIG_DIR)/default.txt
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
-PLOT_CSV    ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
+PLOT_CSV     ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
+PLOT_ENGINES ?= flowlog,souffle
 
 .PHONY: help env get-flowlog cross-engine cross-flowlog-version \
         cross-joinorder gen-joinorder-variants joinorder-summary \
-        archive-joinorder \
         ldbc plot clean distclean
 
 # -----------------------------------------------------------------------------
@@ -140,19 +139,6 @@ joinorder-summary:
 	@python3 $(SCRIPTS)/joinorder/joinorder_summary.py $(FILTER)
 
 # -----------------------------------------------------------------------------
-# archive-joinorder: snapshot results/joinorder/ into docs/historical/.
-# Captures pair CSVs + a regenerated SUMMARY.md + a README with run
-# conditions (flowlog SHA, host, sysctl, workers). Does NOT delete the
-# source or git-add — prints the suggested commit command.
-#
-# Usage:  make archive-joinorder
-#         make archive-joinorder ARCHIVE_FORCE=1   # overwrite existing snapshot
-# -----------------------------------------------------------------------------
-archive-joinorder:
-	@python3 $(SCRIPTS)/joinorder/archive_joinorder.py \
-	    $(if $(filter 1,$(ARCHIVE_FORCE)),--force,)
-
-# -----------------------------------------------------------------------------
 # ldbc: LDBC SNB timing / scaling at one ref. Uses LDBC_CONFIG (NOT
 # the generic CONFIG slot) so the same Make session can drive
 # cross-engine + ldbc with their respective configs.
@@ -168,16 +154,18 @@ ldbc:
 	 bash $(SCRIPTS)/ldbc.sh --config $(LDBC_CONFIG)
 
 # -----------------------------------------------------------------------------
-# plot: render the 2-panel time + peak-RSS chart from a cross-engine CSV.
-# Override the input via PLOT_CSV=<path>; default is the cross_engine.sh
-# output file. Writes <stem>.{pdf,svg} next to the input.
+# plot: render the 2-panel time + peak-RSS chart from a cross-engine CSV
+# (plot/plot.py). Override the input via PLOT_CSV=<path> and the engine
+# set via PLOT_ENGINES=<comma list>; default is the cross_engine.sh
+# output file. Writes <stem>-time/-memory figures next to the input.
+# (The paper figure lives in submission/splash_2026/plot_splash_demo.py.)
 # -----------------------------------------------------------------------------
 plot:
 	@if [[ ! -s "$(PLOT_CSV)" ]]; then \
 	    echo "ERROR: no CSV at $(PLOT_CSV) — run \`make cross-engine\` first, or pass PLOT_CSV=<path>"; \
 	    exit 2; \
 	fi
-	@python3 $(ROOT_DIR)/plot/plot_perf.py "$(PLOT_CSV)"
+	@python3 $(ROOT_DIR)/plot/plot.py "$(PLOT_CSV)" --engines $(PLOT_ENGINES)
 
 # -----------------------------------------------------------------------------
 # clean / distclean

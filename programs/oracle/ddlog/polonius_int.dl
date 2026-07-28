@@ -215,4 +215,3 @@ RelationSizes("Path_maybe_uninitialized_on_exit", size) :- Path_maybe_uninitiali
 RelationSizes("Move_error", size) :- Move_error(x, y), var size = (x, y).group_by(()).count_distinct().
 RelationSizes("Cfg_node", size) :- Cfg_node(x), var size = (x).group_by(()).count_distinct().
 RelationSizes("Var_drop_live_on_entry", size) :- Var_drop_live_on_entry(x, y), var size = (x, y).group_by(()).count_distinct().
-RelationSizes("Out_known_placeholder_subset", size) :- Out_known_placeholder_subset(x, y), var size = (x, y).group_by(()).count_distinct().

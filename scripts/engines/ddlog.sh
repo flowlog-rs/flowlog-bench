@@ -51,6 +51,11 @@ _ddlog_compile() {
 
     if [[ ! -x "$bin" || "$dl_src" -nt "$bin" ]]; then
         log "$BLUE" "BUILD" "DDlog: compiling $stem (ddlog -i + cargo +${DDLOG_RUST}, one-off)"
+        # Ensure the build dir exists: engine_ddlog_setup creates it, but a
+        # --fresh wipe of LOG_DIR (which contains DDLOG_BUILD_DIR) runs *after*
+        # setup, removing it. Re-create here so the cp/ddlog -i below don't die
+        # — same robustness _souffle_compile gets from its own mkdir.
+        mkdir -p "$DDLOG_BUILD_DIR"
         rm -rf "$crate"
         cp "$dl_src" "${DDLOG_BUILD_DIR}/${stem}.dl"
         if ! ( cd "$DDLOG_BUILD_DIR" \
@@ -67,6 +72,23 @@ _ddlog_compile() {
     fi
     [[ -x "$bin" ]] || return 1
     echo "$bin"
+}
+
+# Parse the three "Timestamp: <ns>" lines that ddlog_gen_dat.py plants around
+# the insert phase and the commit (T0 before start, T1 before commit, T2
+# after commit) into load/exec sidecars: load = T1-T0 (stream parse + feed),
+# exec = T2-T1 (commit to fixpoint). Approximate by construction:
+# differential computes asynchronously, so some compute overlaps the load
+# window. No-ops gracefully on cached .dat files predating the markers.
+_ddlog_record_load_exec() {
+    local best_log="$1" run_log="$2"
+    local -a ts
+    mapfile -t ts < <(grep -oE 'Timestamp: [0-9]+' "$run_log" 2>/dev/null | awk '{print $2}')
+    (( ${#ts[@]} >= 3 )) || return 0
+    awk -v t0="${ts[0]}" -v t1="${ts[1]}" 'BEGIN {
+        printf "%.9f", (t1 - t0) / 1e9 }' > "${best_log}.median_load_s"
+    awk -v t1="${ts[1]}" -v t2="${ts[2]}" 'BEGIN {
+        printf "%.9f", (t2 - t1) / 1e9 }' > "${best_log}.median_exec_s"
 }
 
 # Record per-relation sizes to <sizes_sidecar> as "relation\tN" (lowercased,
@@ -127,6 +149,7 @@ engine_ddlog_run() {
                 > "$dat" 2> "${dat}.gen.log"; then
             log "$YELLOW" "WARN" "DDlog: command-stream generation failed for $stem + $dataset_name (see ${dat}.gen.log)"
             rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"; : > "$best_log"
+            rm -f "$dat"   # partial stream must not be mtime-cache-reused on resume
             return 1
         fi
     else
@@ -177,6 +200,7 @@ engine_ddlog_run() {
         log "$RED" "FAIL" "DDlog: all $NUM_RUNS runs failed for $prog_file + $dataset_name"
         rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s" "${best_log}.n_runs_succeeded"
         : > "$best_log"
+        _ddlog_cleanup_dat "$dat"
         return 1
     fi
 
@@ -187,9 +211,21 @@ engine_ddlog_run() {
     median_rss=$(median_int "${rss_values[@]}")
     n_succeeded=$(echo "$entries" | wc -w)
     write_engine_sidecars "$best_log" "$median_log" "$median_rss" "$n_succeeded" "$median_time"
+    _ddlog_record_load_exec "$best_log" "$median_log"
 
     if (( n_succeeded < NUM_RUNS )); then
         log "$YELLOW" "PARTIAL" "DDlog: only $n_succeeded/$NUM_RUNS succeeded for $prog_file + $dataset_name"
     fi
     log "$GREEN" "DONE" "DDlog:     $prog_file + $dataset_name (median: ${median_time}s, peak ${median_rss} KiB, runs=${n_succeeded}/${NUM_RUNS})"
+    _ddlog_cleanup_dat "$dat"
+}
+
+# The cached .dat command stream is dataset-sized text (a doop app's is GBs);
+# across a long multi-pair sweep the accumulated .dats can fill the disk. So
+# mirror the dataset-cache policy: drop it after the pair unless the caller
+# asked to keep dataset artifacts (--keep-datasets).
+_ddlog_cleanup_dat() {
+    local dat="$1"
+    [[ "${KEEP_DATASETS:-0}" == "1" ]] && return 0
+    rm -f "$dat" "${dat}.gen.log"
 }

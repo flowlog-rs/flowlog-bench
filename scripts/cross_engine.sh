@@ -16,7 +16,7 @@
 # Flags:
 #   --engines=<list>            comma list of comparison engines to run
 #                               alongside the FlowLog compiler:
-#                               {interpreter, souffle, ddlog, none}.
+#                               {interpreter, souffle, ddlog, ascent, none}.
 #                               Default: interpreter. `none` runs only
 #                               the compiler column.
 #   --target=<stem:ds>          run only one pair (stem = .dl basename without
@@ -75,15 +75,16 @@ while (( $# )); do
 done
 export KEEP_DATASETS
 
-RUN_INTERPRETER=0; RUN_SOUFFLE=0; RUN_DDLOG=0
+RUN_INTERPRETER=0; RUN_SOUFFLE=0; RUN_DDLOG=0; RUN_ASCENT=0
 case ",$ENGINES," in *,interpreter,*) RUN_INTERPRETER=1 ;; esac
 case ",$ENGINES," in *,souffle,*)     RUN_SOUFFLE=1 ;; esac
 case ",$ENGINES," in *,ddlog,*)       RUN_DDLOG=1 ;; esac
+case ",$ENGINES," in *,ascent,*)      RUN_ASCENT=1 ;; esac
 case ",$ENGINES," in
     *,none,*) ;;  # explicit compiler-only mode is fine
     *)
-        (( RUN_INTERPRETER || RUN_SOUFFLE || RUN_DDLOG )) \
-            || die "--engines must be 'none' or comma list of {interpreter,souffle,ddlog} (got: $ENGINES)"
+        (( RUN_INTERPRETER || RUN_SOUFFLE || RUN_DDLOG || RUN_ASCENT )) \
+            || die "--engines must be 'none' or comma list of {interpreter,souffle,ddlog,ascent} (got: $ENGINES)"
         ;;
 esac
 
@@ -149,6 +150,11 @@ DDLOG_PROG_DIR="${DDLOG_PROG_DIR:-${ROOT_DIR}/programs/oracle/ddlog}"
 DDLOG_RUST="${DDLOG_RUST:-1.76}"
 DDLOG_BUILD_DIR="${DDLOG_BUILD_DIR:-${LOG_DIR}/ddlog-bin}"
 
+# Ascent (Rust embedded Datalog): hand-translated bin crates, one per oracle
+# program, built with stable cargo. Compile cache = cargo fingerprinting in
+# the workspace target/ (survives --fresh).
+ASCENT_PROG_DIR="${ASCENT_PROG_DIR:-${ROOT_DIR}/programs/oracle/ascent}"
+
 # Dataset URL template:
 DATASET_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main/dataset/csv"
 
@@ -156,6 +162,7 @@ export FLOWLOG_BIN PROG_DIR FACT_DIR LOG_DIR COMPILER_BIN \
        INTERPRETER_DIR INTERPRETER_BIN INTERPRETER_PROG_DIR \
        INTERPRETER_PROG_URL SOUFFLE_BIN SOUFFLE_PROG_DIR \
        DDLOG_HOME DDLOG_PROG_DIR DDLOG_RUST DDLOG_BUILD_DIR \
+       ASCENT_PROG_DIR \
        WORKERS NUM_RUNS FLOWLOG_RUN_TIMEOUT TIME_BIN
 
 # --- Library imports -----------------------------------------------------
@@ -165,6 +172,7 @@ source "${ROOT_DIR}/scripts/engines/compiler.sh"
 source "${ROOT_DIR}/scripts/engines/interpreter.sh"
 source "${ROOT_DIR}/scripts/engines/souffle.sh"
 source "${ROOT_DIR}/scripts/engines/ddlog.sh"
+source "${ROOT_DIR}/scripts/engines/ascent.sh"
 
 # --- Reproducibility manifest --------------------------------------------
 RUN_INFO_BENCH_ROOT="$ROOT_DIR"
@@ -179,6 +187,7 @@ source "${ROOT_DIR}/scripts/lib/run_info.sh"
 #   [interp:skip]     skip the interpreter run (vldb26 limitations)
 #   [souffle:skip]    skip the Souffle run
 #   [ddlog:skip]      skip the DDlog run
+#   [ascent:skip]     skip the Ascent run
 parse_config_line() {
     local raw="$1"
     local line="${raw%%#*}"
@@ -237,7 +246,7 @@ cleanup_dataset_for_pair() {
 # = engine wasn't requested for this pair. New engine columns are appended
 # at the end so the header stays append-only; downstream consumers (plot/)
 # parse by column name.
-CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded,Ddlog_Total,Ddlog_PeakRss_MB,Ddlog_vs_Compiler_Total,Crosscheck_Ddlog,Ddlog_RunsSucceeded"
+CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded,Ddlog_Total,Ddlog_PeakRss_MB,Ddlog_vs_Compiler_Total,Crosscheck_Ddlog,Ddlog_RunsSucceeded,Ascent_Total,Ascent_PeakRss_MB,Ascent_vs_Compiler_Total,Crosscheck_Ascent,Ascent_RunsSucceeded,Souffle_Load,Souffle_Exec,Ddlog_Load,Ddlog_Exec,Ascent_Load,Ascent_Exec"
 
 init_csv() {
     mkdir -p "$(dirname "$CSV_FILE")"
@@ -306,11 +315,15 @@ PY
 # them back to 0, so empty outputs don't read as a false PARTIAL.)
 crosscheck_compiler_vs_ddlog() { crosscheck_compiler_vs_souffle "$@"; }
 
+# Same again, compiler vs Ascent. Ascent programs print every .printsize
+# relation (including 0-size ones), already lowercased, so no seeding needed.
+crosscheck_compiler_vs_ascent() { crosscheck_compiler_vs_souffle "$@"; }
+
 # Append one CSV row from the median sidecars + log files left by the
 # engine adapters.
 append_csv_row() {
     local stem="$1" dataset="$2"
-    local interp_log="$3" comp_log="$4" sf_log="$5" dd_log="${6:-}"
+    local interp_log="$3" comp_log="$4" sf_log="$5" dd_log="${6:-}" as_log="${7:-}"
 
     # Median timings (both compiler + interpreter emit Load + Total log lines).
     local i_total i_load i_exec c_total c_load c_exec
@@ -333,24 +346,46 @@ append_csv_row() {
     i_rss_mb=$(kib_to_mib "$i_rss_kb")
     c_rss_mb=$(kib_to_mib "$c_rss_kb")
 
-    # Souffle (optional).
+    # Souffle (optional). Load/exec split comes from the one extra profiled
+    # run (souffle.sh _souffle_profile_split); totals from the clean runs.
     local sf_total="N/A" sf_rss_mb="N/A" sf_vs_comp_total="N/A"
+    local sf_load="N/A" sf_exec="N/A"
     if [[ -n "${sf_log:-}" && -s "${sf_log}.median_total_s" ]]; then
         sf_total=$(cat "${sf_log}.median_total_s")
         local sf_rss_kb
         sf_rss_kb=$(cat "${sf_log}.median_rss_kb" 2>/dev/null || echo "N/A")
         sf_rss_mb=$(kib_to_mib "$sf_rss_kb")
         sf_vs_comp_total=$(speedup_ratio "$sf_total" "$c_total")
+        [[ -s "${sf_log}.median_load_s" ]] && sf_load=$(cat "${sf_log}.median_load_s")
+        [[ -s "${sf_log}.median_exec_s" ]] && sf_exec=$(cat "${sf_log}.median_exec_s")
     fi
 
-    # DDlog (optional).
+    # DDlog (optional). Load/exec split parsed from `timestamp;` markers in
+    # the median run's command stream (ddlog.sh _ddlog_record_load_exec).
     local dd_total="N/A" dd_rss_mb="N/A" dd_vs_comp_total="N/A"
+    local dd_load="N/A" dd_exec="N/A"
     if [[ -n "${dd_log:-}" && -s "${dd_log}.median_total_s" ]]; then
         dd_total=$(cat "${dd_log}.median_total_s")
         local dd_rss_kb
         dd_rss_kb=$(cat "${dd_log}.median_rss_kb" 2>/dev/null || echo "N/A")
         dd_rss_mb=$(kib_to_mib "$dd_rss_kb")
         dd_vs_comp_total=$(speedup_ratio "$dd_total" "$c_total")
+        [[ -s "${dd_log}.median_load_s" ]] && dd_load=$(cat "${dd_log}.median_load_s")
+        [[ -s "${dd_log}.median_exec_s" ]] && dd_exec=$(cat "${dd_log}.median_exec_s")
+    fi
+
+    # Ascent (optional). The harness mirrors FlowLog's log lines, so the
+    # same extractors give the load/exec split from the median run log.
+    local as_total="N/A" as_rss_mb="N/A" as_vs_comp_total="N/A"
+    local as_load="N/A" as_exec="N/A"
+    if [[ -n "${as_log:-}" && -s "${as_log}.median_total_s" ]]; then
+        as_total=$(cat "${as_log}.median_total_s")
+        local as_rss_kb
+        as_rss_kb=$(cat "${as_log}.median_rss_kb" 2>/dev/null || echo "N/A")
+        as_rss_mb=$(kib_to_mib "$as_rss_kb")
+        as_vs_comp_total=$(speedup_ratio "$as_total" "$c_total")
+        as_load=$(extract_load_seconds "$as_log")
+        as_exec=$(compute_exec_seconds "$as_total" "$as_load")
     fi
 
     # Crosscheck (free if both sides wrote a .sizes sidecar this pair).
@@ -370,14 +405,23 @@ append_csv_row() {
             MISMATCH*) log "$RED"   "XCHECK" "compiler vs ddlog: $crosscheck_dd" ;;
         esac
     fi
+    local crosscheck_as="n/a"
+    if [[ "$as_total" != "N/A" ]]; then
+        crosscheck_as=$(crosscheck_compiler_vs_ascent "${comp_log}.sizes" "${as_log}.sizes")
+        case "$crosscheck_as" in
+            match*)    log "$GREEN" "XCHECK" "compiler vs ascent: $crosscheck_as" ;;
+            MISMATCH*) log "$RED"   "XCHECK" "compiler vs ascent: $crosscheck_as" ;;
+        esac
+    fi
 
-    local i_n c_n s_n d_n
+    local i_n c_n s_n d_n a_n
     i_n=$(cat "${interp_log}.n_runs_succeeded" 2>/dev/null || true)
     c_n=$(cat "${comp_log}.n_runs_succeeded"   2>/dev/null || true)
     s_n=$(cat "${sf_log}.n_runs_succeeded"     2>/dev/null || true)
     d_n=$(cat "${dd_log}.n_runs_succeeded"     2>/dev/null || true)
+    a_n=$(cat "${as_log}.n_runs_succeeded"     2>/dev/null || true)
 
-    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n},${dd_total},${dd_rss_mb},${dd_vs_comp_total},${crosscheck_dd},${d_n}" \
+    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n},${dd_total},${dd_rss_mb},${dd_vs_comp_total},${crosscheck_dd},${d_n},${as_total},${as_rss_mb},${as_vs_comp_total},${crosscheck_as},${a_n},${sf_load},${sf_exec},${dd_load},${dd_exec},${as_load},${as_exec}" \
         >> "$CSV_FILE"
 
     log "$GREEN" "CSV" "Appended ${stem}_${dataset} to $CSV_FILE"
@@ -396,7 +440,7 @@ fmt_speedup() {
 }
 
 print_pair_summary() {
-    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}" dd_log="${5:-}"
+    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}" dd_log="${5:-}" as_log="${6:-}"
 
     local i_total i_load i_exec c_total c_load c_exec
     i_total=$(extract_total_seconds "$interp_log")
@@ -422,6 +466,12 @@ print_pair_summary() {
         dd_rss_mb=$(kib_to_mib "$(cat "${dd_log}.median_rss_kb" 2>/dev/null || echo)")
     fi
 
+    local as_total="" as_rss_mb=""
+    if [[ -n "$as_log" && -s "${as_log}.median_total_s" ]]; then
+        as_total=$(cat "${as_log}.median_total_s")
+        as_rss_mb=$(kib_to_mib "$(cat "${as_log}.median_rss_kb" 2>/dev/null || echo)")
+    fi
+
     echo "----------------------------------------"
     log "$GREEN" "RESULT" "$label"
     log "$GREEN" "  LOAD" "Interp=${i_load}s  Comp=${c_load}s  Speedup=$(fmt_speedup "$i_load" "$c_load")"
@@ -433,6 +483,9 @@ print_pair_summary() {
     fi
     if [[ -n "$dd_total" ]]; then
         log "$GREEN" "  DDLOG" "Total=${dd_total}s  PeakRss=${dd_rss_mb}MB  DDlog/Comp=$(fmt_speedup "$dd_total" "$c_total")"
+    fi
+    if [[ -n "$as_total" ]]; then
+        log "$GREEN" " ASCENT" "Total=${as_total}s  PeakRss=${as_rss_mb}MB  Ascent/Comp=$(fmt_speedup "$as_total" "$c_total")"
     fi
     echo "----------------------------------------"
 }
@@ -472,6 +525,7 @@ print_summary_table() {
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
         local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
+        local as_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ascent.log"
 
         # Compiler row: always present (compiler always runs); baseline 1.00x.
         local c_total c_rss_mb
@@ -503,6 +557,15 @@ print_summary_table() {
             fi
             emit_summary_row "" "ddlog" "$dd_total" "$dd_rss_mb" "$(fmt_speedup "$dd_total" "$c_total")"
         fi
+
+        if (( RUN_ASCENT )) && ! pair_has_tag "ascent:skip"; then
+            local as_total="N/A" as_rss_mb="N/A"
+            if [[ -s "${as_log}.median_total_s" ]]; then
+                as_total=$(cat "${as_log}.median_total_s")
+                as_rss_mb=$(kib_to_mib "$(cat "${as_log}.median_rss_kb" 2>/dev/null || echo)")
+            fi
+            emit_summary_row "" "ascent" "$as_total" "$as_rss_mb" "$(fmt_speedup "$as_total" "$c_total")"
+        fi
     done < "$CONFIG_FILE"
     echo ""
     log "$GREEN" "CSV" "Results saved to: $CSV_FILE"
@@ -515,6 +578,7 @@ main() {
     echo "  Interpreter   : $INTERPRETER_DIR  (timed: $RUN_INTERPRETER)"
     echo "  Souffle       : $SOUFFLE_BIN  (timed: $RUN_SOUFFLE)"
     echo "  DDlog         : $DDLOG_HOME  (timed: $RUN_DDLOG)"
+    echo "  Ascent        : $ASCENT_PROG_DIR  (timed: $RUN_ASCENT)"
     echo "  Config        : $CONFIG_FILE"
     [[ -n "$TARGET_FILTER" ]] && echo "  Target filter : $TARGET_FILTER"
     echo "  Workers       : $WORKERS  (applied identically to every engine)"
@@ -525,6 +589,7 @@ main() {
     setup_compiler
     (( RUN_SOUFFLE )) && engine_souffle_setup
     (( RUN_DDLOG )) && engine_ddlog_setup
+    (( RUN_ASCENT )) && engine_ascent_setup
 
     if (( FRESH )); then
         rm -rf "$LOG_DIR"
@@ -568,15 +633,19 @@ main() {
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
         local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
+        local as_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ascent.log"
 
         # Clear stale sidecars so this iteration's CSV row is clean.
         rm -f "${interp_log}" "${interp_log}.median_rss_kb" "${interp_log}.n_runs_succeeded" \
               "${comp_log}.n_runs_succeeded" "${comp_log}.sizes" \
               "${sf_log}" "${sf_log}.median_rss_kb" "${sf_log}.median_total_s" "${sf_log}.n_runs_succeeded" "${sf_log}.sizes" \
-              "${dd_log}" "${dd_log}.median_rss_kb" "${dd_log}.median_total_s" "${dd_log}.n_runs_succeeded" "${dd_log}.sizes"
+              "${sf_log}.median_load_s" "${sf_log}.median_exec_s" \
+              "${dd_log}" "${dd_log}.median_rss_kb" "${dd_log}.median_total_s" "${dd_log}.n_runs_succeeded" "${dd_log}.sizes" \
+              "${dd_log}.median_load_s" "${dd_log}.median_exec_s" \
+              "${as_log}" "${as_log}.median_rss_kb" "${as_log}.median_total_s" "${as_log}.n_runs_succeeded" "${as_log}.sizes"
 
-        local rc_interp=0 rc_compiler=0 rc_souffle=0 rc_ddlog=0
-        local interp_required=0 souffle_required=0 ddlog_required=0
+        local rc_interp=0 rc_compiler=0 rc_souffle=0 rc_ddlog=0 rc_ascent=0
+        local interp_required=0 souffle_required=0 ddlog_required=0 ascent_required=0
 
         if (( RUN_INTERPRETER )) && ! pair_has_tag "interp:skip"; then
             interp_required=1
@@ -601,6 +670,13 @@ main() {
             log "$YELLOW" "SKIP" "DDlog: $PROG_NAME + $DATASET_NAME (per [ddlog:skip] tag)"
         fi
 
+        if (( RUN_ASCENT )) && ! pair_has_tag "ascent:skip"; then
+            ascent_required=1
+            engine_ascent_run "$PROG_NAME" "$DATASET_NAME" || rc_ascent=$?
+        elif pair_has_tag "ascent:skip"; then
+            log "$YELLOW" "SKIP" "Ascent: $PROG_NAME + $DATASET_NAME (per [ascent:skip] tag)"
+        fi
+
         # Gate: a pair is "complete" iff every required engine produced
         # at least one valid sample. Otherwise skip the CSV row so resume
         # can retry on a future invocation. Recording N/A here would mask
@@ -613,6 +689,8 @@ main() {
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }souffle"; }
         (( ddlog_required && rc_ddlog != 0 )) \
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }ddlog"; }
+        (( ascent_required && rc_ascent != 0 )) \
+            && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }ascent"; }
 
         if (( pair_failed )); then
             log "$RED" "PAIR-FAIL" \
@@ -623,9 +701,9 @@ main() {
         fi
 
         print_pair_summary "${_display_stem}_${DATASET_NAME}" \
-            "$interp_log" "$comp_log" "$sf_log" "$dd_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log"
         append_csv_row "$_display_stem" "$DATASET_NAME" \
-            "$interp_log" "$comp_log" "$sf_log" "$dd_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log"
         cleanup_dataset_for_pair "$DATASET_NAME"
     done < "$CONFIG_FILE"
 

@@ -32,5 +32,5 @@ OutQ(x, q, z) :- OutQ(x, r, z), S(r, q).
 OutQ(x, e, o) :- OutQ(x, y, z), R(y, u, e), OutQ(z, u, o).
 
 output relation RelationSizes(rel: string, size: bit<64>)
-RelationSizes("OutP", size) :- OutP(x, z), var size = (x, z).group_by(()).count_distinct().
-RelationSizes("OutQ", size) :- OutQ(x, y, z), var size = (x, y, z).group_by(()).count_distinct().
+RelationSizes("P", size) :- OutP(x, z), var size = (x, z).group_by(()).count_distinct().
+RelationSizes("Q", size) :- OutQ(x, y, z), var size = (x, y, z).group_by(()).count_distinct().

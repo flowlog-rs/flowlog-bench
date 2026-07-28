@@ -8,20 +8,20 @@ input relation Arc(y: node, x: node)
 input relation Source(x: node)
 
 output relation BipartiteViolation(x: node)
-output relation Zero(x: node)
-output relation One(x: node)
+output relation RZero(x: node)
+output relation ROne(x: node)
 
-Zero(x) :- Source(x).
+RZero(x) :- Source(x).
 
-One(y) :- Arc(x, y), Zero(x).
-One(x) :- Arc(x, y), Zero(y).
+ROne(y) :- Arc(x, y), RZero(x).
+ROne(x) :- Arc(x, y), RZero(y).
 
-Zero(y) :- Arc(x, y), One(x).
-Zero(x) :- Arc(x, y), One(y).
+RZero(y) :- Arc(x, y), ROne(x).
+RZero(x) :- Arc(x, y), ROne(y).
 
-BipartiteViolation(x) :- One(x), Zero(x).
+BipartiteViolation(x) :- ROne(x), RZero(x).
 
 output relation RelationSizes(rel: string, size: bit<64>)
 RelationSizes("BipartiteViolation", size) :- BipartiteViolation(x), var size = (x).group_by(()).count_distinct().
-RelationSizes("Zero", size) :- Zero(x), var size = (x).group_by(()).count_distinct().
-RelationSizes("One", size) :- One(x), var size = (x).group_by(()).count_distinct().
+RelationSizes("Zero", size) :- RZero(x), var size = (x).group_by(()).count_distinct().
+RelationSizes("One", size) :- ROne(x), var size = (x).group_by(()).count_distinct().
