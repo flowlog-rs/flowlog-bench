@@ -57,10 +57,13 @@ _ascent_compile() {
     echo "$bin"
 }
 
-# Clear stale sidecars + truncate the best-log so the CSV row reads N/A.
+# Clear ALL stale sidecars + truncate the best-log so the CSV row reads N/A
+# (including the success count + sizes — a stale pair from an earlier LOG_DIR
+# must not leak into append_csv_row if the crate/dataset has since vanished).
 _ascent_record_na() {
     local best_log="$1"
-    rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s"
+    rm -f "${best_log}.median_rss_kb" "${best_log}.median_total_s" \
+          "${best_log}.n_runs_succeeded" "${best_log}.sizes"
     : > "$best_log"
 }
 

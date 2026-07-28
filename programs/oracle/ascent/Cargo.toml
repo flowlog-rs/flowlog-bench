@@ -19,6 +19,10 @@ resolver = "2"
 ascent = "0.8"
 rayon = "1"
 dashmap = "6"
+# boxcar must track the ascent-internal boxcar major: load_rel's collection
+# type unifies with ascent's par-relation storage, so a version split here
+# is a compile error, not a subtle bug. (dashmap intentionally rides its own
+# major — ascent 0.8 pins dashmap 5 internally; the duplicate is accepted.)
 boxcar = "0.1"
 ahash = "0.8"
 harness = { path = "harness" }

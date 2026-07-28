@@ -111,7 +111,11 @@ macro_rules! impl_from_record {
                 let tuple = ($($col::from_field(
                     it.next().unwrap_or_else(|| panic!("missing field in line {line:?}"))
                 ),)+);
-                debug_assert!(it.next().is_none(), "extra fields in line {line:?}");
+                // Hard assert (not debug_assert): benches run --release, and
+                // a wider-than-declared row means a mis-mapped input file —
+                // silently truncating it would "load fine" and produce wrong
+                // relation sizes with no error. Cost is one it.next() per line.
+                assert!(it.next().is_none(), "extra fields in line {line:?}");
                 tuple
             }
         }

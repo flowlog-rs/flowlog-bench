@@ -29,11 +29,13 @@ from matplotlib.ticker import LogLocator, NullLocator
 from matplotlib.transforms import blended_transform_factory, ScaledTranslation
 
 # Okabe-Ito colorblind-safe palette (also distinct in grayscale).
+# Every engine plots its TOTAL (load + solve) so bars compare like for like;
+# FlowLog falls back to Compiler_Exec for older CSVs (its load is ~0 s).
 ENGINES = [
-    ("flowlog", "FlowLog", "#0072B2", ("Compiler_Exec", "Compiler_Total"), "Compiler_PeakRss_MB"),
-    ("souffle", "Soufflé", "#E69F00", ("Souffle_Total",), "Souffle_PeakRss_MB"),
-    ("ddlog",   "DDlog",   "#009E73", ("Ddlog_Total",),   "Ddlog_PeakRss_MB"),
-    ("ascent",  "Ascent",  "#CC79A7", ("Ascent_Total",),  "Ascent_PeakRss_MB"),
+    ("flowlog", "FlowLog", "#0072B2", ("Compiler_Total", "Compiler_Exec")),
+    ("souffle", "Soufflé", "#E69F00", ("Souffle_Total",)),
+    ("ddlog",   "DDlog",   "#009E73", ("Ddlog_Total",)),
+    ("ascent",  "Ascent",  "#CC79A7", ("Ascent_Total",)),
 ]
 
 TEXT_DARK = "#1F2328"
@@ -72,19 +74,16 @@ def _num(row, *names):
 
 def load_group(src, group):
     """Rows for one program, sorted by FlowLog time ascending (small→large
-    reads as a scaling trend). Each row carries per-engine time + mem (GiB)."""
+    reads as a scaling trend). Each row carries per-engine total time."""
     out = []
     for r in csv.DictReader(src.open()):
         if r["Program"] != group:
             continue
-        rec = {"label": r["Dataset"], "t": {}, "m": {}}
-        for key, _, _, tcols, mcol in ENGINES:
+        rec = {"label": r["Dataset"], "t": {}}
+        for key, _, _, tcols in ENGINES:
             t = _num(r, *tcols)
-            m = _num(r, mcol)
             if t is not None:
                 rec["t"][key] = t
-            if m is not None:
-                rec["m"][key] = m / 1024.0
         if "flowlog" in rec["t"]:
             out.append(rec)
     out.sort(key=lambda r: r["t"]["flowlog"])
@@ -95,7 +94,7 @@ PROG_DISPLAY = {"doop": "DOOP", "polonius_int": "Polonius"}
 RED = "#CF222E"
 
 
-def _draw_group(ax, rows, x0, *, first, annotate, xfs):
+def _draw_group(ax, rows, x0, *, first, annotate):
     """Draw one program's grouped bars on a shared axis, leftmost group
     centred at x0. Returns (tick positions, labels, (x_first, x_last))."""
     n = len(rows)
@@ -106,7 +105,7 @@ def _draw_group(ax, rows, x0, *, first, annotate, xfs):
     trans = blended_transform_factory(ax.transData, ax.transAxes)
 
     base = [r["t"].get("flowlog") for r in rows]
-    for (ekey, label, color, _, _), off in zip(ENGINES, offsets):
+    for (ekey, label, color, _), off in zip(ENGINES, offsets):
         vals = np.array([r["t"].get(ekey, np.nan) for r in rows], float)
         ax.bar(centers + off, vals, bar_w,
                label=label if first else "_nolegend_", color=color,
@@ -115,8 +114,10 @@ def _draw_group(ax, rows, x0, *, first, annotate, xfs):
             if ekey == "flowlog":
                 continue
             if not np.isfinite(v):
-                # engine absent (e.g. DDlog timeout) — a cute mathtext × at
-                # the slot base (LaTeX-style glyph, softer than a plot marker).
+                # Engine has no result in the CSV — timeout, OOM, or a
+                # [<engine>:skip] tag; the harness records them identically,
+                # so × means "no result", not necessarily "failed". Mathtext
+                # × at the slot base (softer than a plot marker).
                 ax.text(c + off, 0.10, r"$\times$", transform=trans,
                         ha="center", va="bottom", fontsize=13, color=RED,
                         zorder=6, clip_on=False)
@@ -151,7 +152,7 @@ def render(groups, stem, width, annotate):
     cursor = 0.0
     for gi, (name, rows) in enumerate(groups):
         centers, labs, (xa, xb) = _draw_group(
-            ax, rows, cursor, first=(gi == 0), annotate=annotate, xfs=xfs)
+            ax, rows, cursor, first=(gi == 0), annotate=annotate)
         ticks += centers
         labels += labs
         # category header, centred over the group, snug under the top line
@@ -166,7 +167,7 @@ def render(groups, stem, width, annotate):
 
     ax.yaxis.set_major_locator(LogLocator(base=10, numticks=12))
     ax.yaxis.set_minor_locator(NullLocator())
-    ax.set_ylabel("Execution time (s)", fontsize=12.5)
+    ax.set_ylabel("Total time (s)", fontsize=12.5)
     ax.grid(True, axis="y", color=GRID_FAINT, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
     ax.set_xlim(-0.7, ticks[-1] + 0.7)

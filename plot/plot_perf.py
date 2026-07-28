@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""FlowLog-vs-others perf charts: execution time + peak RSS.
+"""FlowLog-vs-others perf charts: total time + peak RSS.
 
-Reads a benchmark CSV (raw 26-column sweep output OR the curated
+Reads a benchmark CSV (the raw cross_engine.sh sweep output OR the curated
 docs/historical/perf-snapshot.csv schema) and writes two figures next
 to it:
 
-  <csv_stem>-time.{pdf,svg,png}     execution time, log scale, with
-                                    per-pair slowdown annotations
+  <csv_stem>-time.{pdf,svg,png}     total time (load + solve), log scale,
+                                    with per-pair slowdown annotations
   <csv_stem>-memory.{pdf,svg,png}   peak RSS in GiB
 
 FlowLog is always the baseline (first series). Add comparison engines
@@ -19,9 +19,11 @@ group and annotated with its slowdown vs FlowLog.
   --engines flowlog,souffle,ddlog,ascent   all four engines
 
 Rows are sorted by the LAST engine's slowdown (engine_time / flowlog_time)
-so the widest gaps read left-to-right. A row is kept only if every
-selected engine has both a time and a memory cell, so the two figures
-share an identical row set.
+so the widest gaps read left-to-right. A row is kept whenever the BASELINE
+engine has time + memory cells; a comparison engine with no result in the
+CSV is drawn as a red ✗ at its bar slot. The CSV does not say WHY a cell
+is absent (1800 s timeout, OOM, or a [<engine>:skip] tag) — treat ✗ as
+"no result", not necessarily "failed".
 
 Usage:
     python3 plot/plot_perf.py                                   # default CSV
@@ -51,13 +53,14 @@ TEXT_MUTED = "#57606A"
 GRID_FAINT = "#D0D7DE"
 
 # Per-engine spec: display label, bar color, candidate time columns (first
-# non-empty wins), and peak-RSS column. FlowLog keeps its historical
-# Compiler_Exec preference and falls back to Compiler_Total; the comparison
-# engines report a single total.
+# non-empty wins), and peak-RSS column. Every engine plots its TOTAL
+# (load + solve) so the bars compare like for like; FlowLog falls back to
+# Compiler_Exec_s for the curated snapshot schema, which has no total
+# column (FlowLog load is ~0 s, so the two are interchangeable there).
 ENGINES = {
     "flowlog": {
         "label": "FlowLog (compiler)", "color": "#1F6FEB",
-        "time": ("Compiler_Exec_s", "Compiler_Exec", "Compiler_Total"),
+        "time": ("Compiler_Total", "Compiler_Exec_s", "Compiler_Exec"),
         "mem": "Compiler_PeakRss_MB",
     },
     "souffle": {
@@ -176,9 +179,11 @@ def _geomean(a):
 
 
 def _mark_missing(ax, x):
-    """Stamp a red ✗ just above the x-axis at an absent engine's bar slot
-    (e.g. ddlog OOM). y is in axes fraction so it sits at the baseline
-    regardless of the data scale."""
+    """Stamp a red ✗ just above the x-axis at an absent engine's bar slot.
+    Absent = no result in the CSV, which conflates timeout, OOM, and
+    [<engine>:skip]-tagged pairs — the harness records them identically.
+    y is in axes fraction so it sits at the baseline regardless of the
+    data scale."""
     trans = blended_transform_factory(ax.transData, ax.transAxes)
     ax.plot([x], [0.018], marker="x", color="#CF222E", markersize=9,
             markeredgewidth=2.4, transform=trans, zorder=6, clip_on=False)
@@ -198,10 +203,16 @@ def render_time(rows, stem, engines):
     speed = {e: series[e] / fl for e in comps}
 
     n = len(rows)
-    bits = ", ".join(f"{_geomean(speed[e]):.2f}× ({ENGINES[e]['label'].split()[0]})"
-                     for e in comps)
+    # Disclose per-engine coverage: an engine's geomean only spans the pairs
+    # it has results for, which excludes exactly its worst cases (timeouts).
+    def _bit(e):
+        k = int(np.isfinite(speed[e]).sum())
+        cov = f", {k}/{n}" if k < n else ""
+        return f"{_geomean(speed[e]):.2f}× ({ENGINES[e]['label'].split()[0]}{cov})"
+
+    bits = ", ".join(_bit(e) for e in comps)
     names = " vs ".join(ENGINES[e]["label"].split()[0] for e in engines)
-    title = f"{names} — execution time · {n} workloads · FlowLog faster by geomean {bits}"
+    title = f"{names} — total time · {n} workloads · FlowLog faster by geomean {bits}"
 
     def annotate(ax, offsets, bar_w):
         off = dict(zip(engines, offsets))
@@ -222,7 +233,7 @@ def render_time(rows, stem, engines):
         ax.set_ylim(top=ax.get_ylim()[1] * (3.0 if rot else 2.2))
 
     _bar_chart(stem, labels, engines, series,
-               ylabel="Execution time (s, log scale)",
+               ylabel="Total time (load + solve; s, log scale)",
                title=title, log=True, decorate=annotate)
 
 

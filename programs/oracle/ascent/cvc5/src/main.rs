@@ -192,6 +192,9 @@ fn main() {
             load_rel(&dir, "Arch_reg_reg_arithmetic_operation.csv", ',');
         prog.arch_return_reg = load_rel(&dir, "Arch_return_reg.csv", ',');
         prog.block_next = load_rel(&dir, "Block_next.csv", ',');
+        // Loaded but used by no rule — mirrors the Soufflé source, which also
+        // .input's it while every rule using it is commented out; kept so the
+        // load phase does identical I/O work. Do not "fix".
         prog.block_last_instruction = load_rel(&dir, "Block_last_instruction.csv", ',');
         prog.code_in_block = load_rel(&dir, "Code_in_block.csv", ',');
         prog.direct_call = load_rel(&dir, "Direct_call.csv", ',');
