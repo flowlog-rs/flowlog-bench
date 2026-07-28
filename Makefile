@@ -18,9 +18,9 @@
 #   gen-joinorder-variants     — regenerate join-order variant .dl files
 #   cross-joinorder            — sweep every join-order variant per (program, ds)
 #   joinorder-summary          — per-pair fastest/median/slowest report
-#   archive-joinorder          — snapshot results/joinorder/ to docs/historical/
+#   archive-joinorder          — snapshot results/joinorder/ to submission/
 #   ldbc                       — LDBC SNB timing / scaling
-#   plot                       — render the splash_demo paper figure from a CSV
+#   plot                       — render time+RSS charts from a cross-engine CSV
 #   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
 #   distclean                  — also wipes flowlog/ build cache (forces re-fetch)
 #
@@ -47,8 +47,8 @@ CONFIG      ?= $(CONFIG_DIR)/default.txt
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
-PLOT_CSV    ?= $(ROOT_DIR)/docs/historical/splash_demo/comparison_results.csv
-PLOT_GROUPS ?= polonius_int,doop
+PLOT_CSV     ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
+PLOT_ENGINES ?= flowlog,souffle
 
 .PHONY: help env get-flowlog cross-engine cross-flowlog-version \
         cross-joinorder gen-joinorder-variants joinorder-summary \
@@ -141,7 +141,7 @@ joinorder-summary:
 	@python3 $(SCRIPTS)/joinorder/joinorder_summary.py $(FILTER)
 
 # -----------------------------------------------------------------------------
-# archive-joinorder: snapshot results/joinorder/ into docs/historical/.
+# archive-joinorder: snapshot results/joinorder/ into submission/.
 # Captures pair CSVs + a regenerated SUMMARY.md + a README with run
 # conditions (flowlog SHA, host, sysctl, workers). Does NOT delete the
 # source or git-add — prints the suggested commit command.
@@ -169,17 +169,18 @@ ldbc:
 	 bash $(SCRIPTS)/ldbc.sh --config $(LDBC_CONFIG)
 
 # -----------------------------------------------------------------------------
-# plot: render the paper-ready grouped total-time figure from a cross-engine
-# CSV (plot/plot_splash_demo.py). Defaults to the archived splash_demo data;
-# override the input/groups via PLOT_CSV=<path> PLOT_GROUPS=<a,b>.
-# Writes <stem>-<groups>-paper.{pdf,png} next to the input.
+# plot: render the 2-panel time + peak-RSS chart from a cross-engine CSV
+# (plot/plot.py). Override the input via PLOT_CSV=<path> and the engine
+# set via PLOT_ENGINES=<comma list>; default is the cross_engine.sh
+# output file. Writes <stem>-time/-memory figures next to the input.
+# (The paper figure lives in submission/splash_2026/plot_splash_demo.py.)
 # -----------------------------------------------------------------------------
 plot:
 	@if [[ ! -s "$(PLOT_CSV)" ]]; then \
 	    echo "ERROR: no CSV at $(PLOT_CSV) — run \`make cross-engine\` first, or pass PLOT_CSV=<path>"; \
 	    exit 2; \
 	fi
-	@python3 $(ROOT_DIR)/plot/plot_splash_demo.py "$(PLOT_CSV)" --groups $(PLOT_GROUPS)
+	@python3 $(ROOT_DIR)/plot/plot.py "$(PLOT_CSV)" --engines $(PLOT_ENGINES)
 
 # -----------------------------------------------------------------------------
 # clean / distclean

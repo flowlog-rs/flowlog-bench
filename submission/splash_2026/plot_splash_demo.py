@@ -8,8 +8,8 @@ match, a gap + per-panel header keep the groups distinct. No title (the
 LaTeX caption carries it), colorblind-safe Okabe-Ito palette, embedded
 TrueType in the PDF.
 
-    python3 plot/plot_splash_demo.py docs/historical/splash_demo/comparison_results.csv --groups polonius_int,doop
-    python3 plot/plot_splash_demo.py <csv> --groups doop --width 13
+    python3 submission/splash_2026/plot_splash_demo.py submission/splash_2026/comparison_results.csv --groups polonius_int,doop
+    python3 submission/splash_2026/plot_splash_demo.py <csv> --groups doop --width 13
 
 Writes <csv_stem>-<groups>-paper.{pdf,png} next to the CSV.
 """

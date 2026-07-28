@@ -1,5 +1,5 @@
 # SPLASH demo suite: doop + polonius_int, the workload behind the
-# archived paper data in docs/historical/splash_demo/. Run with
+# archived paper data in ./comparison_results.csv. Run with
 # WORKERS=32 NUM_RUNS=3 to match the archived conditions.
 
 # Polonius borrow checker

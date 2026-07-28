@@ -1,7 +1,22 @@
-# splash_demo — 4-engine final data (FlowLog vs Soufflé vs DDlog vs Ascent)
+# submission/splash_2026 — SPLASH 2026 paper artifact
 
-The dataset archived for the SPLASH paper/demo. One CSV, 54
-(program × dataset) pairs across the full oracle suite:
+Everything the paper's evaluation needs, in one folder:
+
+- `comparison_results.csv` — the final 4-engine data (details below).
+- `splash_demo.txt` — the cross_engine.sh config that produced the
+  FlowLog columns (`bash scripts/cross_engine.sh --engines=none
+  submission/splash_2026/splash_demo.txt`, WORKERS=32 NUM_RUNS=3).
+- `plot_splash_demo.py` — renders the paper figure from the CSV:
+  `python3 submission/splash_2026/plot_splash_demo.py
+  submission/splash_2026/comparison_results.csv --groups polonius_int,doop`.
+  (Everyday bench charts use `plot/plot.py` / `make plot` instead.)
+
+Other archived material (join-order study, legacy FlowLog-vs-Soufflé
+snapshot) lives one level up in `submission/`.
+
+## The 4-engine data (FlowLog vs Soufflé vs DDlog vs Ascent)
+
+One CSV, 54 (program × dataset) pairs across the full oracle suite:
 FlowLog compiler vs Soufflé 2.5 (compiled), DDlog 1.2.3, Ascent 0.8.
 All engines at **WORKERS=32, NUM_RUNS=3 (median), 1800 s timeout/attempt**;
 schema is `CSV_HEADER` in `scripts/cross_engine.sh` (times s, RSS MiB,

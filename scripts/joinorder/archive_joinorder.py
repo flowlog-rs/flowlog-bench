@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Snapshot the current join-order sweep results into docs/historical/.
+Snapshot the current join-order sweep results into submission/.
 
 Reads:
     results/joinorder/*.csv        per-pair timing CSVs
     results/joinorder.run.log      sweep log (for SHA + run conditions)
 
 Writes:
-    docs/historical/joinorder-YYYYMMDD-flowlog-<sha12>/
+    submission/joinorder-YYYYMMDD-flowlog-<sha12>/
         README.md                  auto-filled run conditions + caveats
         SUMMARY.md                 regenerated joinorder_summary output
         pairs/<stem>_<dataset>.csv copy of each pair CSV
@@ -33,7 +33,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 RESULTS_DIR = ROOT / "results/joinorder"
 RUN_LOG = ROOT / "results/joinorder.run.log"
-HIST_DIR = ROOT / "docs/historical"
+HIST_DIR = ROOT / "submission"
 SUMMARY_SCRIPT = ROOT / "scripts/joinorder/joinorder_summary.py"
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
