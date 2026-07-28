@@ -62,7 +62,7 @@ join = min), translated from `programs/oracle/flowlog/{cc,sssp}/default.dl`.
 
 Every crate is size-crosschecked against the FlowLog compiler by
 `scripts/cross_engine.sh` on each run. The 2026-06-11 four-engine sweep
-(54 program×dataset pairs, `docs/historical/sweep-20260611-4engine-w32/`)
+(54 program×dataset pairs, `docs/historical/sweep-4engine-w32/`)
 crosschecked clean on all pairs — e.g. tc + G5K-0.001 `tc` = 24,730,729,
 galen `p` = 7,560,179 / `q` = 16,595,494, doop × 20 DaCapo apps `match(26)`
 each, cc/sssp on livejournal/orkut/arabic vs FlowLog's recursive `min()`.
