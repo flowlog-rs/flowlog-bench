@@ -1,6 +1,6 @@
-# Flowlog-only rerun of the PR#14 4-engine sweep subset (doop + polonius).
-# Baseline souffle/ddlog/ascent numbers come from PR#14
-# docs/historical/sweep-20260611-4engine-w32/comparison_results.csv
+# Flowlog-only rerun of the 4-engine sweep subset (doop + polonius).
+# Baseline souffle/ddlog/ascent numbers live in
+# docs/historical/sweep-4engine-w32/comparison_results.csv
 # (WORKERS=32, NUM_RUNS=3 — match those when running this config).
 #
 # polonius_int matches the baseline; polonius_str added per request
