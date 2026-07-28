@@ -1,6 +1,7 @@
-# 4-engine sweep — final data (FlowLog vs Soufflé vs DDlog vs Ascent)
+# splash_demo — 4-engine final data (FlowLog vs Soufflé vs DDlog vs Ascent)
 
-One CSV, 54 (program × dataset) pairs across the full oracle suite:
+The dataset archived for the SPLASH paper/demo. One CSV, 54
+(program × dataset) pairs across the full oracle suite:
 FlowLog compiler vs Soufflé 2.5 (compiled), DDlog 1.2.3, Ascent 0.8.
 All engines at **WORKERS=32, NUM_RUNS=3 (median), 1800 s timeout/attempt**;
 schema is `CSV_HEADER` in `scripts/cross_engine.sh` (times s, RSS MiB,
