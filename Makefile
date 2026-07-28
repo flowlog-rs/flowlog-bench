@@ -20,7 +20,7 @@
 #   joinorder-summary          — per-pair fastest/median/slowest report
 #   archive-joinorder          — snapshot results/joinorder/ to docs/historical/
 #   ldbc                       — LDBC SNB timing / scaling
-#   plot                       — render speedup chart from results/
+#   plot                       — render the splash_demo paper figure from a CSV
 #   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
 #   distclean                  — also wipes flowlog/ build cache (forces re-fetch)
 #
@@ -47,7 +47,8 @@ CONFIG      ?= $(CONFIG_DIR)/default.txt
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
-PLOT_CSV    ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
+PLOT_CSV    ?= $(ROOT_DIR)/docs/historical/splash_demo/comparison_results.csv
+PLOT_GROUPS ?= polonius_int,doop
 
 .PHONY: help env get-flowlog cross-engine cross-flowlog-version \
         cross-joinorder gen-joinorder-variants joinorder-summary \
@@ -168,16 +169,17 @@ ldbc:
 	 bash $(SCRIPTS)/ldbc.sh --config $(LDBC_CONFIG)
 
 # -----------------------------------------------------------------------------
-# plot: render the 2-panel time + peak-RSS chart from a cross-engine CSV.
-# Override the input via PLOT_CSV=<path>; default is the cross_engine.sh
-# output file. Writes <stem>.{pdf,svg} next to the input.
+# plot: render the paper-ready grouped total-time figure from a cross-engine
+# CSV (plot/plot_splash_demo.py). Defaults to the archived splash_demo data;
+# override the input/groups via PLOT_CSV=<path> PLOT_GROUPS=<a,b>.
+# Writes <stem>-<groups>-paper.{pdf,png} next to the input.
 # -----------------------------------------------------------------------------
 plot:
 	@if [[ ! -s "$(PLOT_CSV)" ]]; then \
 	    echo "ERROR: no CSV at $(PLOT_CSV) — run \`make cross-engine\` first, or pass PLOT_CSV=<path>"; \
 	    exit 2; \
 	fi
-	@python3 $(ROOT_DIR)/plot/plot_perf.py "$(PLOT_CSV)"
+	@python3 $(ROOT_DIR)/plot/plot_splash_demo.py "$(PLOT_CSV)" --groups $(PLOT_GROUPS)
 
 # -----------------------------------------------------------------------------
 # clean / distclean

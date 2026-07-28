@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Paper-ready execution-time figure for the program groups a paper argues
-about (e.g. DOOP + Polonius).
+"""Paper-ready total-time figure for the splash_demo archive (the program
+groups the paper argues about, e.g. DOOP + Polonius).
 
-Unlike plot_perf.py (which packs every workload into one strip), this draws
-the selected groups as side-by-side sub-panels sharing one log y-axis —
-panel widths track each group's dataset count so bar widths match, a gap +
-per-panel header keep the groups distinct. No title (the LaTeX caption
-carries it), colorblind-safe Okabe-Ito palette, embedded TrueType in the PDF.
+Draws the selected groups as side-by-side sub-panels sharing one log
+y-axis — panel widths track each group's dataset count so bar widths
+match, a gap + per-panel header keep the groups distinct. No title (the
+LaTeX caption carries it), colorblind-safe Okabe-Ito palette, embedded
+TrueType in the PDF.
 
-    python3 plot/plot_paper.py <csv> --groups polonius_int,doop
-    python3 plot/plot_paper.py <csv> --groups doop --width 13
+    python3 plot/plot_splash_demo.py docs/historical/splash_demo/comparison_results.csv --groups polonius_int,doop
+    python3 plot/plot_splash_demo.py <csv> --groups doop --width 13
 
 Writes <csv_stem>-<groups>-paper.{pdf,png} next to the CSV.
 """
