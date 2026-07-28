@@ -1,0 +1,20 @@
+# Reproducibility manifest (AGENTS.md principle 6). The CSV beside this
+# file was produced under the parameters below. cross_engine.sh hard-
+# fails on resume if any identity field changes (use --fresh to override).
+date            : 2026-07-28T04:15:18Z
+host            : node0.zhhong-310031.advosuwmadison-pg0.clemson.cloudlab.us
+os              : Linux 5.15.0-177-generic x86_64
+flowlog_bin_mtime: 2026-07-28 04:00:54.302469780 +0000
+runner          : cross_engine.sh
+flowlog_ref     : main
+flowlog_sha     : 6c111b729e4bf8bffb5037b85b894031786140cc
+flowlog_bin     : /users/zhhong/flowlog-bench/flowlog/6c111b729e4b/target/release/flowlog-compiler
+workers         : 32
+num_runs        : 3
+config_path     : config/doop-polonius.txt
+config_sha256   : 645610886715c5f0cc7fabaae07edf827f552b820fe21edaf01c7e706651d7b3
+corpus_sha      : 512dc8d12938ed1fbb824bf3f9b930d16d5cd3ed
+corpus_dirty    : yes
+cargo_version   : cargo 1.97.1 (c980f4866 2026-06-30)
+engines         : none
+target          : (none)

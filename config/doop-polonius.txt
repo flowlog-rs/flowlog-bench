@@ -1,0 +1,42 @@
+# Flowlog-only rerun of the PR#14 4-engine sweep subset (doop + polonius).
+# Baseline souffle/ddlog/ascent numbers come from PR#14
+# docs/historical/sweep-20260611-4engine-w32/comparison_results.csv
+# (WORKERS=32, NUM_RUNS=3 — match those when running this config).
+#
+# polonius_int matches the baseline; polonius_str added per request
+# (no baseline columns for it).
+
+# Polonius borrow checker
+polonius_int=clap-rs
+polonius_int=wgpu
+polonius_int=materialize
+polonius_int=scallop
+# polonius_str dropped mid-run on request (clap-rs + wgpu were measured
+# anyway: 48.0 s / 14.3 GB and 51.0 s / 14.3 GB — ~free vs polonius_int
+# under --str-intern). Uncomment to re-include.
+# polonius_str=clap-rs
+# polonius_str=wgpu
+# polonius_str=materialize
+# polonius_str=scallop
+
+# DOOP context-insensitive points-to (20 DaCapo chopin apps)
+doop.dl=avrora
+doop.dl=batik
+doop.dl=biojava
+doop.dl=cassandra
+doop.dl=eclipse
+doop.dl=fop
+doop.dl=graphchi
+doop.dl=h2
+doop.dl=h2o
+doop.dl=jme
+doop.dl=jython
+doop.dl=kafka
+doop.dl=luindex
+doop.dl=lusearch
+doop.dl=pmd
+doop.dl=spring
+doop.dl=sunflow
+doop.dl=tomcat
+doop.dl=xalan
+doop.dl=zxing
