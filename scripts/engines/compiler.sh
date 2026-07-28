@@ -59,6 +59,12 @@ engine_compiler_run() {
     [[ "${FL_NO_STR_INTERN:-0}" == "1" ]] && fl_intern_flag=""
     local compile_log="${LOG_DIR}/${stem}_${dataset_name}_compiler_build.log"
     rm -f "$binary"
+    # Wall-clock the compile (codegen + full cold cargo build of the
+    # generated crate — its target/ is throwaway, so nothing is cached
+    # between pairs) and record it plus the binary size as sidecars.
+    # A/B runs read these to compare compile cost across compiler refs.
+    local compile_t0 compile_t1
+    compile_t0=$(date +%s.%N)
     "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
         -D - \
@@ -68,7 +74,12 @@ engine_compiler_run() {
         ${EXTRA_FL_FLAGS:-} \
         > "$compile_log" 2>&1 \
         || die "Compilation failed for $prog_file (see $compile_log)"
+    compile_t1=$(date +%s.%N)
     [[ -x "$binary" ]] || die "Binary not found: $binary"
+    awk -v a="$compile_t0" -v b="$compile_t1" 'BEGIN { printf "%.2f\n", b - a }' \
+        > "${compile_log%.log}.seconds"
+    stat -c %s "$binary" > "${compile_log%.log}.binsize" 2>/dev/null || true
+    log "$YELLOW" "TIME" "  Compile: $(cat "${compile_log%.log}.seconds")s, binary $(cat "${compile_log%.log}.binsize" 2>/dev/null || echo '?') bytes"
 
     # Run NUM_RUNS times.
     local entries=""
