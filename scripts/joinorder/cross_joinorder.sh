@@ -30,9 +30,11 @@
 # =============================================================================
 
 set -euo pipefail
+ORIGINAL_ARGS=("$@")
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
 source "${ROOT_DIR}/scripts/lib/common.sh"
+source "${ROOT_DIR}/scripts/lib/affinity.sh"
 log() { local c="$1" t="$2"; shift 2; echo -e "${c}[${t}]${NC} $*" >&2; }
 die() { log "$RED" "ERROR" "$*"; exit 1; }
 
@@ -61,6 +63,7 @@ export KEEP_DATASETS
 
 CONFIG_FILE="${POSITIONAL_ARGS[0]:-${ROOT_DIR}/config/default.txt}"
 [[ -f "$CONFIG_FILE" ]] || die "Config file not found: $CONFIG_FILE"
+bench_affinity_reexec WORKERS "${ORIGINAL_ARGS[@]}"
 
 # ---- pre-flight ---------------------------------------------------------
 require_cmd() {
@@ -74,10 +77,7 @@ require_cmd unzip   "needed to extract dataset zips"
 TIME_BIN="${TIME_BIN:-/usr/bin/time}"
 [[ -x "$TIME_BIN" ]] || die "GNU /usr/bin/time not found at $TIME_BIN"
 
-_NPROC=$(nproc 2>/dev/null || echo 64)
-[[ "$_NPROC" =~ ^[0-9]+$ ]] && (( _NPROC > 0 )) || _NPROC=64
-_DEFAULT_WORKERS=$(( _NPROC < 64 ? _NPROC : 64 ))
-WORKERS="${WORKERS:-$_DEFAULT_WORKERS}"
+WORKERS="${WORKERS:-32}"
 [[ "$WORKERS" =~ ^[0-9]+$ ]] && (( WORKERS > 0 )) \
     || die "WORKERS must be a positive integer, got: $WORKERS"
 

@@ -13,8 +13,8 @@
 #   help                       — print this help block
 #   env                        — one-time host bootstrap (souffle, duckdb, rust, …)
 #   get-flowlog                — fetch + build flowlog at FLOWLOG_REF (default: main)
-#   cross-engine               — flowlog vs. {soufflé, interpreter, …} at one ref
-#   cross-flowlog-version      — flowlog@BASE vs. flowlog@HEAD, A/B over commits
+#   cross-engine               — flowlog vs. {soufflé, egglog, interpreter, …} at one ref
+#   regression                 — machine-aware pinned FlowLog BASE-vs-HEAD check
 #   gen-joinorder-variants     — regenerate join-order variant .dl files
 #   cross-joinorder            — sweep every join-order variant per (program, ds)
 #   joinorder-summary          — per-pair fastest/median/slowest report
@@ -28,7 +28,7 @@
 #
 #   make cross-engine                                    # default ref = main
 #   FLOWLOG_REF=abc1234 make cross-engine                # specific commit
-#   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make cross-flowlog-version
+#   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make regression
 # =============================================================================
 
 SHELL := /bin/bash
@@ -43,13 +43,15 @@ CONFIG_DIR := $(ROOT_DIR)/config
 FLOWLOG_REF ?= main
 ENGINES     ?= souffle
 CONFIG      ?= $(CONFIG_DIR)/default.txt
+REGRESSION_CONFIG   ?= $(CONFIG_DIR)/regression.txt
+REGRESSION_NUM_RUNS ?= 5
 # Separate slot for ldbc so the same Make session can drive cross-engine
 # + ldbc without one inheriting the other's config.
 LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
 PLOT_CSV     ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
 PLOT_ENGINES ?= flowlog,souffle
 
-.PHONY: help env get-flowlog cross-engine cross-flowlog-version \
+.PHONY: help env get-flowlog cross-engine regression \
         cross-joinorder gen-joinorder-variants joinorder-summary \
         ldbc plot clean distclean
 
@@ -64,7 +66,7 @@ env:
 # get-flowlog: fetch + build the engine at the chosen ref. Idempotent.
 # Prints "<full_sha> <short_sha> <build_dir>" on the last stdout line.
 #
-# The cross-engine / ldbc / cross-flowlog-version targets call this
+# The cross-engine / ldbc / regression targets call this
 # script in-recipe (not via a `make` dep) — the dep would be redundant
 # since the recipe already has to read the script's output (FULL /
 # SHORT / BUILD) to set FLOWLOG_BIN + FLOWLOG_RESOLVED_SHA.
@@ -80,6 +82,7 @@ get-flowlog:
 #
 # Usage:  make cross-engine
 #         make cross-engine ENGINES=souffle,interpreter CONFIG=config/default.txt
+#         make cross-engine ENGINES=egglog CONFIG=config/default.txt
 #         FLOWLOG_REF=abc1234 make cross-engine
 # -----------------------------------------------------------------------------
 cross-engine:
@@ -89,23 +92,25 @@ cross-engine:
 	 bash $(SCRIPTS)/cross_engine.sh --engines=$(ENGINES) $(CONFIG)
 
 # -----------------------------------------------------------------------------
-# cross-flowlog-version: A/B between two flowlog refs. Both refs are
+# regression: A/B between two flowlog refs. Both refs are
 # fetched + built via get_flowlog.sh; binaries cached at flowlog/<short_sha>/.
 # Dataset for each pair is downloaded into facts/ and cleaned after both
-# refs are measured (skipped under KEEP_DATASETS=1).
+# refs are measured (skipped under KEEP_DATASETS=1). The measured process is
+# pinned to up to 32 physical cores using the fewest NUMA nodes required.
 #
-# Usage:  FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make cross-flowlog-version
+# Usage:  FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make regression
 #         (add KEEP_DATASETS=1 if facts/ is a symlinked shared mount)
 # -----------------------------------------------------------------------------
-cross-flowlog-version:
+regression:
 	@if [[ -z "$(FLOWLOG_BASE)" || -z "$(FLOWLOG_HEAD)" ]]; then \
 	    echo "ERROR: FLOWLOG_BASE and FLOWLOG_HEAD are required."; \
-	    echo "       e.g.  FLOWLOG_BASE=v0.5.0 FLOWLOG_HEAD=main make cross-flowlog-version"; \
+	    echo "       e.g.  FLOWLOG_BASE=main FLOWLOG_HEAD=main-next make regression"; \
 	    exit 2; \
 	fi
-	@bash $(SCRIPTS)/cross_flowlog_version.sh \
+	@PERF_COMPARE_NUM_RUNS=$(REGRESSION_NUM_RUNS) \
+	 bash $(SCRIPTS)/regression.sh \
 	    $(if $(filter 1,$(KEEP_DATASETS)),--keep-datasets,) \
-	    "$(FLOWLOG_BASE)" "$(FLOWLOG_HEAD)" "$(CONFIG)"
+	    "$(FLOWLOG_BASE)" "$(FLOWLOG_HEAD)" "$(REGRESSION_CONFIG)"
 
 # -----------------------------------------------------------------------------
 # gen-joinorder-variants: regenerate per-program join-order variants

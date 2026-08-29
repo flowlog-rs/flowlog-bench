@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/engines/compiler.sh — flowlog-compiler timing adapter.
 #
-# Caller contract (set by cross_engine.sh / cross_flowlog_version.sh before sourcing):
+# Caller contract (set by cross_engine.sh / regression.sh before sourcing):
 #   COMPILER_BIN          flowlog-compiler binary
 #   PROG_DIR              programs/oracle/flowlog/
 #   FACT_DIR              datasets root
@@ -69,7 +69,6 @@ engine_compiler_run() {
         -F "$dataset_path" \
         -D - \
         -o "$binary" \
-        --mode datalog-batch \
         ${fl_intern_flag} \
         ${EXTRA_FL_FLAGS:-} \
         > "$compile_log" 2>&1 \
@@ -126,6 +125,14 @@ engine_compiler_run() {
     n_succeeded=$(echo "$entries" | wc -w)
 
     write_engine_sidecars "$best_log" "$median_log" "$median_rss" "$n_succeeded"
+    # External process wall time gives comparison engines with a CLI/runtime
+    # the same clock boundary (startup + input + fixed point). The historical
+    # Compiler_Total remains Flowlog's internal runtime timer.
+    local median_wall_ms
+    median_wall_ms=$(extract_elapsed_ms "${median_log}.rss")
+    if [[ "$median_wall_ms" =~ ^[0-9]+$ ]]; then
+        awk -v ms="$median_wall_ms" 'BEGIN {printf "%.6f\n", ms/1000}' > "${best_log}.median_wall_s"
+    fi
 
     # Cheap cross-validation: per-relation sizes from "[size][rel] t=() size=N"
     # log lines. cross_engine.sh diffs this against souffle's .sizes.

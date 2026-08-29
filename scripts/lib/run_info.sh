@@ -82,6 +82,11 @@ flowlog_ref     : ${FLOWLOG_REF:-${FLOWLOG_BASE:-${FLOWLOG_HEAD:-(direct FLOWLOG
 flowlog_sha     : $(_run_info_flowlog_sha)
 flowlog_bin     : ${FLOWLOG_BIN:-(unset)}
 workers         : ${WORKERS:-?}
+affinity_cpus   : ${BENCH_AFFINITY_CPUS:-unbound}
+affinity_nodes  : ${BENCH_AFFINITY_NODES:-unbound}
+affinity_memory : ${BENCH_AFFINITY_MEMORY_POLICY:-unbound}
+allowed_cpus    : ${BENCH_TOPOLOGY_ALLOWED_CPUS:-unknown}
+physical_cores  : ${BENCH_TOPOLOGY_PHYSICAL_CORES:-unknown}
 num_runs        : ${NUM_RUNS:-?}
 config_path     : ${config_path:-(none)}
 config_sha256   : ${config_sha}

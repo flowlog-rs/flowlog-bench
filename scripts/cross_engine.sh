@@ -16,7 +16,7 @@
 # Flags:
 #   --engines=<list>            comma list of comparison engines to run
 #                               alongside the FlowLog compiler:
-#                               {interpreter, souffle, ddlog, ascent, none}.
+#                               {interpreter, souffle, ddlog, ascent, egglog, none}.
 #                               Default: interpreter. `none` runs only
 #                               the compiler column.
 #   --target=<stem:ds>          run only one pair (stem = .dl basename without
@@ -29,8 +29,11 @@
 #   -h, --help                  print this header.
 #
 # Environment knobs:
-#   WORKERS             thread count for every engine; default min(64, nproc).
+#   WORKERS             thread count for every engine; default 32.
 #                       Same value across runs you compare.
+#   BENCH_NUMA_NODES    optional NUMA-node allowlist override.
+#   BENCH_CPUS          optional CPU allowlist override.
+#   BENCH_NO_PIN=1      disable numactl pinning (not recommended for perf).
 #   NUM_RUNS            timed runs per (engine, pair). Median is kept. Default 3.
 #   FLOWLOG_RUN_TIMEOUT SIGTERM cap on a single attempt (seconds). Default 1800.
 #   SOUFFLE_BIN         override Souffle binary location (default /usr/bin/souffle).
@@ -39,11 +42,13 @@
 # ==========================================================================
 
 set -euo pipefail
+ORIGINAL_ARGS=("$@")
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 # --- Logging + shared helpers (colors, trim, cleanup safety) -------------
 source "${ROOT_DIR}/scripts/lib/common.sh"
+source "${ROOT_DIR}/scripts/lib/affinity.sh"
 # Stderr — keeps stdout clean for $(_souffle_compile ...)-style captures
 # and for the summary table at the end.
 log() { local c="$1" t="$2"; shift 2; echo -e "${c}[${t}]${NC} $*" >&2; }
@@ -75,21 +80,23 @@ while (( $# )); do
 done
 export KEEP_DATASETS
 
-RUN_INTERPRETER=0; RUN_SOUFFLE=0; RUN_DDLOG=0; RUN_ASCENT=0
+RUN_INTERPRETER=0; RUN_SOUFFLE=0; RUN_DDLOG=0; RUN_ASCENT=0; RUN_EGGLOG=0
 case ",$ENGINES," in *,interpreter,*) RUN_INTERPRETER=1 ;; esac
 case ",$ENGINES," in *,souffle,*)     RUN_SOUFFLE=1 ;; esac
 case ",$ENGINES," in *,ddlog,*)       RUN_DDLOG=1 ;; esac
 case ",$ENGINES," in *,ascent,*)      RUN_ASCENT=1 ;; esac
+case ",$ENGINES," in *,egglog,*)      RUN_EGGLOG=1 ;; esac
 case ",$ENGINES," in
     *,none,*) ;;  # explicit compiler-only mode is fine
     *)
-        (( RUN_INTERPRETER || RUN_SOUFFLE || RUN_DDLOG || RUN_ASCENT )) \
-            || die "--engines must be 'none' or comma list of {interpreter,souffle,ddlog,ascent} (got: $ENGINES)"
+        (( RUN_INTERPRETER || RUN_SOUFFLE || RUN_DDLOG || RUN_ASCENT || RUN_EGGLOG )) \
+            || die "--engines must be 'none' or comma list of {interpreter,souffle,ddlog,ascent,egglog} (got: $ENGINES)"
         ;;
 esac
 
 CONFIG_FILE="${POSITIONAL_ARGS[0]:-${ROOT_DIR}/config/default.txt}"
 [[ -f "$CONFIG_FILE" ]] || die "Config file not found: $CONFIG_FILE"
+bench_affinity_reexec WORKERS "${ORIGINAL_ARGS[@]}"
 
 # --- Pre-flight dependency checks ----------------------------------------
 require_cmd() {
@@ -106,13 +113,8 @@ TIME_BIN="${TIME_BIN:-/usr/bin/time}"
     || die "GNU /usr/bin/time not found at $TIME_BIN — apt install time, or set TIME_BIN=<path>"
 
 # --- WORKERS / NUM_RUNS / timeout ----------------------------------------
-# Default WORKERS = min(64, nproc): caps at the VLDB paper rig (64 cores)
-# so cross-machine numbers stay paper-comparable; auto-shrinks on smaller
-# hosts so a 16-core laptop doesn't context-switch through a 64-thread storm.
-_NPROC=$(nproc 2>/dev/null || echo 64)
-[[ "$_NPROC" =~ ^[0-9]+$ ]] && (( _NPROC > 0 )) || _NPROC=64
-_DEFAULT_WORKERS=$(( _NPROC < 64 ? _NPROC : 64 ))
-WORKERS="${WORKERS:-$_DEFAULT_WORKERS}"
+# Keep the default parallelism consistent across benchmark workflows.
+WORKERS="${WORKERS:-32}"
 [[ "$WORKERS" =~ ^[0-9]+$ ]] && (( WORKERS > 0 )) \
     || die "WORKERS must be a positive integer, got: $WORKERS"
 
@@ -123,8 +125,8 @@ FLOWLOG_RUN_TIMEOUT="${FLOWLOG_RUN_TIMEOUT:-1800}"
 
 # --- Paths (env-overridable) ---------------------------------------------
 PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/oracle/flowlog}"
-FACT_DIR="${ROOT_DIR}/facts"
-LOG_DIR="${ROOT_DIR}/results/benchmark"
+FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts}"
+LOG_DIR="${LOG_DIR:-${ROOT_DIR}/results/benchmark}"
 CSV_FILE="${LOG_DIR}/comparison_results.csv"
 
 # flowlog-compiler binary: built by scripts/get_flowlog.sh; Makefile sets
@@ -155,6 +157,12 @@ DDLOG_BUILD_DIR="${DDLOG_BUILD_DIR:-${LOG_DIR}/ddlog-bin}"
 # the workspace target/ (survives --fresh).
 ASCENT_PROG_DIR="${ASCENT_PROG_DIR:-${ROOT_DIR}/programs/oracle/ascent}"
 
+# egglog (native CLI; translations are opt-in per stem).
+EGGLOG_VERSION="${EGGLOG_VERSION:-3.0.0}"
+EGGLOG_ROOT="${EGGLOG_ROOT:-${ROOT_DIR}/tools/egglog-${EGGLOG_VERSION}}"
+EGGLOG_BIN="${EGGLOG_BIN:-${EGGLOG_ROOT}/bin/egglog}"
+EGGLOG_PROG_DIR="${EGGLOG_PROG_DIR:-${ROOT_DIR}/programs/oracle/egglog}"
+
 # Dataset URL template:
 DATASET_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main/dataset/csv"
 
@@ -162,7 +170,7 @@ export FLOWLOG_BIN PROG_DIR FACT_DIR LOG_DIR COMPILER_BIN \
        INTERPRETER_DIR INTERPRETER_BIN INTERPRETER_PROG_DIR \
        INTERPRETER_PROG_URL SOUFFLE_BIN SOUFFLE_PROG_DIR \
        DDLOG_HOME DDLOG_PROG_DIR DDLOG_RUST DDLOG_BUILD_DIR \
-       ASCENT_PROG_DIR \
+       ASCENT_PROG_DIR EGGLOG_VERSION EGGLOG_ROOT EGGLOG_BIN EGGLOG_PROG_DIR \
        WORKERS NUM_RUNS FLOWLOG_RUN_TIMEOUT TIME_BIN
 
 # --- Library imports -----------------------------------------------------
@@ -173,6 +181,7 @@ source "${ROOT_DIR}/scripts/engines/interpreter.sh"
 source "${ROOT_DIR}/scripts/engines/souffle.sh"
 source "${ROOT_DIR}/scripts/engines/ddlog.sh"
 source "${ROOT_DIR}/scripts/engines/ascent.sh"
+source "${ROOT_DIR}/scripts/engines/egglog.sh"
 
 # --- Reproducibility manifest --------------------------------------------
 RUN_INFO_BENCH_ROOT="$ROOT_DIR"
@@ -188,6 +197,7 @@ source "${ROOT_DIR}/scripts/lib/run_info.sh"
 #   [souffle:skip]    skip the Souffle run
 #   [ddlog:skip]      skip the DDlog run
 #   [ascent:skip]     skip the Ascent run
+#   [egglog:skip]     skip egglog even when a translation exists
 parse_config_line() {
     local raw="$1"
     local line="${raw%%#*}"
@@ -246,11 +256,18 @@ cleanup_dataset_for_pair() {
 # = engine wasn't requested for this pair. New engine columns are appended
 # at the end so the header stays append-only; downstream consumers (plot/)
 # parse by column name.
-CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded,Ddlog_Total,Ddlog_PeakRss_MB,Ddlog_vs_Compiler_Total,Crosscheck_Ddlog,Ddlog_RunsSucceeded,Ascent_Total,Ascent_PeakRss_MB,Ascent_vs_Compiler_Total,Crosscheck_Ascent,Ascent_RunsSucceeded,Souffle_Load,Souffle_Exec,Ddlog_Load,Ddlog_Exec,Ascent_Load,Ascent_Exec"
+CSV_HEADER="Program,Dataset,Interp_Load,Compiler_Load,Load_Speedup,Interp_Exec,Compiler_Exec,Exec_Speedup,Interp_Total,Compiler_Total,Total_Speedup,Interp_PeakRss_MB,Compiler_PeakRss_MB,Souffle_Total,Souffle_PeakRss_MB,Souffle_vs_Compiler_Total,Crosscheck_Souffle,Interp_RunsSucceeded,Compiler_RunsSucceeded,Souffle_RunsSucceeded,Ddlog_Total,Ddlog_PeakRss_MB,Ddlog_vs_Compiler_Total,Crosscheck_Ddlog,Ddlog_RunsSucceeded,Ascent_Total,Ascent_PeakRss_MB,Ascent_vs_Compiler_Total,Crosscheck_Ascent,Ascent_RunsSucceeded,Souffle_Load,Souffle_Exec,Ddlog_Load,Ddlog_Exec,Ascent_Load,Ascent_Exec,Egglog_Wall,Egglog_PeakRss_MB,Egglog_vs_Compiler_Wall,Crosscheck_Egglog,Egglog_RunsSucceeded,Compiler_Wall_For_Egglog"
 
 init_csv() {
     mkdir -p "$(dirname "$CSV_FILE")"
-    [[ -s "$CSV_FILE" ]] || echo "$CSV_HEADER" > "$CSV_FILE"
+    if [[ -s "$CSV_FILE" ]]; then
+        local existing_header
+        IFS= read -r existing_header < "$CSV_FILE"
+        [[ "$existing_header" == "$CSV_HEADER" ]] \
+            || die "CSV schema changed at $CSV_FILE — use --fresh to start a compatible run"
+    else
+        echo "$CSV_HEADER" > "$CSV_FILE"
+    fi
 }
 
 pair_already_done() {
@@ -323,7 +340,7 @@ crosscheck_compiler_vs_ascent() { crosscheck_compiler_vs_souffle "$@"; }
 # engine adapters.
 append_csv_row() {
     local stem="$1" dataset="$2"
-    local interp_log="$3" comp_log="$4" sf_log="$5" dd_log="${6:-}" as_log="${7:-}"
+    local interp_log="$3" comp_log="$4" sf_log="$5" dd_log="${6:-}" as_log="${7:-}" egg_log="${8:-}"
 
     # Median timings (both compiler + interpreter emit Load + Total log lines).
     local i_total i_load i_exec c_total c_load c_exec
@@ -414,14 +431,28 @@ append_csv_row() {
         esac
     fi
 
-    local i_n c_n s_n d_n a_n
+    local egg_total="N/A" egg_rss_mb="N/A" egg_vs_comp_total="N/A" crosscheck_egg="n/a" c_wall="N/A"
+    if [[ -n "${egg_log:-}" && -s "${egg_log}.median_total_s" ]]; then
+        egg_total="$(cat "${egg_log}.median_total_s")"
+        [[ -s "${comp_log}.median_wall_s" ]] && c_wall="$(cat "${comp_log}.median_wall_s")"
+        egg_rss_mb="$(kib_to_mib "$(cat "${egg_log}.median_rss_kb" 2>/dev/null || echo)")"
+        egg_vs_comp_total="$(speedup_ratio "$egg_total" "$c_wall")"
+        crosscheck_egg="$(crosscheck_compiler_vs_souffle "${comp_log}.sizes" "${egg_log}.sizes")"
+        case "$crosscheck_egg" in
+            match*) log "$GREEN" "XCHECK" "compiler vs egglog: $crosscheck_egg" ;;
+            MISMATCH*) log "$RED" "XCHECK" "compiler vs egglog: $crosscheck_egg" ;;
+        esac
+    fi
+
+    local i_n c_n s_n d_n a_n e_n
     i_n=$(cat "${interp_log}.n_runs_succeeded" 2>/dev/null || true)
     c_n=$(cat "${comp_log}.n_runs_succeeded"   2>/dev/null || true)
     s_n=$(cat "${sf_log}.n_runs_succeeded"     2>/dev/null || true)
     d_n=$(cat "${dd_log}.n_runs_succeeded"     2>/dev/null || true)
     a_n=$(cat "${as_log}.n_runs_succeeded"     2>/dev/null || true)
+    e_n=$(cat "${egg_log}.n_runs_succeeded"    2>/dev/null || true)
 
-    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n},${dd_total},${dd_rss_mb},${dd_vs_comp_total},${crosscheck_dd},${d_n},${as_total},${as_rss_mb},${as_vs_comp_total},${crosscheck_as},${a_n},${sf_load},${sf_exec},${dd_load},${dd_exec},${as_load},${as_exec}" \
+    echo "${stem},${dataset},${i_load},${c_load},${rs_load},${i_exec},${c_exec},${rs_exec},${i_total},${c_total},${rs_total},${i_rss_mb},${c_rss_mb},${sf_total},${sf_rss_mb},${sf_vs_comp_total},${crosscheck},${i_n},${c_n},${s_n},${dd_total},${dd_rss_mb},${dd_vs_comp_total},${crosscheck_dd},${d_n},${as_total},${as_rss_mb},${as_vs_comp_total},${crosscheck_as},${a_n},${sf_load},${sf_exec},${dd_load},${dd_exec},${as_load},${as_exec},${egg_total},${egg_rss_mb},${egg_vs_comp_total},${crosscheck_egg},${e_n},${c_wall}" \
         >> "$CSV_FILE"
 
     log "$GREEN" "CSV" "Appended ${stem}_${dataset} to $CSV_FILE"
@@ -440,7 +471,7 @@ fmt_speedup() {
 }
 
 print_pair_summary() {
-    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}" dd_log="${5:-}" as_log="${6:-}"
+    local label="$1" interp_log="$2" comp_log="$3" sf_log="${4:-}" dd_log="${5:-}" as_log="${6:-}" egg_log="${7:-}"
 
     local i_total i_load i_exec c_total c_load c_exec
     i_total=$(extract_total_seconds "$interp_log")
@@ -487,6 +518,13 @@ print_pair_summary() {
     if [[ -n "$as_total" ]]; then
         log "$GREEN" " ASCENT" "Total=${as_total}s  PeakRss=${as_rss_mb}MB  Ascent/Comp=$(fmt_speedup "$as_total" "$c_total")"
     fi
+    if [[ -n "$egg_log" && -s "${egg_log}.median_total_s" ]]; then
+        local egg_wall egg_rss_mb comp_wall
+        egg_wall=$(cat "${egg_log}.median_total_s")
+        egg_rss_mb=$(kib_to_mib "$(cat "${egg_log}.median_rss_kb" 2>/dev/null || echo)")
+        comp_wall=$(cat "${comp_log}.median_wall_s" 2>/dev/null || echo "N/A")
+        log "$GREEN" " EGGLOG" "Wall=${egg_wall}s  PeakRss=${egg_rss_mb}MB  egglog/Flowlog-wall=$(fmt_speedup "$egg_wall" "$comp_wall")"
+    fi
     echo "----------------------------------------"
 }
 
@@ -520,12 +558,20 @@ print_summary_table() {
         file_stem="${prog_base%.*}"
         display_stem="${PROG_NAME%.*}"
         label="${display_stem}_${DATASET_NAME}"
+        if [[ -n "$TARGET_FILTER" && "${file_stem}:${DATASET_NAME}" != "$TARGET_FILTER" ]]; then
+            continue
+        fi
+        if (( RUN_EGGLOG )) && ! pair_has_tag "egglog:skip" \
+                && ! engine_egglog_has_program "$PROG_NAME"; then
+            continue
+        fi
 
         local interp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_interpreter.log"
         local comp_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_compiler.log"
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
         local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
         local as_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ascent.log"
+        local egg_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_egglog.log"
 
         # Compiler row: always present (compiler always runs); baseline 1.00x.
         local c_total c_rss_mb
@@ -566,6 +612,17 @@ print_summary_table() {
             fi
             emit_summary_row "" "ascent" "$as_total" "$as_rss_mb" "$(fmt_speedup "$as_total" "$c_total")"
         fi
+
+        if (( RUN_EGGLOG )) && ! pair_has_tag "egglog:skip" && engine_egglog_has_program "$PROG_NAME"; then
+            local egg_total="N/A" egg_rss_mb="N/A"
+            if [[ -s "${egg_log}.median_total_s" ]]; then
+                egg_total="$(cat "${egg_log}.median_total_s")"
+                egg_rss_mb="$(kib_to_mib "$(cat "${egg_log}.median_rss_kb" 2>/dev/null || echo)")"
+            fi
+            local c_wall="N/A"
+            [[ -s "${comp_log}.median_wall_s" ]] && c_wall="$(cat "${comp_log}.median_wall_s")"
+            emit_summary_row "" "egglog" "$egg_total" "$egg_rss_mb" "$(fmt_speedup "$egg_total" "$c_wall")"
+        fi
     done < "$CONFIG_FILE"
     echo ""
     log "$GREEN" "CSV" "Results saved to: $CSV_FILE"
@@ -579,6 +636,7 @@ main() {
     echo "  Souffle       : $SOUFFLE_BIN  (timed: $RUN_SOUFFLE)"
     echo "  DDlog         : $DDLOG_HOME  (timed: $RUN_DDLOG)"
     echo "  Ascent        : $ASCENT_PROG_DIR  (timed: $RUN_ASCENT)"
+    echo "  egglog        : $EGGLOG_BIN  (timed: $RUN_EGGLOG; translated stems only)"
     echo "  Config        : $CONFIG_FILE"
     [[ -n "$TARGET_FILTER" ]] && echo "  Target filter : $TARGET_FILTER"
     echo "  Workers       : $WORKERS  (applied identically to every engine)"
@@ -590,6 +648,7 @@ main() {
     (( RUN_SOUFFLE )) && engine_souffle_setup
     (( RUN_DDLOG )) && engine_ddlog_setup
     (( RUN_ASCENT )) && engine_ascent_setup
+    (( RUN_EGGLOG )) && engine_egglog_setup
 
     if (( FRESH )); then
         rm -rf "$LOG_DIR"
@@ -617,6 +676,15 @@ main() {
             continue
         fi
 
+        # Do not record a compiler-only row when egglog was requested but no
+        # translation exists. Such a row would make resume logic treat the pair
+        # as complete and prevent a future translation from being benchmarked.
+        if (( RUN_EGGLOG )) && ! pair_has_tag "egglog:skip" \
+                && ! engine_egglog_has_program "$PROG_NAME"; then
+            log "$YELLOW" "UNSUPPORTED" "egglog: no validated translation for $PROG_NAME"
+            continue
+        fi
+
         if pair_already_done "$_display_stem" "$DATASET_NAME"; then
             log "$YELLOW" "SKIP" "$_display_stem + $DATASET_NAME — already in CSV"
             continue
@@ -634,18 +702,20 @@ main() {
         local sf_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_souffle.log"
         local dd_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ddlog.log"
         local as_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_ascent.log"
+        local egg_log="${LOG_DIR}/${file_stem}_${DATASET_NAME}_egglog.log"
 
         # Clear stale sidecars so this iteration's CSV row is clean.
         rm -f "${interp_log}" "${interp_log}.median_rss_kb" "${interp_log}.n_runs_succeeded" \
-              "${comp_log}.n_runs_succeeded" "${comp_log}.sizes" \
+              "${comp_log}.n_runs_succeeded" "${comp_log}.sizes" "${comp_log}.median_wall_s" \
               "${sf_log}" "${sf_log}.median_rss_kb" "${sf_log}.median_total_s" "${sf_log}.n_runs_succeeded" "${sf_log}.sizes" \
               "${sf_log}.median_load_s" "${sf_log}.median_exec_s" \
               "${dd_log}" "${dd_log}.median_rss_kb" "${dd_log}.median_total_s" "${dd_log}.n_runs_succeeded" "${dd_log}.sizes" \
               "${dd_log}.median_load_s" "${dd_log}.median_exec_s" \
-              "${as_log}" "${as_log}.median_rss_kb" "${as_log}.median_total_s" "${as_log}.n_runs_succeeded" "${as_log}.sizes"
+              "${as_log}" "${as_log}.median_rss_kb" "${as_log}.median_total_s" "${as_log}.n_runs_succeeded" "${as_log}.sizes" \
+              "${egg_log}" "${egg_log}.median_rss_kb" "${egg_log}.median_total_s" "${egg_log}.n_runs_succeeded" "${egg_log}.sizes"
 
-        local rc_interp=0 rc_compiler=0 rc_souffle=0 rc_ddlog=0 rc_ascent=0
-        local interp_required=0 souffle_required=0 ddlog_required=0 ascent_required=0
+        local rc_interp=0 rc_compiler=0 rc_souffle=0 rc_ddlog=0 rc_ascent=0 rc_egglog=0
+        local interp_required=0 souffle_required=0 ddlog_required=0 ascent_required=0 egglog_required=0
 
         if (( RUN_INTERPRETER )) && ! pair_has_tag "interp:skip"; then
             interp_required=1
@@ -677,6 +747,15 @@ main() {
             log "$YELLOW" "SKIP" "Ascent: $PROG_NAME + $DATASET_NAME (per [ascent:skip] tag)"
         fi
 
+        if (( RUN_EGGLOG )) && pair_has_tag "egglog:skip"; then
+            log "$YELLOW" "SKIP" "egglog: $PROG_NAME + $DATASET_NAME (per [egglog:skip] tag)"
+        elif (( RUN_EGGLOG )) && engine_egglog_has_program "$PROG_NAME"; then
+            egglog_required=1
+            engine_egglog_run "$PROG_NAME" "$DATASET_NAME" || rc_egglog=$?
+        elif (( RUN_EGGLOG )); then
+            log "$YELLOW" "UNSUPPORTED" "egglog: no validated translation for $PROG_NAME"
+        fi
+
         # Gate: a pair is "complete" iff every required engine produced
         # at least one valid sample. Otherwise skip the CSV row so resume
         # can retry on a future invocation. Recording N/A here would mask
@@ -691,6 +770,8 @@ main() {
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }ddlog"; }
         (( ascent_required && rc_ascent != 0 )) \
             && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }ascent"; }
+        (( egglog_required && rc_egglog != 0 )) \
+            && { pair_failed=1; fail_reasons="${fail_reasons:+$fail_reasons, }egglog"; }
 
         if (( pair_failed )); then
             log "$RED" "PAIR-FAIL" \
@@ -701,9 +782,9 @@ main() {
         fi
 
         print_pair_summary "${_display_stem}_${DATASET_NAME}" \
-            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log" "$egg_log"
         append_csv_row "$_display_stem" "$DATASET_NAME" \
-            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log"
+            "$interp_log" "$comp_log" "$sf_log" "$dd_log" "$as_log" "$egg_log"
         cleanup_dataset_for_pair "$DATASET_NAME"
     done < "$CONFIG_FILE"
 

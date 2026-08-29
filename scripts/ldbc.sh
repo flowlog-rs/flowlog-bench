@@ -30,12 +30,13 @@
 #                (default: ROOT_DIR/flowlog/main/target/release/flowlog-compiler;
 #                 the Makefile target sets this from scripts/get_flowlog.sh's output)
 #   DUCKDB_BIN   path to duckdb binary (default: duckdb on PATH)
-#   WORKERS      parallelism for both engines (default: 64)
+#   WORKERS      parallelism for both engines (default: 32)
 #   FACT_DIR     dataset cache directory (default: ROOT_DIR/facts/ldbc)
 #   TIME_BIN     GNU /usr/bin/time binary, required for both wall-clock
 #                and peak-RSS measurement (default: /usr/bin/time)
 # =============================================================================
 set -euo pipefail
+ORIGINAL_ARGS=("$@")
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -43,6 +44,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # /usr/bin/time wrapping + extractors / median / kib_to_mib,
 # dataset cache (download + cleanup with the same safety guard).
 source "$(dirname "$0")/lib/common.sh"
+source "$(dirname "$0")/lib/affinity.sh"
 source "$(dirname "$0")/lib/measure.sh"
 source "$(dirname "$0")/lib/datasets.sh"
 
@@ -75,6 +77,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 export KEEP_DATASETS
+bench_affinity_reexec WORKERS "${ORIGINAL_ARGS[@]}"
 
 HF_BASE="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main"
 FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts/ldbc}"
@@ -125,7 +128,7 @@ _speedup() {
 [[ -x "$DUCKDB_BIN" ]] || die "duckdb not found: $DUCKDB_BIN"
 [[ -x "$FLOWLOG_BIN" ]] || die "flowlog-compiler not built: $FLOWLOG_BIN"
 
-WORKERS="${WORKERS:-64}"
+WORKERS="${WORKERS:-32}"
 
 # Durable per-run output dir under results/ldbc/. Honours AGENTS.md
 # principle 3 (scripts only write to results/) and gives principle 6

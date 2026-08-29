@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# scripts/cross_flowlog_version.sh — perf + peak-RSS drift check between two flowlog refs.
+# scripts/regression.sh — perf + peak-RSS drift check between two flowlog refs.
 #
 # Designed for closed-loop tooling that wants to verify a series of
 # in-tree changes hasn't regressed any benchmark beyond a tolerance,
@@ -35,15 +35,15 @@
 #   3  internal error (get_flowlog.sh, cargo build, compile/run failure)
 #
 # Usage:
-#   scripts/cross_flowlog_version.sh [--keep-datasets] <base_ref> <head_ref> <config_file>
-#   scripts/cross_flowlog_version.sh --help
+#   scripts/regression.sh [--keep-datasets] <base_ref> <head_ref> <config_file>
+#   scripts/regression.sh --help
 #
 #   --keep-datasets   skip per-pair dataset cleanup. Required if $FACT_DIR
 #                     is a symlink — the runner refuses to rm -rf through
 #                     one (would wipe the linked target).
 #
 # Or via the env-var form:
-#   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make cross-flowlog-version CONFIG=config/default.txt
+#   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make regression
 #
 # Both refs are passed to scripts/get_flowlog.sh (branch / tag / sha all OK).
 # Each fetched build is cached at flowlog/<short_sha>/, so re-running the
@@ -56,13 +56,17 @@
 # Environment:
 #   PERF_COMPARE_TIME_PCT     wall-time regression tolerance  (default 10)
 #   PERF_COMPARE_RSS_PCT      peak-RSS regression tolerance   (default 20)
-#   PERF_COMPARE_NUM_RUNS     timed runs per ref per pair     (default 3)
-#   PERF_COMPARE_WORKERS      `-w` value passed to the binary (default
-#                             min(64, nproc) — matches cross_engine.sh)
+#   PERF_COMPARE_NUM_RUNS     timed runs per ref per pair     (default 5)
+#   PERF_COMPARE_WORKERS      `-w` value passed to the binary (default 32)
+#   BENCH_NUMA_NODES          optional NUMA-node allowlist override
+#   BENCH_CPUS                optional CPU allowlist override
+#   BENCH_NO_PIN=1            disable numactl pinning
 #
-# This script is the implementation behind `make cross-flowlog-version`.
+# Every invocation automatically pins physical cores and applies a NUMA-aware
+# memory policy. It uses the fewest nodes needed for the worker count.
 
 set -euo pipefail
+ORIGINAL_ARGS=("$@")
 
 # ----------------------------------------------------------------------
 # --help: extract the doc header above (everything up to the first
@@ -107,8 +111,10 @@ cd "$ROOT_DIR"
 # Shared helpers (ANSI colors, cleanup_dataset_should_clean, time_wrap +
 # extractors + median helpers, engine_compiler_run).
 source "${ROOT_DIR}/scripts/lib/common.sh"
+source "${ROOT_DIR}/scripts/lib/affinity.sh"
 source "${ROOT_DIR}/scripts/lib/datasets.sh"
 source "${ROOT_DIR}/scripts/lib/measure.sh"
+bench_affinity_reexec PERF_COMPARE_WORKERS "${ORIGINAL_ARGS[@]}"
 
 PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/oracle/flowlog}"
 FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts}"
@@ -119,13 +125,8 @@ export FACT_DIR TIME_BIN
 
 TIME_PCT="${PERF_COMPARE_TIME_PCT:-10}"
 RSS_PCT="${PERF_COMPARE_RSS_PCT:-20}"
-NUM_RUNS="${PERF_COMPARE_NUM_RUNS:-3}"
-# Default WORKERS = min(64, nproc): matches cross_engine.sh, caps at the
-# VLDB rig's 64 cores so cross-machine numbers stay comparable, scales
-# down on smaller hosts so a laptop doesn't context-switch through it.
-_NPROC=$(nproc 2>/dev/null || echo 64)
-[[ "$_NPROC" =~ ^[0-9]+$ ]] && (( _NPROC > 0 )) || _NPROC=64
-WORKERS="${PERF_COMPARE_WORKERS:-$(( _NPROC < 64 ? _NPROC : 64 ))}"
+NUM_RUNS="${PERF_COMPARE_NUM_RUNS:-5}"
+WORKERS="${PERF_COMPARE_WORKERS:-32}"
 
 for var in TIME_PCT RSS_PCT NUM_RUNS WORKERS; do
     val="${!var}"
@@ -208,7 +209,7 @@ log "tolerances         : time +${TIME_PCT}%, peak RSS +${RSS_PCT}%"
 log "bench knobs        : NUM_RUNS=$NUM_RUNS, WORKERS=$WORKERS"
 
 # ----------------------------------------------------------------------
-# Durable per-run output dir under results/cross-flowlog-version/.
+# Durable per-run output dir under results/regression/.
 # Honours AGENTS.md principle 3 (scripts only write to results/) and
 # gives principle 6 something to anchor the run_info.txt manifest to.
 #
@@ -216,7 +217,7 @@ log "bench knobs        : NUM_RUNS=$NUM_RUNS, WORKERS=$WORKERS"
 # (workers, num_runs, tolerances, config sha) hard-fails so we don't
 # silently clobber a previous A/B result. --fresh wipes and starts over.
 # ----------------------------------------------------------------------
-OUT_DIR="${ROOT_DIR}/results/cross-flowlog-version/${BASE_SHORT}_vs_${HEAD_SHORT}"
+OUT_DIR="${ROOT_DIR}/results/regression/${BASE_SHORT}_vs_${HEAD_SHORT}"
 mkdir -p "$OUT_DIR"
 SUMMARY_TSV="${OUT_DIR}/summary.tsv"
 
@@ -224,9 +225,9 @@ SUMMARY_TSV="${OUT_DIR}/summary.tsv"
 # captures BOTH refs, so a year from now you can reproduce the exact
 # A/B even if both refs have moved or been rewritten.
 RUN_INFO_BENCH_ROOT="$ROOT_DIR"
-RUN_INFO_RUNNER="cross_flowlog_version.sh"
+RUN_INFO_RUNNER="regression.sh"
 RUN_INFO_CONFIG_PATH="$CONFIG_FILE"
-# cross_flowlog_version resolves two SHAs via get_flowlog.sh; we record both
+# The regression runner resolves two SHAs via get_flowlog.sh; record both
 # explicitly. The single FLOWLOG_RESOLVED_SHA slot in run_info.sh
 # becomes "n/a (see base_sha + head_sha)".
 FLOWLOG_RESOLVED_SHA="n/a (A/B run — see base_sha + head_sha)"
@@ -269,6 +270,11 @@ log "output dir         : $OUT_DIR"
 bench_pair() {
     local tree="$1" prog="$2" ds="$3" sublabel="$4"
     COMPILER_BIN="${tree}/target/release/flowlog-compiler"
+    # Generated crates must use the runtime from the same revision as the
+    # compiler. Branch tips can contain runtime APIs that are not published
+    # to crates.io yet, and mixing those versions makes codegen fail.
+    FLOWLOG_RUNTIME_PATH="${tree}/src/flowlog-runtime"
+    export FLOWLOG_RUNTIME_PATH
     LOG_DIR="${OUT_DIR}/${sublabel}"
     mkdir -p "$LOG_DIR"
 

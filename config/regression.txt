@@ -1,3 +1,6 @@
+# FlowLog version-regression suite. Keep this separate from default.txt so
+# cross-engine aliases/tags cannot silently make version coverage incomplete.
+
 # Graph analysis
 tc.dl=G5K-0.001
 tc.dl=G10K-0.001
@@ -6,12 +9,12 @@ sg.dl=G10K-0.001
 reach.dl=livejournal
 reach.dl=orkut
 reach.dl=arabic
-reach.dl=twitter [interp:skip] [souffle:skip]
-cc.dl=livejournal [souffle:skip]
-cc.dl=arabic [souffle:skip]
-cc.dl=orkut [souffle:skip]
-sssp.dl=livejournal-sssp [interp:skip] [souffle:skip]
-sssp.dl=orkut-sssp [interp:skip] [souffle:skip]
+reach.dl=twitter
+cc.dl=livejournal
+cc.dl=arabic
+cc.dl=orkut
+sssp.dl=livejournal-sssp
+sssp.dl=orkut-sssp
 bipartite.dl=mind
 bipartite.dl=netflix
 bipartite.dl=mag
@@ -23,7 +26,7 @@ dyck.dl=postgre
 crdt.dl=crdt
 galen.dl=galen
 
-# Program analysis (integer-typed legacy + Polonius borrow checker)
+# Program analysis
 andersen.dl=medium
 andersen.dl=large
 polonius_str.dl=clap-rs
@@ -39,9 +42,7 @@ csda.dl=csda-postgresql
 cvc5.dl=cvc5
 z3.dl=z3
 
-# DOOP context-insensitive points-to (string-typed; canonical chopin set).
-# Single rule file (doop/default.dl) cross 20 DaCapo 23.11-MR2-chopin apps.
-# Facts on HuggingFace: dataset/csv/<app>.zip. See docs/doop-data-prep.md.
+# DOOP context-insensitive points-to (DaCapo 23.11-MR2-chopin)
 doop.dl=avrora
 doop.dl=batik
 doop.dl=biojava

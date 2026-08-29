@@ -15,7 +15,7 @@
 #   bash env.sh --list                    # print engine list
 #   bash env.sh --help
 #
-# Engines: duckdb, souffle, ddlog, umbra, interpreter.
+# Engines: duckdb, souffle, ddlog, umbra, interpreter, egglog.
 # Idempotent: every install_* function early-returns if the target
 # binary is already present, so running this with --all on a partially-
 # bootstrapped box only fills in the gaps.
@@ -32,11 +32,12 @@ die()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 command -v apt-get >/dev/null 2>&1 || die "apt-get required (Ubuntu/Debian only)"
 
 HOME_BIN="$HOME/bin"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------
 # CLI parsing.
 # ---------------------------------------------------------------------
-AVAILABLE=("duckdb" "souffle" "ddlog" "umbra" "interpreter")
+AVAILABLE=("duckdb" "souffle" "ddlog" "umbra" "interpreter" "egglog")
 SELECTED=()
 
 show_help() {
@@ -88,7 +89,7 @@ setup_basic() {
     sudo apt-get install -y -qq \
         git python3 python3-pip wget curl unzip tar build-essential \
         pkg-config protobuf-compiler bsdmainutils \
-        time zstd jq dos2unix htop
+        time zstd jq dos2unix htop numactl
 
     if command -v rustup >/dev/null 2>&1; then
         ok "rustup already installed"
@@ -240,6 +241,21 @@ install_interpreter() {
     ok "interpreter installed at $interpreter_root"
 }
 
+install_egglog() {
+    local version="3.0.0"
+    local root="${SCRIPT_DIR}/tools/egglog-${version}"
+    local binary="${root}/bin/egglog"
+    if [[ -x "$binary" && "$($binary --version 2>/dev/null)" == "egglog ${version}"* ]]; then
+        ok "egglog ${version} already installed at $binary"
+        return
+    fi
+    log "installing egglog ${version} into $root ..."
+    cargo install egglog --version "$version" --locked --root "$root" \
+        || die "failed to install egglog ${version}"
+    [[ -x "$binary" ]] || die "egglog binary missing after install: $binary"
+    ok "egglog ${version} installed at $binary"
+}
+
 # ---------------------------------------------------------------------
 # Main.
 # ---------------------------------------------------------------------
@@ -256,6 +272,7 @@ if (( ${#SELECTED[@]} > 0 )); then
     selected ddlog       && install_ddlog
     selected umbra       && install_umbra
     selected interpreter && install_interpreter
+    selected egglog      && install_egglog
 else
     warn "no engines selected — only basic deps + rustup were installed."
     warn "  add engines with:  bash env.sh --all"
