@@ -23,7 +23,7 @@ make cross-engine ENGINES=souffle,interpreter
 make cross-engine ENGINES=egglog
 
 FLOWLOG_REF=v0.5.0 make cross-engine       # bench a specific FlowLog commit
-FLOWLOG_BASE=main FLOWLOG_HEAD=main-next \
+FLOWLOG_BASE=flowlog-compiler-v0.6.0 FLOWLOG_HEAD=main \
     make regression                        # pinned A/B between FlowLog commits
 
 make cross-joinorder                       # sweep every variant per (program, dataset)

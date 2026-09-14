@@ -104,7 +104,7 @@ cross-engine:
 regression:
 	@if [[ -z "$(FLOWLOG_BASE)" || -z "$(FLOWLOG_HEAD)" ]]; then \
 	    echo "ERROR: FLOWLOG_BASE and FLOWLOG_HEAD are required."; \
-	    echo "       e.g.  FLOWLOG_BASE=main FLOWLOG_HEAD=main-next make regression"; \
+	    echo "       e.g.  FLOWLOG_BASE=flowlog-compiler-v0.6.0 FLOWLOG_HEAD=main make regression"; \
 	    exit 2; \
 	fi
 	@PERF_COMPARE_NUM_RUNS=$(REGRESSION_NUM_RUNS) \
