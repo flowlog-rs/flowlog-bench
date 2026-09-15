@@ -1,0 +1,348 @@
+// LDBC Graphalytics PageRank — UNROLLED K=30 (Souffle).
+// Integer-scaled by 1e9, damping 0.85. Auto-generated; do not hand-edit.
+.decl Arc(src: number, dst: number)
+.input Arc(IO=file, filename="Arc.csv", delimiter=",")
+.decl Vertex(v: number)
+.input Vertex(IO=file, filename="Vertex.csv", delimiter=",")
+.decl N(n: number)
+N(n) :- n = count : { Vertex(_) }.
+.decl Outdeg(v: number, d: number)
+Outdeg(v, d) :- Arc(v, _), d = count : { Arc(v, _) }.
+.decl Base(b: number)
+Base(150000000 / n) :- N(n).
+.decl PR0(v: number, pr: number)
+PR0(v, 1000000000 / n) :- Vertex(v), N(n).
+.decl ContribVal0(u: number, t: number)
+ContribVal0(u, t) :- PR0(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib0(u: number, c: number)
+Contrib0(u, c) :- ContribVal0(u, _), c = sum t : { ContribVal0(u, t) }.
+.decl HasContrib0(v: number)
+HasContrib0(v) :- Contrib0(v, _).
+.decl Dpart0(v: number, dp: number)
+Dpart0(v, 85 * c / 100) :- Contrib0(v, c).
+.decl PR1(v: number, pr: number)
+PR1(v, b + dp) :- Base(b), Dpart0(v, dp).
+PR1(v, b) :- Vertex(v), Base(b), !HasContrib0(v).
+.decl ContribVal1(u: number, t: number)
+ContribVal1(u, t) :- PR1(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib1(u: number, c: number)
+Contrib1(u, c) :- ContribVal1(u, _), c = sum t : { ContribVal1(u, t) }.
+.decl HasContrib1(v: number)
+HasContrib1(v) :- Contrib1(v, _).
+.decl Dpart1(v: number, dp: number)
+Dpart1(v, 85 * c / 100) :- Contrib1(v, c).
+.decl PR2(v: number, pr: number)
+PR2(v, b + dp) :- Base(b), Dpart1(v, dp).
+PR2(v, b) :- Vertex(v), Base(b), !HasContrib1(v).
+.decl ContribVal2(u: number, t: number)
+ContribVal2(u, t) :- PR2(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib2(u: number, c: number)
+Contrib2(u, c) :- ContribVal2(u, _), c = sum t : { ContribVal2(u, t) }.
+.decl HasContrib2(v: number)
+HasContrib2(v) :- Contrib2(v, _).
+.decl Dpart2(v: number, dp: number)
+Dpart2(v, 85 * c / 100) :- Contrib2(v, c).
+.decl PR3(v: number, pr: number)
+PR3(v, b + dp) :- Base(b), Dpart2(v, dp).
+PR3(v, b) :- Vertex(v), Base(b), !HasContrib2(v).
+.decl ContribVal3(u: number, t: number)
+ContribVal3(u, t) :- PR3(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib3(u: number, c: number)
+Contrib3(u, c) :- ContribVal3(u, _), c = sum t : { ContribVal3(u, t) }.
+.decl HasContrib3(v: number)
+HasContrib3(v) :- Contrib3(v, _).
+.decl Dpart3(v: number, dp: number)
+Dpart3(v, 85 * c / 100) :- Contrib3(v, c).
+.decl PR4(v: number, pr: number)
+PR4(v, b + dp) :- Base(b), Dpart3(v, dp).
+PR4(v, b) :- Vertex(v), Base(b), !HasContrib3(v).
+.decl ContribVal4(u: number, t: number)
+ContribVal4(u, t) :- PR4(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib4(u: number, c: number)
+Contrib4(u, c) :- ContribVal4(u, _), c = sum t : { ContribVal4(u, t) }.
+.decl HasContrib4(v: number)
+HasContrib4(v) :- Contrib4(v, _).
+.decl Dpart4(v: number, dp: number)
+Dpart4(v, 85 * c / 100) :- Contrib4(v, c).
+.decl PR5(v: number, pr: number)
+PR5(v, b + dp) :- Base(b), Dpart4(v, dp).
+PR5(v, b) :- Vertex(v), Base(b), !HasContrib4(v).
+.decl ContribVal5(u: number, t: number)
+ContribVal5(u, t) :- PR5(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib5(u: number, c: number)
+Contrib5(u, c) :- ContribVal5(u, _), c = sum t : { ContribVal5(u, t) }.
+.decl HasContrib5(v: number)
+HasContrib5(v) :- Contrib5(v, _).
+.decl Dpart5(v: number, dp: number)
+Dpart5(v, 85 * c / 100) :- Contrib5(v, c).
+.decl PR6(v: number, pr: number)
+PR6(v, b + dp) :- Base(b), Dpart5(v, dp).
+PR6(v, b) :- Vertex(v), Base(b), !HasContrib5(v).
+.decl ContribVal6(u: number, t: number)
+ContribVal6(u, t) :- PR6(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib6(u: number, c: number)
+Contrib6(u, c) :- ContribVal6(u, _), c = sum t : { ContribVal6(u, t) }.
+.decl HasContrib6(v: number)
+HasContrib6(v) :- Contrib6(v, _).
+.decl Dpart6(v: number, dp: number)
+Dpart6(v, 85 * c / 100) :- Contrib6(v, c).
+.decl PR7(v: number, pr: number)
+PR7(v, b + dp) :- Base(b), Dpart6(v, dp).
+PR7(v, b) :- Vertex(v), Base(b), !HasContrib6(v).
+.decl ContribVal7(u: number, t: number)
+ContribVal7(u, t) :- PR7(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib7(u: number, c: number)
+Contrib7(u, c) :- ContribVal7(u, _), c = sum t : { ContribVal7(u, t) }.
+.decl HasContrib7(v: number)
+HasContrib7(v) :- Contrib7(v, _).
+.decl Dpart7(v: number, dp: number)
+Dpart7(v, 85 * c / 100) :- Contrib7(v, c).
+.decl PR8(v: number, pr: number)
+PR8(v, b + dp) :- Base(b), Dpart7(v, dp).
+PR8(v, b) :- Vertex(v), Base(b), !HasContrib7(v).
+.decl ContribVal8(u: number, t: number)
+ContribVal8(u, t) :- PR8(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib8(u: number, c: number)
+Contrib8(u, c) :- ContribVal8(u, _), c = sum t : { ContribVal8(u, t) }.
+.decl HasContrib8(v: number)
+HasContrib8(v) :- Contrib8(v, _).
+.decl Dpart8(v: number, dp: number)
+Dpart8(v, 85 * c / 100) :- Contrib8(v, c).
+.decl PR9(v: number, pr: number)
+PR9(v, b + dp) :- Base(b), Dpart8(v, dp).
+PR9(v, b) :- Vertex(v), Base(b), !HasContrib8(v).
+.decl ContribVal9(u: number, t: number)
+ContribVal9(u, t) :- PR9(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib9(u: number, c: number)
+Contrib9(u, c) :- ContribVal9(u, _), c = sum t : { ContribVal9(u, t) }.
+.decl HasContrib9(v: number)
+HasContrib9(v) :- Contrib9(v, _).
+.decl Dpart9(v: number, dp: number)
+Dpart9(v, 85 * c / 100) :- Contrib9(v, c).
+.decl PR10(v: number, pr: number)
+PR10(v, b + dp) :- Base(b), Dpart9(v, dp).
+PR10(v, b) :- Vertex(v), Base(b), !HasContrib9(v).
+.decl ContribVal10(u: number, t: number)
+ContribVal10(u, t) :- PR10(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib10(u: number, c: number)
+Contrib10(u, c) :- ContribVal10(u, _), c = sum t : { ContribVal10(u, t) }.
+.decl HasContrib10(v: number)
+HasContrib10(v) :- Contrib10(v, _).
+.decl Dpart10(v: number, dp: number)
+Dpart10(v, 85 * c / 100) :- Contrib10(v, c).
+.decl PR11(v: number, pr: number)
+PR11(v, b + dp) :- Base(b), Dpart10(v, dp).
+PR11(v, b) :- Vertex(v), Base(b), !HasContrib10(v).
+.decl ContribVal11(u: number, t: number)
+ContribVal11(u, t) :- PR11(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib11(u: number, c: number)
+Contrib11(u, c) :- ContribVal11(u, _), c = sum t : { ContribVal11(u, t) }.
+.decl HasContrib11(v: number)
+HasContrib11(v) :- Contrib11(v, _).
+.decl Dpart11(v: number, dp: number)
+Dpart11(v, 85 * c / 100) :- Contrib11(v, c).
+.decl PR12(v: number, pr: number)
+PR12(v, b + dp) :- Base(b), Dpart11(v, dp).
+PR12(v, b) :- Vertex(v), Base(b), !HasContrib11(v).
+.decl ContribVal12(u: number, t: number)
+ContribVal12(u, t) :- PR12(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib12(u: number, c: number)
+Contrib12(u, c) :- ContribVal12(u, _), c = sum t : { ContribVal12(u, t) }.
+.decl HasContrib12(v: number)
+HasContrib12(v) :- Contrib12(v, _).
+.decl Dpart12(v: number, dp: number)
+Dpart12(v, 85 * c / 100) :- Contrib12(v, c).
+.decl PR13(v: number, pr: number)
+PR13(v, b + dp) :- Base(b), Dpart12(v, dp).
+PR13(v, b) :- Vertex(v), Base(b), !HasContrib12(v).
+.decl ContribVal13(u: number, t: number)
+ContribVal13(u, t) :- PR13(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib13(u: number, c: number)
+Contrib13(u, c) :- ContribVal13(u, _), c = sum t : { ContribVal13(u, t) }.
+.decl HasContrib13(v: number)
+HasContrib13(v) :- Contrib13(v, _).
+.decl Dpart13(v: number, dp: number)
+Dpart13(v, 85 * c / 100) :- Contrib13(v, c).
+.decl PR14(v: number, pr: number)
+PR14(v, b + dp) :- Base(b), Dpart13(v, dp).
+PR14(v, b) :- Vertex(v), Base(b), !HasContrib13(v).
+.decl ContribVal14(u: number, t: number)
+ContribVal14(u, t) :- PR14(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib14(u: number, c: number)
+Contrib14(u, c) :- ContribVal14(u, _), c = sum t : { ContribVal14(u, t) }.
+.decl HasContrib14(v: number)
+HasContrib14(v) :- Contrib14(v, _).
+.decl Dpart14(v: number, dp: number)
+Dpart14(v, 85 * c / 100) :- Contrib14(v, c).
+.decl PR15(v: number, pr: number)
+PR15(v, b + dp) :- Base(b), Dpart14(v, dp).
+PR15(v, b) :- Vertex(v), Base(b), !HasContrib14(v).
+.decl ContribVal15(u: number, t: number)
+ContribVal15(u, t) :- PR15(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib15(u: number, c: number)
+Contrib15(u, c) :- ContribVal15(u, _), c = sum t : { ContribVal15(u, t) }.
+.decl HasContrib15(v: number)
+HasContrib15(v) :- Contrib15(v, _).
+.decl Dpart15(v: number, dp: number)
+Dpart15(v, 85 * c / 100) :- Contrib15(v, c).
+.decl PR16(v: number, pr: number)
+PR16(v, b + dp) :- Base(b), Dpart15(v, dp).
+PR16(v, b) :- Vertex(v), Base(b), !HasContrib15(v).
+.decl ContribVal16(u: number, t: number)
+ContribVal16(u, t) :- PR16(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib16(u: number, c: number)
+Contrib16(u, c) :- ContribVal16(u, _), c = sum t : { ContribVal16(u, t) }.
+.decl HasContrib16(v: number)
+HasContrib16(v) :- Contrib16(v, _).
+.decl Dpart16(v: number, dp: number)
+Dpart16(v, 85 * c / 100) :- Contrib16(v, c).
+.decl PR17(v: number, pr: number)
+PR17(v, b + dp) :- Base(b), Dpart16(v, dp).
+PR17(v, b) :- Vertex(v), Base(b), !HasContrib16(v).
+.decl ContribVal17(u: number, t: number)
+ContribVal17(u, t) :- PR17(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib17(u: number, c: number)
+Contrib17(u, c) :- ContribVal17(u, _), c = sum t : { ContribVal17(u, t) }.
+.decl HasContrib17(v: number)
+HasContrib17(v) :- Contrib17(v, _).
+.decl Dpart17(v: number, dp: number)
+Dpart17(v, 85 * c / 100) :- Contrib17(v, c).
+.decl PR18(v: number, pr: number)
+PR18(v, b + dp) :- Base(b), Dpart17(v, dp).
+PR18(v, b) :- Vertex(v), Base(b), !HasContrib17(v).
+.decl ContribVal18(u: number, t: number)
+ContribVal18(u, t) :- PR18(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib18(u: number, c: number)
+Contrib18(u, c) :- ContribVal18(u, _), c = sum t : { ContribVal18(u, t) }.
+.decl HasContrib18(v: number)
+HasContrib18(v) :- Contrib18(v, _).
+.decl Dpart18(v: number, dp: number)
+Dpart18(v, 85 * c / 100) :- Contrib18(v, c).
+.decl PR19(v: number, pr: number)
+PR19(v, b + dp) :- Base(b), Dpart18(v, dp).
+PR19(v, b) :- Vertex(v), Base(b), !HasContrib18(v).
+.decl ContribVal19(u: number, t: number)
+ContribVal19(u, t) :- PR19(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib19(u: number, c: number)
+Contrib19(u, c) :- ContribVal19(u, _), c = sum t : { ContribVal19(u, t) }.
+.decl HasContrib19(v: number)
+HasContrib19(v) :- Contrib19(v, _).
+.decl Dpart19(v: number, dp: number)
+Dpart19(v, 85 * c / 100) :- Contrib19(v, c).
+.decl PR20(v: number, pr: number)
+PR20(v, b + dp) :- Base(b), Dpart19(v, dp).
+PR20(v, b) :- Vertex(v), Base(b), !HasContrib19(v).
+.decl ContribVal20(u: number, t: number)
+ContribVal20(u, t) :- PR20(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib20(u: number, c: number)
+Contrib20(u, c) :- ContribVal20(u, _), c = sum t : { ContribVal20(u, t) }.
+.decl HasContrib20(v: number)
+HasContrib20(v) :- Contrib20(v, _).
+.decl Dpart20(v: number, dp: number)
+Dpart20(v, 85 * c / 100) :- Contrib20(v, c).
+.decl PR21(v: number, pr: number)
+PR21(v, b + dp) :- Base(b), Dpart20(v, dp).
+PR21(v, b) :- Vertex(v), Base(b), !HasContrib20(v).
+.decl ContribVal21(u: number, t: number)
+ContribVal21(u, t) :- PR21(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib21(u: number, c: number)
+Contrib21(u, c) :- ContribVal21(u, _), c = sum t : { ContribVal21(u, t) }.
+.decl HasContrib21(v: number)
+HasContrib21(v) :- Contrib21(v, _).
+.decl Dpart21(v: number, dp: number)
+Dpart21(v, 85 * c / 100) :- Contrib21(v, c).
+.decl PR22(v: number, pr: number)
+PR22(v, b + dp) :- Base(b), Dpart21(v, dp).
+PR22(v, b) :- Vertex(v), Base(b), !HasContrib21(v).
+.decl ContribVal22(u: number, t: number)
+ContribVal22(u, t) :- PR22(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib22(u: number, c: number)
+Contrib22(u, c) :- ContribVal22(u, _), c = sum t : { ContribVal22(u, t) }.
+.decl HasContrib22(v: number)
+HasContrib22(v) :- Contrib22(v, _).
+.decl Dpart22(v: number, dp: number)
+Dpart22(v, 85 * c / 100) :- Contrib22(v, c).
+.decl PR23(v: number, pr: number)
+PR23(v, b + dp) :- Base(b), Dpart22(v, dp).
+PR23(v, b) :- Vertex(v), Base(b), !HasContrib22(v).
+.decl ContribVal23(u: number, t: number)
+ContribVal23(u, t) :- PR23(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib23(u: number, c: number)
+Contrib23(u, c) :- ContribVal23(u, _), c = sum t : { ContribVal23(u, t) }.
+.decl HasContrib23(v: number)
+HasContrib23(v) :- Contrib23(v, _).
+.decl Dpart23(v: number, dp: number)
+Dpart23(v, 85 * c / 100) :- Contrib23(v, c).
+.decl PR24(v: number, pr: number)
+PR24(v, b + dp) :- Base(b), Dpart23(v, dp).
+PR24(v, b) :- Vertex(v), Base(b), !HasContrib23(v).
+.decl ContribVal24(u: number, t: number)
+ContribVal24(u, t) :- PR24(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib24(u: number, c: number)
+Contrib24(u, c) :- ContribVal24(u, _), c = sum t : { ContribVal24(u, t) }.
+.decl HasContrib24(v: number)
+HasContrib24(v) :- Contrib24(v, _).
+.decl Dpart24(v: number, dp: number)
+Dpart24(v, 85 * c / 100) :- Contrib24(v, c).
+.decl PR25(v: number, pr: number)
+PR25(v, b + dp) :- Base(b), Dpart24(v, dp).
+PR25(v, b) :- Vertex(v), Base(b), !HasContrib24(v).
+.decl ContribVal25(u: number, t: number)
+ContribVal25(u, t) :- PR25(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib25(u: number, c: number)
+Contrib25(u, c) :- ContribVal25(u, _), c = sum t : { ContribVal25(u, t) }.
+.decl HasContrib25(v: number)
+HasContrib25(v) :- Contrib25(v, _).
+.decl Dpart25(v: number, dp: number)
+Dpart25(v, 85 * c / 100) :- Contrib25(v, c).
+.decl PR26(v: number, pr: number)
+PR26(v, b + dp) :- Base(b), Dpart25(v, dp).
+PR26(v, b) :- Vertex(v), Base(b), !HasContrib25(v).
+.decl ContribVal26(u: number, t: number)
+ContribVal26(u, t) :- PR26(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib26(u: number, c: number)
+Contrib26(u, c) :- ContribVal26(u, _), c = sum t : { ContribVal26(u, t) }.
+.decl HasContrib26(v: number)
+HasContrib26(v) :- Contrib26(v, _).
+.decl Dpart26(v: number, dp: number)
+Dpart26(v, 85 * c / 100) :- Contrib26(v, c).
+.decl PR27(v: number, pr: number)
+PR27(v, b + dp) :- Base(b), Dpart26(v, dp).
+PR27(v, b) :- Vertex(v), Base(b), !HasContrib26(v).
+.decl ContribVal27(u: number, t: number)
+ContribVal27(u, t) :- PR27(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib27(u: number, c: number)
+Contrib27(u, c) :- ContribVal27(u, _), c = sum t : { ContribVal27(u, t) }.
+.decl HasContrib27(v: number)
+HasContrib27(v) :- Contrib27(v, _).
+.decl Dpart27(v: number, dp: number)
+Dpart27(v, 85 * c / 100) :- Contrib27(v, c).
+.decl PR28(v: number, pr: number)
+PR28(v, b + dp) :- Base(b), Dpart27(v, dp).
+PR28(v, b) :- Vertex(v), Base(b), !HasContrib27(v).
+.decl ContribVal28(u: number, t: number)
+ContribVal28(u, t) :- PR28(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib28(u: number, c: number)
+Contrib28(u, c) :- ContribVal28(u, _), c = sum t : { ContribVal28(u, t) }.
+.decl HasContrib28(v: number)
+HasContrib28(v) :- Contrib28(v, _).
+.decl Dpart28(v: number, dp: number)
+Dpart28(v, 85 * c / 100) :- Contrib28(v, c).
+.decl PR29(v: number, pr: number)
+PR29(v, b + dp) :- Base(b), Dpart28(v, dp).
+PR29(v, b) :- Vertex(v), Base(b), !HasContrib28(v).
+.decl ContribVal29(u: number, t: number)
+ContribVal29(u, t) :- PR29(v, pr), Arc(v, u), Outdeg(v, d), t = pr / d.
+.decl Contrib29(u: number, c: number)
+Contrib29(u, c) :- ContribVal29(u, _), c = sum t : { ContribVal29(u, t) }.
+.decl HasContrib29(v: number)
+HasContrib29(v) :- Contrib29(v, _).
+.decl Dpart29(v: number, dp: number)
+Dpart29(v, 85 * c / 100) :- Contrib29(v, c).
+.decl PR30(v: number, pr: number)
+PR30(v, b + dp) :- Base(b), Dpart29(v, dp).
+PR30(v, b) :- Vertex(v), Base(b), !HasContrib29(v).
+.decl FinalPR(v: number, pr: number)
+FinalPR(v, pr) :- PR30(v, pr).
+.printsize FinalPR
+.output FinalPR

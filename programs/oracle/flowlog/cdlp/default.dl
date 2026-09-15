@@ -1,0 +1,84 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// LDBC Graphalytics — Community Detection via Label Propagation (CDLP)
+//
+// Spec (Graphalytics §3.3): each vertex starts with its own ID as label.
+// For K iterations (default K = 10):
+//   1. Each vertex collects labels from all neighbours (undirected for
+//      undirected graphs; for directed graphs the spec sums in- and
+//      out-neighbours together — implemented here via the symmetric
+//      UndirEdge view, matching the reference Pregel implementation).
+//   2. Adopts the most frequent neighbour label. Ties are broken by
+//      smallest label (LDBC spec).
+//
+// Isolated vertices keep their initial label across all iterations.
+//
+// LANGUAGE NOTE: like PageRank above, this uses recursive aggregation
+// (count + max + min) inside a cycle that is broken at the value level by
+// the `iter` counter. The chain is:
+//   Label(i)              — no aggregation
+//   NbrLabelCount(i)      — count
+//   ModeCount(i)          — max
+//   LabelNext(i+1)        — min (tie-break)
+//   Label(i+1)            — no aggregation
+// All aggregators are monotone over the well-founded iter domain.
+//
+// Inputs:
+//   Arc.csv     — directed edges
+//   Vertex.csv  — vertex IDs (one per line)
+//   MaxIter.csv — single integer K (typically 10)
+// ══════════════════════════════════════════════════════════════════════════════
+
+.decl Arc(src: int64, dst: int64)
+.input Arc(IO="file", filename="Arc.csv", delimiter=",")
+
+.decl Vertex(v: int64)
+.input Vertex(IO="file", filename="Vertex.csv", delimiter=",")
+
+.decl MaxIter(k: int32)
+.input MaxIter(IO="file", filename="MaxIter.csv", delimiter=",")
+
+// ── Undirected view (no self-loops) ──────────────────────────────────────────
+.decl UndirEdge(u: int64, v: int64)
+UndirEdge(u, v) :- Arc(u, v), u != v.
+UndirEdge(v, u) :- Arc(u, v), u != v.
+
+// ── Label table: (iter, vertex, label) ───────────────────────────────────────
+.decl Label(iter: int32, v: int64, l: int64)
+Label(0, v, v) :- Vertex(v).
+
+// neighbour label counts at iter i
+.decl NbrLabelCount(iter: int32, v: int64, l: int64, c: int64)
+NbrLabelCount(i, v, l, count(u)) :-
+    Label(i, u, l), UndirEdge(v, u),
+    MaxIter(k), i < k.
+
+// per-vertex mode count
+.decl ModeCount(iter: int32, v: int64, c: int64)
+ModeCount(i, v, max(c)) :- NbrLabelCount(i, v, _, c).
+
+// smallest label achieving the mode count (LDBC tie-break)
+.decl LabelNext(iter: int32, v: int64, l: int64)
+LabelNext(i + 1, v, min(l)) :-
+    NbrLabelCount(i, v, l, c),
+    ModeCount(i, v, c).
+
+// promote to Label
+// NOTE: body atoms cannot carry arithmetic args in FlowLog, so bind the
+// already-incremented iteration of LabelNext to a fresh var `j` (= i+1).
+Label(j, v, l) :- LabelNext(j, v, l).
+
+// isolated vertices: carry forward
+.decl HasNbr(iter: int32, v: int64)
+HasNbr(i, v) :- NbrLabelCount(i, v, _, _).
+
+Label(i + 1, v, lprev) :-
+    Vertex(v), MaxIter(k), i < k,
+    Label(i, v, lprev),
+    !HasNbr(i, v).
+
+// ── Final-iteration snapshot ─────────────────────────────────────────────────
+.decl FinalLabel(v: int64, l: int64)
+FinalLabel(v, l) :- Label(k, v, l), MaxIter(k).
+
+.printsize FinalLabel
+.output FinalLabel

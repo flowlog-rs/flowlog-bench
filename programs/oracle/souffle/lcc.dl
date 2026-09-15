@@ -1,0 +1,37 @@
+// LDBC Graphalytics — LCC (Souffle reference, integer-scaled by 1e9)
+// See programs/oracle/flowlog/lcc/default.dl for the algorithmic notes.
+.decl Arc(src: number, dst: number)
+.input Arc(IO=file, filename="Arc.csv", delimiter=",")
+
+.decl Vertex(v: number)
+.input Vertex(IO=file, filename="Vertex.csv", delimiter=",")
+
+.decl UndirEdge(u: number, v: number)
+UndirEdge(u, v) :- Arc(u, v), u != v.
+UndirEdge(v, u) :- Arc(u, v), u != v.
+
+.decl Deg(v: number, d: number)
+Deg(v, d) :- UndirEdge(v, _), d = count : { UndirEdge(v, _) }.
+
+.decl TriPair(v: number, u: number, w: number)
+TriPair(v, u, w) :-
+    UndirEdge(v, u),
+    UndirEdge(v, w),
+    UndirEdge(u, w),
+    u != w.
+
+.decl TriPairCode(v: number, code: number)
+TriPairCode(v, u + w * 100000007) :- TriPair(v, u, w).
+
+.decl TriThruV(v: number, t: number)
+TriThruV(v, t) :- TriPairCode(v, _), t = count : { TriPairCode(v, _) }.
+
+.decl LCC(v: number, lcc_scaled: number)
+LCC(v, 0) :- Vertex(v), !Deg(v, _).
+LCC(v, 0) :- Vertex(v), Deg(v, d), d < 2.
+LCC(v, 0) :- Vertex(v), Deg(v, d), d >= 2, !TriThruV(v, _).
+LCC(v, t * 1000000000 / (d * (d - 1))) :-
+    Vertex(v), Deg(v, d), TriThruV(v, t), d >= 2.
+
+.printsize LCC
+.output LCC

@@ -23,6 +23,24 @@ dyck.dl=postgre
 crdt.dl=crdt
 galen.dl=galen
 
+# LDBC Graphalytics (fixed-iter, integer-scaled by 1e9)
+# See docs/data/graphalytics-data-prep.md for prep + dataset pointers.
+# LCC's triangle enumeration is O(Σ deg²) so it is restricted to small graphs.
+# Souffle's reference uses unrolled K (K=30 PR, K=10 CDLP); FlowLog's recursive
+# encoding is single-program.
+lcc.dl=G5K-0.001
+lcc.dl=G10K-0.001
+lcc.dl=mind [souffle:skip]
+// ── Souffle reference uses an unrolled-iteration encoding (see
+//    PR / CDLP discussion in docs/data/graphalytics-data-prep.md). Both
+//    pagerank and cdlp currently `[souffle:skip]` in config/default.txt.
+pagerank.dl=G5K-0.001 [souffle:skip]
+pagerank.dl=G10K-0.001 [souffle:skip]
+pagerank.dl=livejournal [souffle:skip] [interp:skip]
+cdlp.dl=G5K-0.001 [souffle:skip]
+cdlp.dl=G10K-0.001 [souffle:skip]
+cdlp.dl=livejournal [souffle:skip] [interp:skip]
+
 # Program analysis (integer-typed legacy + Polonius borrow checker)
 andersen.dl=medium
 andersen.dl=large

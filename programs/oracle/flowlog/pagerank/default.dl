@@ -1,0 +1,85 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// LDBC Graphalytics — PageRank (fixed-iteration, integer-scaled)
+//
+// Spec (Graphalytics §3.5): damping d = 0.85, K iterations (default K = 50
+// for LDBC; the test driver passes K via MaxIter.csv).
+//
+//   PR_0(v)     = 1 / N
+//   PR_{i+1}(v) = (1 - d) / N + d * SUM_{u : (u,v) in E} PR_i(u) / outdeg(u)
+//
+// Integer-scaled encoding (no float in FlowLog):
+//   SCALE = 1_000_000_000
+//   D     = 85, ONE_MINUS_D = 15 (both /100)
+//
+//   PR_0(v) = SCALE / N
+//   PR_{i+1}(v) = (15 * SCALE) / (100 * N) + (85 * SUM(PR_i(u)/outdeg(u))) / 100
+//
+// Dangling vertices (outdeg = 0) leak mass — that matches the LDBC
+// non-redistributing variant. Vertices with no incoming edges get only the
+// base (1-d)/N contribution every iteration.
+//
+// LANGUAGE NOTE: This program uses *recursive sum aggregation*. The
+// dependency Contrib -> PR -> Contrib is broken at the value level by the
+// strictly-increasing `iter` counter, so each PR(i+1,_,_) is determined by
+// the (already-stable) PR(i,_,_) layer. FlowLog's `recursive_min` /
+// `recursive_max` test fixtures show recursive aggregation works for those
+// operators; if recursive `sum` isn't yet supported, see the unrolled
+// variant in `pagerank/unrolled_k30.dl` (TODO — file an issue if needed).
+//
+// Inputs:
+//   Arc.csv     — directed edges
+//   Vertex.csv  — vertex IDs (one per line)
+//   MaxIter.csv — single integer K (number of iterations, e.g. 30 or 50)
+// ══════════════════════════════════════════════════════════════════════════════
+
+.decl Arc(src: int64, dst: int64)
+.input Arc(IO="file", filename="Arc.csv", delimiter=",")
+
+.decl Vertex(v: int64)
+.input Vertex(IO="file", filename="Vertex.csv", delimiter=",")
+
+.decl MaxIter(k: int32)
+.input MaxIter(IO="file", filename="MaxIter.csv", delimiter=",")
+
+// ── Vertex count ─────────────────────────────────────────────────────────────
+.decl N(n: int64)
+N(count(v)) :- Vertex(v).
+
+// ── Out-degree ───────────────────────────────────────────────────────────────
+.decl Outdeg(v: int64, d: int64)
+Outdeg(v, count(u)) :- Arc(v, u).
+
+// ── PR table: (iter, vertex, PR-scaled-by-1e9) ───────────────────────────────
+.decl PR(iter: int32, v: int64, pr: int64)
+
+// iteration 0: uniform 1/N (scaled)
+PR(0, v, 1000000000 / n) :- Vertex(v), N(n).
+
+// per-iteration contribution from in-neighbours
+.decl Contrib(iter: int32, dst: int64, c: int64)
+Contrib(i, u, sum(pr / d)) :-
+    PR(i, v, pr), Arc(v, u), Outdeg(v, d),
+    MaxIter(k), i < k.
+
+.decl HasContrib(iter: int32, v: int64)
+HasContrib(i, v) :- Contrib(i, v, _).
+
+// PR(i+1) for vertices that received any contribution
+PR(i + 1, v, base + dpart) :-
+    Vertex(v), N(n), MaxIter(k), i < k,
+    Contrib(i, v, c),
+    base = 15000000000 / (100 * n),
+    dpart = 85 * c / 100.
+
+// PR(i+1) for vertices with no incoming contributions at iter i
+PR(i + 1, v, base) :-
+    Vertex(v), N(n), MaxIter(k), i < k,
+    !HasContrib(i, v),
+    base = 15000000000 / (100 * n).
+
+// ── Final-iteration snapshot ─────────────────────────────────────────────────
+.decl FinalPR(v: int64, pr: int64)
+FinalPR(v, pr) :- PR(k, v, pr), MaxIter(k).
+
+.printsize FinalPR
+.output FinalPR

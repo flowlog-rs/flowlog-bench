@@ -1,0 +1,125 @@
+// LDBC Graphalytics CDLP — UNROLLED K=10 (FlowLog).
+// Label propagation, mode label, smallest-id tie-break. Auto-generated.
+.decl Arc(src: int64, dst: int64)
+.input Arc(IO="file", filename="Arc.csv", delimiter=",")
+.decl Vertex(v: int64)
+.input Vertex(IO="file", filename="Vertex.csv", delimiter=",")
+.decl UndirEdge(u: int64, v: int64)
+UndirEdge(u, v) :- Arc(u, v), u != v.
+UndirEdge(v, u) :- Arc(u, v), u != v.
+.decl Label0(v: int64, l: int64)
+Label0(v, v) :- Vertex(v).
+.decl NbrLabelCount0(v: int64, l: int64, c: int64)
+NbrLabelCount0(v, l, count(u)) :- Label0(u, l), UndirEdge(v, u).
+.decl ModeCount0(v: int64, c: int64)
+ModeCount0(v, max(c)) :- NbrLabelCount0(v, _, c).
+.decl LabelNext0(v: int64, l: int64)
+LabelNext0(v, min(l)) :- NbrLabelCount0(v, l, c), ModeCount0(v, c).
+.decl HasNbr0(v: int64)
+HasNbr0(v) :- NbrLabelCount0(v, _, _).
+.decl Label1(v: int64, l: int64)
+Label1(v, l) :- LabelNext0(v, l).
+Label1(v, lprev) :- Label0(v, lprev), !HasNbr0(v).
+.decl NbrLabelCount1(v: int64, l: int64, c: int64)
+NbrLabelCount1(v, l, count(u)) :- Label1(u, l), UndirEdge(v, u).
+.decl ModeCount1(v: int64, c: int64)
+ModeCount1(v, max(c)) :- NbrLabelCount1(v, _, c).
+.decl LabelNext1(v: int64, l: int64)
+LabelNext1(v, min(l)) :- NbrLabelCount1(v, l, c), ModeCount1(v, c).
+.decl HasNbr1(v: int64)
+HasNbr1(v) :- NbrLabelCount1(v, _, _).
+.decl Label2(v: int64, l: int64)
+Label2(v, l) :- LabelNext1(v, l).
+Label2(v, lprev) :- Label1(v, lprev), !HasNbr1(v).
+.decl NbrLabelCount2(v: int64, l: int64, c: int64)
+NbrLabelCount2(v, l, count(u)) :- Label2(u, l), UndirEdge(v, u).
+.decl ModeCount2(v: int64, c: int64)
+ModeCount2(v, max(c)) :- NbrLabelCount2(v, _, c).
+.decl LabelNext2(v: int64, l: int64)
+LabelNext2(v, min(l)) :- NbrLabelCount2(v, l, c), ModeCount2(v, c).
+.decl HasNbr2(v: int64)
+HasNbr2(v) :- NbrLabelCount2(v, _, _).
+.decl Label3(v: int64, l: int64)
+Label3(v, l) :- LabelNext2(v, l).
+Label3(v, lprev) :- Label2(v, lprev), !HasNbr2(v).
+.decl NbrLabelCount3(v: int64, l: int64, c: int64)
+NbrLabelCount3(v, l, count(u)) :- Label3(u, l), UndirEdge(v, u).
+.decl ModeCount3(v: int64, c: int64)
+ModeCount3(v, max(c)) :- NbrLabelCount3(v, _, c).
+.decl LabelNext3(v: int64, l: int64)
+LabelNext3(v, min(l)) :- NbrLabelCount3(v, l, c), ModeCount3(v, c).
+.decl HasNbr3(v: int64)
+HasNbr3(v) :- NbrLabelCount3(v, _, _).
+.decl Label4(v: int64, l: int64)
+Label4(v, l) :- LabelNext3(v, l).
+Label4(v, lprev) :- Label3(v, lprev), !HasNbr3(v).
+.decl NbrLabelCount4(v: int64, l: int64, c: int64)
+NbrLabelCount4(v, l, count(u)) :- Label4(u, l), UndirEdge(v, u).
+.decl ModeCount4(v: int64, c: int64)
+ModeCount4(v, max(c)) :- NbrLabelCount4(v, _, c).
+.decl LabelNext4(v: int64, l: int64)
+LabelNext4(v, min(l)) :- NbrLabelCount4(v, l, c), ModeCount4(v, c).
+.decl HasNbr4(v: int64)
+HasNbr4(v) :- NbrLabelCount4(v, _, _).
+.decl Label5(v: int64, l: int64)
+Label5(v, l) :- LabelNext4(v, l).
+Label5(v, lprev) :- Label4(v, lprev), !HasNbr4(v).
+.decl NbrLabelCount5(v: int64, l: int64, c: int64)
+NbrLabelCount5(v, l, count(u)) :- Label5(u, l), UndirEdge(v, u).
+.decl ModeCount5(v: int64, c: int64)
+ModeCount5(v, max(c)) :- NbrLabelCount5(v, _, c).
+.decl LabelNext5(v: int64, l: int64)
+LabelNext5(v, min(l)) :- NbrLabelCount5(v, l, c), ModeCount5(v, c).
+.decl HasNbr5(v: int64)
+HasNbr5(v) :- NbrLabelCount5(v, _, _).
+.decl Label6(v: int64, l: int64)
+Label6(v, l) :- LabelNext5(v, l).
+Label6(v, lprev) :- Label5(v, lprev), !HasNbr5(v).
+.decl NbrLabelCount6(v: int64, l: int64, c: int64)
+NbrLabelCount6(v, l, count(u)) :- Label6(u, l), UndirEdge(v, u).
+.decl ModeCount6(v: int64, c: int64)
+ModeCount6(v, max(c)) :- NbrLabelCount6(v, _, c).
+.decl LabelNext6(v: int64, l: int64)
+LabelNext6(v, min(l)) :- NbrLabelCount6(v, l, c), ModeCount6(v, c).
+.decl HasNbr6(v: int64)
+HasNbr6(v) :- NbrLabelCount6(v, _, _).
+.decl Label7(v: int64, l: int64)
+Label7(v, l) :- LabelNext6(v, l).
+Label7(v, lprev) :- Label6(v, lprev), !HasNbr6(v).
+.decl NbrLabelCount7(v: int64, l: int64, c: int64)
+NbrLabelCount7(v, l, count(u)) :- Label7(u, l), UndirEdge(v, u).
+.decl ModeCount7(v: int64, c: int64)
+ModeCount7(v, max(c)) :- NbrLabelCount7(v, _, c).
+.decl LabelNext7(v: int64, l: int64)
+LabelNext7(v, min(l)) :- NbrLabelCount7(v, l, c), ModeCount7(v, c).
+.decl HasNbr7(v: int64)
+HasNbr7(v) :- NbrLabelCount7(v, _, _).
+.decl Label8(v: int64, l: int64)
+Label8(v, l) :- LabelNext7(v, l).
+Label8(v, lprev) :- Label7(v, lprev), !HasNbr7(v).
+.decl NbrLabelCount8(v: int64, l: int64, c: int64)
+NbrLabelCount8(v, l, count(u)) :- Label8(u, l), UndirEdge(v, u).
+.decl ModeCount8(v: int64, c: int64)
+ModeCount8(v, max(c)) :- NbrLabelCount8(v, _, c).
+.decl LabelNext8(v: int64, l: int64)
+LabelNext8(v, min(l)) :- NbrLabelCount8(v, l, c), ModeCount8(v, c).
+.decl HasNbr8(v: int64)
+HasNbr8(v) :- NbrLabelCount8(v, _, _).
+.decl Label9(v: int64, l: int64)
+Label9(v, l) :- LabelNext8(v, l).
+Label9(v, lprev) :- Label8(v, lprev), !HasNbr8(v).
+.decl NbrLabelCount9(v: int64, l: int64, c: int64)
+NbrLabelCount9(v, l, count(u)) :- Label9(u, l), UndirEdge(v, u).
+.decl ModeCount9(v: int64, c: int64)
+ModeCount9(v, max(c)) :- NbrLabelCount9(v, _, c).
+.decl LabelNext9(v: int64, l: int64)
+LabelNext9(v, min(l)) :- NbrLabelCount9(v, l, c), ModeCount9(v, c).
+.decl HasNbr9(v: int64)
+HasNbr9(v) :- NbrLabelCount9(v, _, _).
+.decl Label10(v: int64, l: int64)
+Label10(v, l) :- LabelNext9(v, l).
+Label10(v, lprev) :- Label9(v, lprev), !HasNbr9(v).
+.decl FinalLabel(v: int64, l: int64)
+FinalLabel(v, l) :- Label10(v, l).
+.printsize FinalLabel
+.output FinalLabel
