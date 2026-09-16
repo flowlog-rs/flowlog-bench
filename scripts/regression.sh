@@ -1,77 +1,35 @@
 #!/usr/bin/env bash
-#
-# scripts/regression.sh — perf + peak-RSS drift check between two flowlog refs.
-#
-# Designed for closed-loop tooling that wants to verify a series of
-# in-tree changes hasn't regressed any benchmark beyond a tolerance,
-# without invoking the heavy `cross_engine.sh` cross-engine machinery
-# (no Soufflé, no legacy interpreter).
-#
-# What it does:
-#   1. Read a list of `<prog>=<dataset>` pairs from a config file
-#      (same format as `config/default.txt`; per-pair `[tag]` markers
-#      are stripped so the same files can be reused).
-#   2. For each pair, compile <prog>.dl with each ref's flowlog-compiler
-#      and run the resulting binary NUM_RUNS times; capture the median
-#      "Dataflow executed in <Dur>" + median peak RSS.
-#   3. Compare each metric to BASE; flag PASS / FAIL.
-#   4. Exit 0 iff every pair stayed within both tolerances; otherwise 1.
-#
-# Build strategy: BASE and HEAD are both fetched + built via
-# scripts/get_flowlog.sh into flowlog/<short_sha>/. Each cached build
-# survives across runs, so iterative loops (same BASE, varying HEAD)
-# only pay for HEAD's build. `flowlog/` and `results/` are gitignored.
-#
-# Output:
-#   - One stdout line per pair on success: `<pair>  time%  rss%  OK`
-#   - The summary table on stdout when every pair is OK; on stderr
-#     when any pair failed, so wrapper scripts can keep extractors
-#     pointed at stdout for clean signals.
-#
-# Exit code:
-#   0  every pair within tolerances
-#   1  at least one pair regressed beyond a tolerance
-#   2  argument / I/O error (config missing, ref unknown)
-#   3  internal error (get_flowlog.sh, cargo build, compile/run failure)
+# Compare two FlowLog refs using the same programs, datasets and worker count.
 #
 # Usage:
-#   scripts/regression.sh [--keep-datasets] <base_ref> <head_ref> <config_file>
-#   scripts/regression.sh --help
+#   scripts/regression.sh [--keep-datasets] [--fresh] BASE HEAD CONFIG
+#   FLOWLOG_BASE=BASE FLOWLOG_HEAD=HEAD make regression
 #
-#   --keep-datasets   skip per-pair dataset cleanup. Required if $FACT_DIR
-#                     is a symlink — the runner refuses to rm -rf through
-#                     one (would wipe the linked target).
+# Refs accept tags, branches, commit SHAs and explicit remote refs.
+# Both compilers build with their own Cargo.lock. Generated programs use the
+# matching runtime, verified through Cargo metadata before measurement.
 #
-# Or via the env-var form:
-#   FLOWLOG_BASE=abc1234 FLOWLOG_HEAD=def5678 make regression
+# Each invocation measures every pair again. --fresh removes previous results;
+# otherwise run_info.txt must match before any measurements are overwritten.
+# Generated sources, Cargo.lock and metadata are retained under base/generated/
+# and head/generated/. Their target/ directories are removed after compilation.
 #
-# Both refs are passed to scripts/get_flowlog.sh (branch / tag / sha all OK).
-# Each fetched build is cached at flowlog/<short_sha>/, so re-running the
-# same BASE-vs-HEAD is free after the first build.
+# Metrics: median FlowLog "Dataflow executed" time and median peak RSS.
+# These are independent medians; the time metric is not process wall time.
+#   PERF_COMPARE_TIME_PCT    time regression threshold (default 10)
+#   PERF_COMPARE_RSS_PCT     peak RSS threshold (default 20)
+#   PERF_COMPARE_NUM_RUNS    successful attempts required per ref (default 5)
+#   PERF_COMPARE_WORKERS     physical cores (default up to 32)
+#   FLOWLOG_RUN_TIMEOUT      seconds per attempt (default 86400)
 #
-# Datasets: this script downloads each pair's dataset into $FACT_DIR
-# (default: ROOT_DIR/facts) before benching and removes it after both
-# refs have been measured (skipped under --keep-datasets).
-#
-# Environment:
-#   PERF_COMPARE_TIME_PCT     wall-time regression tolerance  (default 10)
-#   PERF_COMPARE_RSS_PCT      peak-RSS regression tolerance   (default 20)
-#   PERF_COMPARE_NUM_RUNS     timed runs per ref per pair     (default 5)
-#   PERF_COMPARE_WORKERS      `-w` value passed to the binary (default 32)
-#   BENCH_NUMA_NODES          optional NUMA-node allowlist override
-#   BENCH_CPUS                optional CPU allowlist override
-#   BENCH_NO_PIN=1            disable numactl pinning
-#
-# Every invocation automatically pins physical cores and applies a NUMA-aware
-# memory policy. It uses the fewest nodes needed for the worker count.
+# Physical cores and NUMA memory are pinned by default; BENCH_NO_PIN=1 opts out.
+# Datasets are removed after each pair unless --keep-datasets / KEEP_DATASETS=1.
+# Output: results/regression/<base>_vs_<head>/summary.tsv and per-run logs.
+# Exit: 0 pass, 1 measured regression, 2 invalid input, 3 build/measurement error.
 
 set -euo pipefail
 ORIGINAL_ARGS=("$@")
 
-# ----------------------------------------------------------------------
-# --help: extract the doc header above (everything up to the first
-# bash command after `set -euo pipefail`).
-# ----------------------------------------------------------------------
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     awk '/^set -euo pipefail/ { exit }
          NR > 1 { sub(/^# ?/, ""); print }' "$0"
@@ -81,7 +39,7 @@ fi
 # ----------------------------------------------------------------------
 # Argument parsing.
 # ----------------------------------------------------------------------
-KEEP_DATASETS=0
+KEEP_DATASETS="${KEEP_DATASETS:-0}"
 FRESH=0
 POSITIONAL=()
 while (( $# )); do
@@ -94,7 +52,7 @@ while (( $# )); do
     esac
 done
 if [[ ${#POSITIONAL[@]} -ne 3 ]]; then
-    echo "usage: $0 [--keep-datasets] <base_ref> <head_ref> <config_file>" >&2
+    echo "usage: $0 [--keep-datasets] [--fresh] <base_ref> <head_ref> <config_file>" >&2
     echo "       $0 --help" >&2
     exit 2
 fi
@@ -104,6 +62,11 @@ CONFIG_FILE="${POSITIONAL[2]}"
 export KEEP_DATASETS
 
 [[ -f "$CONFIG_FILE" ]] || { echo "ERROR: config file not found: $CONFIG_FILE" >&2; exit 2; }
+CONFIG_FILE="$(realpath "$CONFIG_FILE")"
+ORIGINAL_ARGS=()
+[[ "$KEEP_DATASETS" == 1 ]] && ORIGINAL_ARGS+=(--keep-datasets)
+(( FRESH )) && ORIGINAL_ARGS+=(--fresh)
+ORIGINAL_ARGS+=(-- "$BASE_SHA" "$HEAD_SHA" "$CONFIG_FILE")
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -118,6 +81,9 @@ bench_affinity_reexec PERF_COMPARE_WORKERS "${ORIGINAL_ARGS[@]}"
 
 PROG_DIR="${PROG_DIR:-${ROOT_DIR}/programs/oracle/flowlog}"
 FACT_DIR="${FACT_DIR:-${ROOT_DIR}/facts}"
+PROG_DIR="$(realpath "$PROG_DIR")"
+# Preserve symlinks so the dataset cleanup safety check can still detect them.
+FACT_DIR="$(realpath -m -s "$FACT_DIR")"
 DATASET_URL="https://huggingface.co/datasets/NemoYuu/flowlog_benchmark/resolve/main/dataset/csv"
 TIME_BIN="${TIME_BIN:-/usr/bin/time}"
 FLOWLOG_RUN_TIMEOUT="${FLOWLOG_RUN_TIMEOUT:-86400}"
@@ -133,6 +99,8 @@ for var in TIME_PCT RSS_PCT NUM_RUNS WORKERS; do
     [[ "$val" =~ ^[0-9]+$ ]] \
         || { echo "ERROR: PERF_COMPARE_$var must be a non-negative integer (got: $val)" >&2; exit 2; }
 done
+(( NUM_RUNS > 0 && WORKERS > 0 )) || { echo "ERROR: runs and workers must be positive" >&2; exit 2; }
+export LC_ALL=C
 
 # log accepts either form so engine_compiler_run (3-arg) and our own
 # 1-arg [perf-compare] callers can share the function:
@@ -146,7 +114,7 @@ log() {
         printf '%s[perf-compare]%s %s\n' "${BLUE}" "${NC}" "$*" >&2
     fi
 }
-die() { printf '%s[ERROR]%s %s\n' "${RED}" "${NC}" "$*" >&2; exit 1; }
+die() { printf '%s[ERROR]%s %s\n' "${RED}" "${NC}" "$*" >&2; exit 3; }
 
 [[ -x "$TIME_BIN" ]] || die "GNU /usr/bin/time not found at $TIME_BIN; apt install time"
 
@@ -155,28 +123,9 @@ die() { printf '%s[ERROR]%s %s\n' "${RED}" "${NC}" "$*" >&2; exit 1; }
 # pick a median for the flowlog compiler.
 source "${ROOT_DIR}/scripts/engines/compiler.sh"
 
-# ----------------------------------------------------------------------
-# Resolve shas via scripts/get_flowlog.sh — both BASE and HEAD are *fetched*
-# inputs in the bench repo (no in-tree HEAD assumption like the original
-# in-flowlog version). FLOWLOG_BASE and FLOWLOG_HEAD env vars override
-# the positional args (matches the AGENTS.md "Specifying which flowlog
-# commit to bench" call shape).
-# ----------------------------------------------------------------------
+# Environment refs take precedence over positional refs for Make callers.
 BASE_REF="${FLOWLOG_BASE:-$BASE_SHA}"
 HEAD_REF="${FLOWLOG_HEAD:-$HEAD_SHA}"
-
-log "fetching + building BASE: $BASE_REF"
-read BASE_FULL BASE_SHORT BASE_TREE < <(FLOWLOG_REF="$BASE_REF" bash "${ROOT_DIR}/scripts/get_flowlog.sh" | tail -1)
-[[ -n "${BASE_FULL:-}" ]] || { echo "ERROR: get_flowlog.sh failed for BASE=$BASE_REF" >&2; exit 3; }
-
-log "fetching + building HEAD: $HEAD_REF"
-read HEAD_FULL HEAD_SHORT HEAD_TREE < <(FLOWLOG_REF="$HEAD_REF" bash "${ROOT_DIR}/scripts/get_flowlog.sh" | tail -1)
-[[ -n "${HEAD_FULL:-}" ]] || { echo "ERROR: get_flowlog.sh failed for HEAD=$HEAD_REF" >&2; exit 3; }
-
-if [[ "$BASE_FULL" == "$HEAD_FULL" ]]; then
-    echo "ERROR: BASE and HEAD resolve to the same sha ($BASE_FULL); nothing to compare" >&2
-    exit 2
-fi
 
 # ----------------------------------------------------------------------
 # Parse the config: one `<prog>=<dataset>` per line, blanks/comments
@@ -184,6 +133,8 @@ fi
 # the same files can be reused across both tools.
 # ----------------------------------------------------------------------
 PAIRS=()
+PROGRAM_HASHES=()
+declare -A ARTIFACT_KEYS=()
 while IFS= read -r raw || [[ -n "$raw" ]]; do
     line="${raw%%#*}"
     line="${line#"${line%%[![:space:]]*}"}"
@@ -193,10 +144,59 @@ while IFS= read -r raw || [[ -n "$raw" ]]; do
         line="${BASH_REMATCH[1]}"
     done
     [[ "$line" == *=* ]] || { echo "ERROR: malformed pair (expected '<prog>=<dataset>'): $raw" >&2; exit 2; }
+    prog="${line%%=*}"; ds="${line#*=}"
+    [[ "$prog" =~ ^[a-zA-Z0-9_/-]+\.dl$ && "$prog" != /* && "$ds" =~ ^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$ ]] \
+        || { echo "ERROR: invalid program/dataset: $line" >&2; exit 2; }
+    if [[ "$prog" == */* ]]; then prog_path="$PROG_DIR/$prog"; else prog_path="$PROG_DIR/${prog%.dl}/default.dl"; fi
+    [[ -f "$prog_path" ]] || { echo "ERROR: program missing: $prog_path" >&2; exit 2; }
+    artifact_key="${prog%.dl}_${ds}"; artifact_key="${artifact_key//\//%}"
+    [[ -z "${ARTIFACT_KEYS[$artifact_key]:-}" ]] \
+        || { echo "ERROR: pairs share an artifact name: $line and ${ARTIFACT_KEYS[$artifact_key]}" >&2; exit 2; }
+    ARTIFACT_KEYS[$artifact_key]="$line"
+    PROGRAM_HASHES+=("$(sha256sum "$prog_path")")
     PAIRS+=("$line")
 done < "$CONFIG_FILE"
 
 (( ${#PAIRS[@]} > 0 )) || { echo "ERROR: config has no pairs: $CONFIG_FILE" >&2; exit 2; }
+
+# Capture the command's exit status directly. Process substitution + tail used
+# to mask fetch/build failures and could continue with empty or stale paths.
+for side in BASE HEAD; do
+    ref_var="${side}_REF"
+    log "fetching + building $side: ${!ref_var}"
+    resolved=$(FLOWLOG_REF="${!ref_var}" bash "${ROOT_DIR}/scripts/get_flowlog.sh") || {
+        rc=$?
+        [[ "$rc" == 2 ]] && exit 2
+        die "get_flowlog.sh failed for $side=${!ref_var}"
+    }
+    IFS=$'\t' read -r full short tree <<< "$resolved"
+    [[ "$full" =~ ^[0-9a-f]{40,64}$ && "$short" == "${full:0:12}" && -x "$tree/target/release/flowlog-compiler" ]] \
+        || die "invalid build returned for $side"
+    printf -v "${side}_FULL" '%s' "$full"
+    printf -v "${side}_SHORT" '%s' "$short"
+    printf -v "${side}_TREE" '%s' "$tree"
+    printf -v "${side}_COMPILER_SHA256" '%s' "$(sha256sum "$tree/target/release/flowlog-compiler" | cut -d ' ' -f1)"
+    toolchain=""
+    if command -v rustup >/dev/null; then
+        toolchain=$(cd "$tree/src" && rustup show active-toolchain) || die "cannot select toolchain"
+        toolchain="${toolchain%% *}"
+    fi
+    printf -v "${side}_RUSTUP_TOOLCHAIN" '%s' "$toolchain"
+    printf -v "${side}_TOOL_VERSIONS" '%s' "$(cd "$tree/src" && cargo --version && rustc -vV)"
+done
+# Prevent another job from rebuilding these cached binaries under different
+# flags/toolchains while this run measures them.
+exec 7>"$(dirname "$BASE_TREE")/.fetch.lock"
+flock -s 7
+for side in BASE HEAD; do
+    tree_var="${side}_TREE"; hash_var="${side}_COMPILER_SHA256"
+    [[ "$(sha256sum "${!tree_var}/target/release/flowlog-compiler" | cut -d ' ' -f1)" == "${!hash_var}" ]] \
+        || die "compiler changed during preparation; use a job-specific FLOWLOG_CACHE_DIR"
+done
+if [[ "$BASE_FULL" == "$HEAD_FULL" ]]; then
+    echo "ERROR: BASE and HEAD resolve to the same sha ($BASE_FULL); nothing to compare" >&2
+    exit 2
+fi
 
 # ----------------------------------------------------------------------
 # BASE and HEAD trees are populated by scripts/get_flowlog.sh above.
@@ -208,22 +208,15 @@ log "head sha           : $HEAD_FULL  ($HEAD_TREE)"
 log "tolerances         : time +${TIME_PCT}%, peak RSS +${RSS_PCT}%"
 log "bench knobs        : NUM_RUNS=$NUM_RUNS, WORKERS=$WORKERS"
 
-# ----------------------------------------------------------------------
-# Durable per-run output dir under results/regression/.
-# Honours AGENTS.md principle 3 (scripts only write to results/) and
-# gives principle 6 something to anchor the run_info.txt manifest to.
-#
-# Strict resume: a re-run with the SAME OUT_DIR but a different identity
-# (workers, num_runs, tolerances, config sha) hard-fails so we don't
-# silently clobber a previous A/B result. --fresh wipes and starts over.
-# ----------------------------------------------------------------------
+# Guard the result directory before replacing any measurements.
 OUT_DIR="${ROOT_DIR}/results/regression/${BASE_SHORT}_vs_${HEAD_SHORT}"
 mkdir -p "$OUT_DIR"
+# Keep the lock outside OUT_DIR so --fresh cannot remove a held lock.
+exec 8>"${OUT_DIR}.lock"
+flock -n 8 || die "another regression run is using $OUT_DIR"
 SUMMARY_TSV="${OUT_DIR}/summary.tsv"
 
-# Write the run_info.txt manifest now (before benching). The manifest
-# captures BOTH refs, so a year from now you can reproduce the exact
-# A/B even if both refs have moved or been rewritten.
+# Record the resolved commits and measurement parameters.
 RUN_INFO_BENCH_ROOT="$ROOT_DIR"
 RUN_INFO_RUNNER="regression.sh"
 RUN_INFO_CONFIG_PATH="$CONFIG_FILE"
@@ -248,25 +241,31 @@ guard_run_info "$OUT_DIR" \
         "base_sha=${BASE_FULL}" \
         "head_ref=${HEAD_REF}" \
         "head_sha=${HEAD_FULL}" \
+        "build_mode=compiler-build-dir-runtime-check" \
+        "base_compiler_sha256=${BASE_COMPILER_SHA256}" \
+        "head_compiler_sha256=${HEAD_COMPILER_SHA256}" \
+        "base_tools_sha256=$(printf '%s' "$BASE_TOOL_VERSIONS" | sha256sum | cut -d ' ' -f1)" \
+        "head_tools_sha256=$(printf '%s' "$HEAD_TOOL_VERSIONS" | sha256sum | cut -d ' ' -f1)" \
+        "rustflags=${CARGO_ENCODED_RUSTFLAGS-${RUSTFLAGS:-}}" \
+        "extra_fl_flags=${EXTRA_FL_FLAGS:-}" \
+        "str_intern=$([[ "${FL_NO_STR_INTERN:-0}" == 1 ]] && echo off || echo on)" \
+        "run_timeout=${FLOWLOG_RUN_TIMEOUT}" \
+        "programs_sha256=$(printf '%s\n' "${PROGRAM_HASHES[@]}" | sha256sum | cut -d ' ' -f1)" \
+        "fact_dir=${FACT_DIR}" \
         "time_pct=${TIME_PCT}" \
         "rss_pct=${RSS_PCT}" \
-    || die "resume blocked — see diff above. Use --fresh to start over."
+    || die "run parameters changed — use --fresh to replace previous results."
 log "output dir         : $OUT_DIR"
+# A failed new attempt must not leave a previous passing summary in place.
+rm -f "$SUMMARY_TSV"
+for side in base head; do
+    tree_var="${side^^}_TREE"; tools_var="${side^^}_TOOL_VERSIONS"
+    mkdir -p "$OUT_DIR/$side"
+    cp "${!tree_var}/src/Cargo.lock" "$OUT_DIR/$side/compiler.Cargo.lock"
+    printf '%s\n' "${!tools_var}" > "$OUT_DIR/$side/toolchain.txt"
+done
 
-# ----------------------------------------------------------------------
-# bench_pair <tree_path> <prog_rel> <dataset_name> <sublabel>
-#
-# Thin wrapper around engine_compiler_run: sets COMPILER_BIN + LOG_DIR
-# for the given <tree_path>, runs the engine adapter, then reads the
-# median time + median RSS back out of the sidecars it writes.
-#
-# <sublabel> is "base" or "head" — selects ${OUT_DIR}/<sublabel>/ as
-# this call's LOG_DIR so per-tree per-pair logs are kept side-by-side
-# under the run's results dir.
-#
-# Emits "<median_sec> <median_kb>" on stdout; returns 1 on any failure
-# (missing binary, all runs failed).
-# ----------------------------------------------------------------------
+# Run one revision; return "<median seconds> <median RSS KiB>".
 bench_pair() {
     local tree="$1" prog="$2" ds="$3" sublabel="$4"
     COMPILER_BIN="${tree}/target/release/flowlog-compiler"
@@ -275,6 +274,13 @@ bench_pair() {
     # to crates.io yet, and mixing those versions makes codegen fail.
     FLOWLOG_RUNTIME_PATH="${tree}/src/flowlog-runtime"
     export FLOWLOG_RUNTIME_PATH
+    export FLOWLOG_VERIFY_RUNTIME=1 FLOWLOG_STRICT_RUNS=1
+    # Select the same toolchain in Cargo's generated-project working directory.
+    local toolchain_var="${sublabel^^}_RUSTUP_TOOLCHAIN"
+    if [[ -n "${!toolchain_var}" ]]; then export RUSTUP_TOOLCHAIN="${!toolchain_var}"; fi
+    # Old compilers assume target/ is inside their scratch directory. Neither
+    # revision may inherit an unrelated shared target directory from CI.
+    unset CARGO_TARGET_DIR CARGO_BUILD_TARGET_DIR
     LOG_DIR="${OUT_DIR}/${sublabel}"
     mkdir -p "$LOG_DIR"
 
@@ -284,12 +290,13 @@ bench_pair() {
     engine_compiler_run "$prog" "$ds" || return 1
 
     # Read back the medians from engine_compiler_run's sidecar layout.
-    local stem; stem="$(basename "$prog" .dl)"
+    local stem; stem="$(engine_compiler_stem "$prog")"
     local best_log="${LOG_DIR}/${stem}_${ds}_compiler.log"
     local sec rss
     sec=$(extract_total_seconds "$best_log")
     rss=$(cat "${best_log}.median_rss_kb" 2>/dev/null || echo "N/A")
-    [[ "$sec" =~ ^[0-9] ]] || return 1
+    [[ "$sec" =~ ^[0-9]+\.[0-9]+$ && "$rss" =~ ^[0-9]+$ ]] || return 1
+    awk -v t="$sec" -v r="$rss" 'BEGIN { exit !(t > 0 && r > 0) }' || return 1
     printf '%s %s\n' "$sec" "${rss:-N/A}"
 }
 
@@ -339,6 +346,7 @@ done
 # ----------------------------------------------------------------------
 ROWS=()
 FAILED=0
+MEASURE_FAILED=0
 
 for pair in "${PAIRS[@]}"; do
     b_sec="${B_SEC[$pair]:-}"; h_sec="${H_SEC[$pair]:-}"
@@ -346,7 +354,7 @@ for pair in "${PAIRS[@]}"; do
 
     if [[ -z "$b_sec" || -z "$h_sec" ]]; then
         ROWS+=("${pair}|${b_sec:-N/A}|${h_sec:-N/A}|N/A|${b_kb:-N/A}|${h_kb:-N/A}|N/A|MEASURE_FAIL")
-        FAILED=1
+        MEASURE_FAILED=1
         continue
     fi
 
@@ -380,11 +388,9 @@ PY
 done
 
 SINK=1
-[[ "$FAILED" = "1" ]] && SINK=2
+(( FAILED || MEASURE_FAILED )) && SINK=2
 
-# Persist summary as TSV alongside the run_info.txt manifest. This is
-# the durable artifact that makes regression runs reconstructable
-# (principle 6) without having to scroll back through stdout.
+# Persist the verdict beside the logs and run parameters.
 {
     printf 'pair\tbase_sec\thead_sec\ttime_pct\tbase_kb\thead_kb\trss_pct\tverdict\n'
     for row in "${ROWS[@]}"; do
@@ -410,7 +416,9 @@ SINK=1
             "$pair" "$bs" "$hs" "$tp" "$bk" "$hk" "$rp" "$color" "$v" "$NC"
     done
     printf '\n'
-    if (( FAILED )); then
+    if (( MEASURE_FAILED )); then
+        printf '%sMEASUREMENT FAILED%s — incomplete or invalid measurements; no passing verdict\n' "$RED" "$NC"
+    elif (( FAILED )); then
         printf '%sREGRESSION%s — at least one pair exceeded a tolerance\n' "$RED" "$NC"
     else
         printf '%sALL OK%s — every pair within tolerances\n' "$GREEN" "$NC"
@@ -418,4 +426,5 @@ SINK=1
     printf '\n'
 } >&$SINK
 
+(( MEASURE_FAILED )) && exit 3
 exit $FAILED

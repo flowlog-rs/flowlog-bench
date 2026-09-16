@@ -2,19 +2,13 @@
 # flowlog-bench/Makefile — single source of entry points for perf workflows.
 # =============================================================================
 #
-# Per AGENTS.md design principle 4 ("One Make target per task, no full-
-# sweep orchestrator"): each script already iterates over its
-# (program × dataset) pairs internally, so a wrapper that calls all
-# three would just be glue. If a consumer wants "run everything," it
-# chains the three targets itself — same script-library philosophy as
-# the flowlog repo.
-#
 # Targets:
 #   help                       — print this help block
 #   env                        — one-time host bootstrap (souffle, duckdb, rust, …)
 #   get-flowlog                — fetch + build flowlog at FLOWLOG_REF (default: main)
 #   cross-engine               — flowlog vs. {soufflé, egglog, interpreter, …} at one ref
 #   regression                 — machine-aware pinned FlowLog BASE-vs-HEAD check
+#   test-regression            — offline Git/Cargo regression harness tests
 #   gen-joinorder-variants     — regenerate join-order variant .dl files
 #   cross-joinorder            — sweep every join-order variant per (program, ds)
 #   joinorder-summary          — per-pair fastest/median/slowest report
@@ -23,8 +17,7 @@
 #   clean                      — wipe results/ (keeps facts/ and flowlog/ caches)
 #   distclean                  — also wipes flowlog/ build cache (forces re-fetch)
 #
-# Standard call shapes (see AGENTS.md, "Specifying which flowlog commit
-# to bench"):
+# Examples:
 #
 #   make cross-engine                                    # default ref = main
 #   FLOWLOG_REF=abc1234 make cross-engine                # specific commit
@@ -51,7 +44,7 @@ LDBC_CONFIG ?= $(CONFIG_DIR)/ldbc.txt
 PLOT_CSV     ?= $(ROOT_DIR)/results/benchmark/comparison_results.csv
 PLOT_ENGINES ?= flowlog,souffle
 
-.PHONY: help env get-flowlog cross-engine regression \
+.PHONY: help env get-flowlog cross-engine regression test-regression \
         cross-joinorder gen-joinorder-variants joinorder-summary \
         ldbc plot clean distclean
 
@@ -111,6 +104,9 @@ regression:
 	 bash $(SCRIPTS)/regression.sh \
 	    $(if $(filter 1,$(KEEP_DATASETS)),--keep-datasets,) \
 	    "$(FLOWLOG_BASE)" "$(FLOWLOG_HEAD)" "$(REGRESSION_CONFIG)"
+
+test-regression:
+	@python3 -m unittest discover -s tests -v
 
 # -----------------------------------------------------------------------------
 # gen-joinorder-variants: regenerate per-program join-order variants

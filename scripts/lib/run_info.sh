@@ -120,9 +120,8 @@ write_run_info() {
 
     {
         cat <<EOF
-# Reproducibility manifest (AGENTS.md principle 6). The CSV beside this
-# file was produced under the parameters below. cross_engine.sh hard-
-# fails on resume if any identity field changes (use --fresh to override).
+# Parameters for results in this directory. A runner's reuse guard rejects
+# changed identity fields; --fresh replaces previous results.
 date            : $(date -u +%Y-%m-%dT%H:%M:%SZ)
 host            : $(hostname 2>/dev/null || echo unknown)
 os              : $(uname -srm 2>/dev/null || echo unknown)

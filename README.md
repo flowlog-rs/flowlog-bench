@@ -46,6 +46,8 @@ matrix.
 | Variable | Default | Effect |
 | --- | --- | --- |
 | `FLOWLOG_REF` | `main` | FlowLog branch / tag / SHA to fetch + build |
+| `FLOWLOG_REPO` | `https://github.com/flowlog-rs/flowlog.git` | source repository, including a local Git repository |
+| `FLOWLOG_CACHE_DIR` | `flowlog/` | source/build cache; use separate directories for different repositories or concurrent CI jobs |
 | `ENGINES` | `souffle` | comma list: `souffle`, `interpreter`, `ddlog`, `ascent`, `egglog`, `none` |
 | `CONFIG` | `config/default.txt` for `cross-engine`, `config/joinorder.txt` for `cross-joinorder` | which `<prog>=<dataset>` list to run |
 | `LDBC_CONFIG` | `config/ldbc.txt` | config slot used by `make ldbc` |
@@ -92,9 +94,9 @@ Console summary at end of a cross-engine run:
 
 `make plot` renders `comparison_results.{pdf,svg}` next to the CSV.
 
-### Resume vs. fresh
+### Existing results vs. fresh
 
-The resumable runners write results incrementally and **hard-fail on resume if the run identity changed** (different `ENGINES` / `FLOWLOG_REF` / `WORKERS` / affinity / `NUM_RUNS` / config hash / tolerances). The identity is recorded in a `run_info.txt` sidecar; re-running with anything different produces a colored diff and exits non-zero. Use `--fresh` to start over:
+Runners record their parameters in `run_info.txt` and refuse to reuse a result directory with different settings (engines, refs, workers, affinity, run count, config hash or tolerances). Regression remeasures all pairs; it does not resume partially completed measurements. Use `--fresh` to replace existing results:
 
 ```bash
 bash scripts/cross_engine.sh --fresh                            # wipes results/benchmark/
@@ -102,3 +104,43 @@ bash scripts/joinorder/cross_joinorder.sh --fresh               # wipes results/
 bash scripts/regression.sh --fresh BASE HEAD CONFIG             # wipes the BASE_vs_HEAD dir
 make clean                                                      # wipes all of results/
 ```
+
+### Regression in CI
+
+```bash
+FLOWLOG_BASE=v0.5.0 FLOWLOG_HEAD=refs/heads/main \
+KEEP_DATASETS=1 make regression
+make test-regression                       # offline Git/Cargo integration tests
+```
+
+Refs can be tags, branches, full/abbreviated commits, or explicit remote refs
+such as `refs/pull/123/head`. Ambiguous branch/tag names require a `refs/heads/`
+or `refs/tags/` prefix. Each ref is resolved to a commit and built with
+`cargo build --release --locked` in a clean checkout. Cargo manages build reuse.
+
+The compiler receives `FLOWLOG_RUNTIME_PATH` from the same checkout. Regression
+uses its native `-B` option to keep the generated project, then checks
+`cargo metadata --locked` **before timing**. Both old `[patch.crates-io]` and new
+`path` dependencies work. A missing or mismatched runtime fails the run.
+
+The compiler workspace and generated program have separate lockfiles. Generated
+third-party dependencies follow that compiler's emitted manifest; their actual
+versions are recorded in `base/generated/<pair>/Cargo.lock` and
+`head/generated/<pair>/Cargo.lock`, alongside sources and `metadata.json`.
+The corresponding compiler lockfiles and toolchain versions are saved per side.
+A commit alone does not specify historical versions of dependencies it never
+locked. Keep these artifacts; this is not a hermetic build environment.
+
+The gate compares median **FlowLog execution time** and median peak RSS, not
+process wall time or compilation time. Every requested attempt must succeed
+with valid metrics. Direct script exit codes are `0` for pass, `1` for a measured
+regression, `2` for invalid inputs, and `3` for build/measurement errors. Use
+`bash scripts/regression.sh --keep-datasets BASE HEAD CONFIG` if CI needs these
+codes; Make maps recipe failures to its own exit code.
+
+Each invocation measures every pair again. The parameter guard prevents mixing
+runs with different settings; it does not skip completed pairs. `--fresh`
+removes the previous result directory. Generated Rust build artifacts are
+removed after each successful compile to limit disk use. `-B` uses the selected
+compiler's normal persistent-project build profile. Pin `RUSTUP_TOOLCHAIN` and
+use controlled hardware for CI performance comparisons.
