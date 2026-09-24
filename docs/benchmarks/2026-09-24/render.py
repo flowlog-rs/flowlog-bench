@@ -16,7 +16,7 @@ import numpy as np
 
 
 HERE = Path(__file__).resolve().parent
-COLORS = ("#1576A4", "#BC916B")
+COLORS = ("#0087B9", "#F5A623")
 LABELS = ("FlowLog", "Soufflé")
 INK = "#193447"
 MUTED = "#5C6B75"
@@ -111,18 +111,14 @@ def draw_panel(ax, rows, title, metric):
         ax.bar(positions + offset, data, width, label=label, color=color,
                linewidth=0, zorder=3)
     ratios = values[1] / values[0]
-    ratio_mean = geomean(ratios)
     if memory:
-        detail = f"{ratio_mean:.2f}× geometric mean RSS · Soufflé / FlowLog"
         ax.set_ylabel("Peak RSS (GiB)")
         ax.set_ylim(0, max(map(max, values)) * 1.18)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     else:
-        wins = sum(value > 1 for value in ratios)
-        detail = f"{ratio_mean:.2f}× geometric mean speedup · {wins}/{len(rows)} faster"
         ax.set_yscale("log")
         ax.yaxis.set_major_locator(LogLocator(base=10))
-        ax.set_ylabel("Run time (seconds, log scale)")
+        ax.set_ylabel("Run time (s, log)")
         ax.set_ylim(10 ** math.floor(math.log10(min(map(min, values)))),
                     max(map(max, values)) * 2.0)
     ax.yaxis.set_major_formatter(FuncFormatter(
@@ -130,9 +126,8 @@ def draw_panel(ax, rows, title, metric):
     ))
     ax.yaxis.set_minor_locator(NullLocator())
     ax.grid(axis="y", color=GRID, linewidth=0.7)
-    ax.set_title(title, loc="left", fontsize=12, fontweight=700, pad=16)
-    ax.text(1, 1.055, detail, transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=10.5, color=MUTED if memory else COLORS[0])
+    if title:
+        ax.set_title(title, loc="left", fontsize=12, fontweight=700, pad=16)
     labels = [
         r["dataset"] if r["program"] == "doop" else f"{r['program']}/{r['dataset']}"
         for r in rows
@@ -151,31 +146,21 @@ def draw_panel(ax, rows, title, metric):
 
 
 def render(groups, stem, metric):
-    height = 6.2 if len(groups) == 1 else 16.4
+    single = len(groups) == 1
+    height = 4.8 if single else 14.2
     fig, axes = plt.subplots(len(groups), 1, figsize=(16, height), squeeze=False)
-    fig.subplots_adjust(left=0.068, right=0.985, top=1 - 1.3 / height,
-                        bottom=1.22 / height, hspace=0.60)
-    description = "Peak memory" if metric == "memory" else "Run time"
-    fig.text(0.068, 1 - 0.30 / height, "FlowLog vs Soufflé",
-             fontsize=20, fontweight=700, va="top")
-    fig.text(0.068, 1 - 0.73 / height,
-             f"{description}  ·  32 threads  ·  batch mode  ·  median of 3 runs",
-             fontsize=10.5, color=MUTED, va="top")
+    fig.subplots_adjust(left=0.068, right=0.985,
+                        top=1 - (0.45 if single else 0.80) / height,
+                        bottom=(0.85 if single else 1.05) / height, hspace=0.60)
+    fig.text(0.068, 1 - 0.15 / height, "Ratios: Soufflé / FlowLog",
+             fontsize=9, color=MUTED, va="top")
     for ax, (title, rows) in zip(axes[:, 0], groups):
-        draw_panel(ax, rows, title, metric)
+        draw_panel(ax, rows, "" if single else title, metric)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False,
-               bbox_to_anchor=(0.985, 1 - 0.30 / height), borderaxespad=0,
+               bbox_to_anchor=(0.985, 1 - 0.15 / height), borderaxespad=0,
                handlelength=1.4, handleheight=0.8, columnspacing=1.6,
                fontsize=10.5)
-    coverage = ("50 supported comparisons; 5 unsupported cases omitted"
-                if len(groups) > 1 else "All 20 DOOP datasets, including Jython")
-    fig.text(0.068, 0.39 / height,
-             "Compiler 0.7.0 · runtime 0.5.0 · Soufflé 2.5 · September 24, 2026",
-             color=MUTED, fontsize=8.5)
-    fig.text(0.068, 0.15 / height,
-             f"Loading included · compilation excluded · labels = Soufflé / FlowLog · {coverage}",
-             color=MUTED, fontsize=8.5)
     for extension in ("png", "svg"):
         metadata = {"Date": None} if extension == "svg" else None
         path = HERE / f"{stem}.{extension}"
@@ -233,8 +218,8 @@ FlowLog/Soufflé peak-RSS ratio was **{memory_ratio:.2f}×**.
 
 The panels separate graph/reasoning, program analysis, and DOOP so all labels
 remain readable. Within each panel, both charts use descending runtime speedup
-order. FlowLog uses its logo's blue (`#1576A4`); Soufflé uses muted copper
-(`#BC916B`). Ubuntu typography matches
+order. FlowLog uses light-theme blue (`#0087B9`); Soufflé uses orange
+(`#F5A623`). Ubuntu typography matches
 [FlowLog's brand font](https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css),
 with bold headings and light gridlines.
 

@@ -18,8 +18,8 @@ FlowLog/Soufflé peak-RSS ratio was **1.88×**.
 
 The panels separate graph/reasoning, program analysis, and DOOP so all labels
 remain readable. Within each panel, both charts use descending runtime speedup
-order. FlowLog uses its logo's blue (`#1576A4`); Soufflé uses muted copper
-(`#BC916B`). Ubuntu typography matches
+order. FlowLog uses light-theme blue (`#0087B9`); Soufflé uses orange
+(`#F5A623`). Ubuntu typography matches
 [FlowLog's brand font](https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css),
 with bold headings and light gridlines.
 

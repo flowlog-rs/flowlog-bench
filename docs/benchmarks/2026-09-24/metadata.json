@@ -128,8 +128,8 @@
     ]
   },
   "plot_style": {
-    "flowlog": "#1576A4",
-    "souffle": "#BC916B",
+    "flowlog": "#0087B9",
+    "souffle": "#F5A623",
     "font_family": "Ubuntu",
     "font_weights": [400, 700],
     "font_source": "https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css",
