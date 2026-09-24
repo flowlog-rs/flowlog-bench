@@ -18,9 +18,9 @@
 #                + host + worker count + wall-clock for reproducibility.
 # --------------------------------------------------------------------
 
-/flowlog/
+/flowlog
 /facts
-/results/
+/results
 
 # scratch / OS / editor noise
 .DS_Store

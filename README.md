@@ -2,6 +2,24 @@
 
 Performance benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog) Datalog engine. 
 
+## Recorded results: September 24, 2026
+
+FlowLog **compiler 0.7.0 / runtime 0.5.0**, batch mode, versus **Soufflé 2.5**,
+both with **32 threads**. Median process wall time over three runs, with input
+loading included and compilation excluded.
+
+| Scope | FlowLog faster | Geometric-mean speedup |
+|---|---:|---:|
+| All 50 supported comparisons | 49/50 | **5.78×** |
+| All 20 DOOP datasets | 20/20 | **3.68×** |
+
+![DOOP runtime comparison, FlowLog versus Soufflé at 32 threads](docs/benchmarks/2026-09-24/doop-time.png)
+
+[Full results table, runtime and memory plots, and methodology](docs/benchmarks/2026-09-24/README.md)
+· [CSV](docs/benchmarks/2026-09-24/all_results.csv).
+Five CC/SSSP cases have no Soufflé translation and are recorded as unsupported.
+Soufflé used less peak RAM in every completed comparison.
+
 ## Setup
 
 Ubuntu only. ~50 GB free for the FlowLog build cache + dataset cache.
@@ -53,6 +71,7 @@ matrix.
 | `LDBC_CONFIG` | `config/ldbc.txt` | config slot used by `make ldbc` |
 | `WORKERS` | `min(32, available physical cores)` | thread count, applied identically to every engine |
 | `NUM_RUNS` | `3` | timed runs per pair (median is kept) |
+| `SOUFFLE_PROFILE_SPLIT` | `1` | extra, untimed profiled run for load/exec estimates; set `0` for total-time comparisons only |
 | `FLOWLOG_RUN_TIMEOUT` | `1800` | seconds before SIGTERM on one attempt |
 | `KEEP_DATASETS` | `0` | delete each dataset after its pair runs (saves disk); set `1` to keep them across pairs (faster on resume) |
 
@@ -61,6 +80,10 @@ NUMA nodes that can supply the worker count. A single selected node uses local
 memory binding; multiple nodes use interleaved memory. The current cgroup CPU
 allowance is always respected. Set `BENCH_NUMA_NODES`, `BENCH_CPUS`, or
 `BENCH_NO_PIN=1` only when deliberately overriding that policy.
+
+Souffle timed binaries are compiled without profiling and receive `-j WORKERS`
+both during compilation and execution. Profiled binaries, when requested for
+the load/exec split, are separate and never used for the timed samples.
 
 > **If `facts/` lives on a shared / remote filesystem, always set `KEEP_DATASETS=1`** — otherwise each dataset is deleted after its pair runs. (When `facts/` is a symlink the script refuses to `rm -rf` through it as a safety net, but a bind-mounted or NFS-mounted real directory has no such guard.)
 

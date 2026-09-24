@@ -1,0 +1,25 @@
+{
+  "all_comparable": {
+    "cases": 50,
+    "flowlog_faster": 49,
+    "souffle_faster": 1,
+    "geomean_souffle_over_flowlog": 5.776136848514672,
+    "souffle_lower_peak_rss": 50,
+    "geomean_flowlog_over_souffle_peak_rss": 1.8808216758256056
+  },
+  "doop": {
+    "cases": 20,
+    "flowlog_faster": 20,
+    "souffle_faster": 0,
+    "geomean_souffle_over_flowlog": 3.6782846742277924,
+    "souffle_lower_peak_rss": 20,
+    "geomean_flowlog_over_souffle_peak_rss": 2.2015497281328407
+  },
+  "coverage": {
+    "canonical_cases": 55,
+    "requested_comparisons": 50,
+    "unsupported": 5,
+    "completed_comparisons": 50,
+    "failed_or_incomplete": 0
+  }
+}
