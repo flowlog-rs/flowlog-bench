@@ -18,7 +18,8 @@ FlowLog/Soufflé peak-RSS ratio was **1.88×**.
 
 The panels separate graph/reasoning, program analysis, and DOOP so all labels
 remain readable. Within each panel, both charts use descending runtime speedup
-order. Blue is FlowLog; orange is Soufflé, matching the engine README's style.
+order. FlowLog uses its logo's blue (`#1576A4`); Soufflé uses muted copper
+(`#BC916B`). Inter typography and light gridlines keep the plots readable.
 
 ![All 50 runtime comparisons, grouped by workload family](all-time.png)
 
@@ -155,7 +156,9 @@ cross-version regressions are outside this comparison.
 - [Machine-readable provenance](metadata.json).
 - [Render script](render.py): reproduces the figures and this document, without rerunning benchmarks.
 
-With Python, Matplotlib, and NumPy installed, run from the repository root:
+With Python, Matplotlib, NumPy, and the Inter font installed, run from the
+repository root. On Ubuntu/Debian the font package is `fonts-inter`.
+SVG text is saved as outlines so the typography is preserved on other systems.
 
 ```bash
 python3 docs/benchmarks/2026-09-24/render.py

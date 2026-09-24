@@ -9,14 +9,18 @@ import statistics
 import matplotlib
 
 matplotlib.use("Agg")
+from matplotlib import font_manager
 import matplotlib.pyplot as plt
-from matplotlib.ticker import LogLocator
+from matplotlib.ticker import FuncFormatter, LogLocator, MaxNLocator, NullLocator
 import numpy as np
 
 
 HERE = Path(__file__).resolve().parent
-COLORS = ("#2F6FED", "#F5A623")
-LABELS = ("FlowLog (-w 32)", "Soufflé (-j 32)")
+COLORS = ("#1576A4", "#BC916B")
+LABELS = ("FlowLog", "Soufflé")
+INK = "#193447"
+MUTED = "#5C6B75"
+GRID = "#E8EEF2"
 GRAPH = {"tc", "sg", "reach", "bipartite", "dyck", "crdt", "galen"}
 ANALYSIS = {"andersen", "polonius_str", "cspa", "csda", "cvc5", "z3"}
 METRICS = (
@@ -24,18 +28,34 @@ METRICS = (
     "flowlog_peak_rss_mib", "souffle_peak_rss_mib",
 )
 
+# Matplotlib's cached font list can predate the Inter installation.
+for font in sorted(font_manager.findSystemFonts()):
+    if Path(font).stem in {"Inter-Regular", "Inter-SemiBold"}:
+        font_manager.fontManager.addfont(font)
+try:
+    font_manager.findfont("Inter", fallback_to_default=False)
+except ValueError as error:
+    raise RuntimeError(
+        "Rendering requires the Inter font (Ubuntu/Debian package: fonts-inter)."
+    ) from error
+
 plt.rcParams.update({
-    "font.family": "DejaVu Sans",
+    "font.family": "Inter",
     "font.size": 11,
-    "text.color": "#333333",
-    "axes.labelcolor": "#333333",
-    "xtick.color": "#333333",
-    "ytick.color": "#333333",
+    "text.color": INK,
+    "axes.labelcolor": MUTED,
+    "axes.labelpad": 10,
+    "axes.edgecolor": "#C8D3DA",
+    "axes.linewidth": 0.7,
+    "xtick.color": MUTED,
+    "ytick.color": MUTED,
+    "axes.spines.left": False,
     "axes.spines.top": False,
     "axes.spines.right": False,
+    "axes.axisbelow": True,
     "figure.facecolor": "white",
     "savefig.facecolor": "white",
-    "svg.fonttype": "none",
+    "svg.fonttype": "path",
     "svg.hashsalt": "flowlog-souffle-2026-09-24",
 })
 
@@ -84,63 +104,82 @@ def draw_panel(ax, rows, title, metric):
         for engine in ("flowlog", "souffle")
     ]
     positions = np.arange(len(rows))
-    width = 0.38
+    width = 0.34
     for offset, data, label, color in zip(
         (-width / 2, width / 2), values, LABELS, COLORS
     ):
-        ax.bar(positions + offset, data, width, label=label, color=color)
+        ax.bar(positions + offset, data, width, label=label, color=color,
+               linewidth=0, zorder=3)
     ratios = values[1] / values[0]
     ratio_mean = geomean(ratios)
     if memory:
-        detail = f"Soufflé/FlowLog geomean {ratio_mean:.2f}×"
+        detail = f"{ratio_mean:.2f}× geometric mean RSS · Soufflé / FlowLog"
         ax.set_ylabel("Peak RSS (GiB)")
-        ax.set_ylim(0, max(map(max, values)) * 1.25)
+        ax.set_ylim(0, max(map(max, values)) * 1.18)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     else:
         wins = sum(value > 1 for value in ratios)
-        detail = f"FlowLog faster {wins}/{len(rows)}, geomean {ratio_mean:.2f}×"
+        detail = f"{ratio_mean:.2f}× geometric mean speedup · {wins}/{len(rows)} faster"
         ax.set_yscale("log")
         ax.yaxis.set_major_locator(LogLocator(base=10))
-        ax.set_ylabel("Run time (s, log)")
-        ax.set_ylim(min(map(min, values)) * 0.75, max(map(max, values)) * 3.0)
-    ax.set_title(f"{title}  ·  {detail}", fontsize=13, pad=14)
-    ax.legend(loc="upper right", frameon=False, ncol=2, fontsize=10)
+        ax.set_ylabel("Run time (seconds, log scale)")
+        ax.set_ylim(10 ** math.floor(math.log10(min(map(min, values)))),
+                    max(map(max, values)) * 2.0)
+    ax.yaxis.set_major_formatter(FuncFormatter(
+        lambda value, _: f"{value:,.0f}" if value >= 1 else f"{value:g}"
+    ))
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.grid(axis="y", color=GRID, linewidth=0.7)
+    ax.set_title(title, loc="left", fontsize=12, fontweight=600, pad=16)
+    ax.text(1, 1.055, detail, transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=10.5, color=MUTED if memory else COLORS[0])
     labels = [
         r["dataset"] if r["program"] == "doop" else f"{r['program']}/{r['dataset']}"
         for r in rows
     ]
     ax.set_xticks(positions)
-    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=10)
+    ax.set_xticklabels(labels, rotation=40, ha="right", rotation_mode="anchor",
+                       fontsize=10)
+    ax.tick_params(axis="x", length=0, pad=8)
+    ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
     ax.margins(x=0.025)
     for index, ratio in enumerate(ratios):
         high = max(data[index] for data in values)
-        height = high + ax.get_ylim()[1] * 0.014 if memory else high * 1.10
+        height = high + ax.get_ylim()[1] * 0.018 if memory else high * 1.12
         ax.text(index, height, f"{ratio:.2f}×", ha="center", va="bottom",
-                fontsize=9, color="#666666")
+                fontsize=9, color=MUTED)
 
 
 def render(groups, stem, metric):
-    fig, axes = plt.subplots(len(groups), 1, figsize=(18, 5.5 * len(groups)),
-                             squeeze=False)
-    description = "peak memory" if metric == "memory" else "run time"
-    fig.suptitle(
-        f"FlowLog vs Soufflé — {description}, 32 threads\n"
-        "Compiler 0.7.0 / runtime 0.5.0 · batch mode · median of 3 runs · September 24, 2026",
-        fontsize=15, y=0.995,
-    )
+    height = 6.2 if len(groups) == 1 else 16.4
+    fig, axes = plt.subplots(len(groups), 1, figsize=(16, height), squeeze=False)
+    fig.subplots_adjust(left=0.068, right=0.985, top=1 - 1.3 / height,
+                        bottom=1.22 / height, hspace=0.60)
+    description = "Peak memory" if metric == "memory" else "Run time"
+    fig.text(0.068, 1 - 0.30 / height, "FlowLog vs Soufflé",
+             fontsize=20, fontweight=600, va="top")
+    fig.text(0.068, 1 - 0.73 / height,
+             f"{description}  ·  32 threads  ·  batch mode  ·  median of 3 runs",
+             fontsize=10.5, color=MUTED, va="top")
     for ax, (title, rows) in zip(axes[:, 0], groups):
         draw_panel(ax, rows, title, metric)
-    fig.text(0.012, 0.006,
-             "Labels = Soufflé / FlowLog. Compilation excluded. "
-             "50 supported comparisons; 5 cases without a Soufflé translation are not plotted."
-             if len(groups) > 1 else
-             "Labels = Soufflé / FlowLog. Compilation excluded. All 20 DOOP datasets.",
-             color="#666666", fontsize=10)
-    fig.tight_layout(rect=(0, 0.035 if len(groups) == 1 else 0.018, 1, 1),
-                     h_pad=3.0)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper right", ncol=2, frameon=False,
+               bbox_to_anchor=(0.985, 1 - 0.30 / height), borderaxespad=0,
+               handlelength=1.4, handleheight=0.8, columnspacing=1.6,
+               fontsize=10.5)
+    coverage = ("50 supported comparisons; 5 unsupported cases omitted"
+                if len(groups) > 1 else "All 20 DOOP datasets, including Jython")
+    fig.text(0.068, 0.39 / height,
+             "Compiler 0.7.0 · runtime 0.5.0 · Soufflé 2.5 · September 24, 2026",
+             color=MUTED, fontsize=8.5)
+    fig.text(0.068, 0.15 / height,
+             f"Loading included · compilation excluded · labels = Soufflé / FlowLog · {coverage}",
+             color=MUTED, fontsize=8.5)
     for extension in ("png", "svg"):
         metadata = {"Date": None} if extension == "svg" else None
         path = HERE / f"{stem}.{extension}"
-        fig.savefig(path, dpi=140, bbox_inches="tight", metadata=metadata)
+        fig.savefig(path, dpi=160, bbox_inches="tight", metadata=metadata)
         if extension == "svg":
             path.write_text("\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n")
     plt.close(fig)
@@ -194,7 +233,8 @@ FlowLog/Soufflé peak-RSS ratio was **{memory_ratio:.2f}×**.
 
 The panels separate graph/reasoning, program analysis, and DOOP so all labels
 remain readable. Within each panel, both charts use descending runtime speedup
-order. Blue is FlowLog; orange is Soufflé, matching the engine README's style.
+order. FlowLog uses its logo's blue (`#1576A4`); Soufflé uses muted copper
+(`#BC916B`). Inter typography and light gridlines keep the plots readable.
 
 ![All 50 runtime comparisons, grouped by workload family](all-time.png)
 
@@ -275,7 +315,9 @@ cross-version regressions are outside this comparison.
 - [Machine-readable provenance](metadata.json).
 - [Render script](render.py): reproduces the figures and this document, without rerunning benchmarks.
 
-With Python, Matplotlib, and NumPy installed, run from the repository root:
+With Python, Matplotlib, NumPy, and the Inter font installed, run from the
+repository root. On Ubuntu/Debian the font package is `fonts-inter`.
+SVG text is saved as outlines so the typography is preserved on other systems.
 
 ```bash
 python3 docs/benchmarks/2026-09-24/render.py

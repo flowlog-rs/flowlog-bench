@@ -128,14 +128,19 @@
     ]
   },
   "plot_style": {
-    "flowlog": "#2F6FED",
-    "souffle": "#F5A623",
+    "flowlog": "#1576A4",
+    "souffle": "#BC916B",
+    "font_family": "Inter",
+    "svg_text": "outlines",
     "time_scale": "log",
     "memory_scale": "linear"
   },
   "render_environment": {
     "matplotlib": "3.5.1",
-    "numpy": "1.21.5"
+    "numpy": "1.21.5",
+    "inter_package": "fonts-inter 3.19+ds-2",
+    "inter_regular_sha256": "9ac0e64929eea921168b49f1b8b44e0ebbf3d04e622a317492330062109ecb78",
+    "inter_semibold_sha256": "155c881dd3d6abcff1aef44d69185123cb4d9cbe58be91e54a679fb801c7cd42"
   },
   "datasets": {
     "G10K-0.001": {
