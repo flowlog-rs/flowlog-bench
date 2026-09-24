@@ -130,7 +130,9 @@
   "plot_style": {
     "flowlog": "#1576A4",
     "souffle": "#BC916B",
-    "font_family": "Inter",
+    "font_family": "Ubuntu",
+    "font_weights": [400, 700],
+    "font_source": "https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css",
     "svg_text": "outlines",
     "time_scale": "log",
     "memory_scale": "linear"
@@ -138,9 +140,9 @@
   "render_environment": {
     "matplotlib": "3.5.1",
     "numpy": "1.21.5",
-    "inter_package": "fonts-inter 3.19+ds-2",
-    "inter_regular_sha256": "9ac0e64929eea921168b49f1b8b44e0ebbf3d04e622a317492330062109ecb78",
-    "inter_semibold_sha256": "155c881dd3d6abcff1aef44d69185123cb4d9cbe58be91e54a679fb801c7cd42"
+    "ubuntu_package": "fonts-ubuntu 0.83-6ubuntu1",
+    "ubuntu_regular_sha256": "52c1afa489ae7bfd893af6cdd9f1af258005703600449e70d338caabcff507e5",
+    "ubuntu_bold_sha256": "c90e629e932f768909bdce1481ccd259d8aff1490a4bc1cf94d5413492317336"
   },
   "datasets": {
     "G10K-0.001": {

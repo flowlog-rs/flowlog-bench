@@ -28,19 +28,19 @@ METRICS = (
     "flowlog_peak_rss_mib", "souffle_peak_rss_mib",
 )
 
-# Matplotlib's cached font list can predate the Inter installation.
+# Matplotlib's cached font list can predate the Ubuntu font installation.
 for font in sorted(font_manager.findSystemFonts()):
-    if Path(font).stem in {"Inter-Regular", "Inter-SemiBold"}:
+    if Path(font).stem in {"Ubuntu-R", "Ubuntu-B", "Ubuntu-Regular", "Ubuntu-Bold"}:
         font_manager.fontManager.addfont(font)
 try:
-    font_manager.findfont("Inter", fallback_to_default=False)
+    font_manager.findfont("Ubuntu", fallback_to_default=False)
 except ValueError as error:
     raise RuntimeError(
-        "Rendering requires the Inter font (Ubuntu/Debian package: fonts-inter)."
+        "Rendering requires the Ubuntu font (Ubuntu package: fonts-ubuntu)."
     ) from error
 
 plt.rcParams.update({
-    "font.family": "Inter",
+    "font.family": "Ubuntu",
     "font.size": 11,
     "text.color": INK,
     "axes.labelcolor": MUTED,
@@ -130,7 +130,7 @@ def draw_panel(ax, rows, title, metric):
     ))
     ax.yaxis.set_minor_locator(NullLocator())
     ax.grid(axis="y", color=GRID, linewidth=0.7)
-    ax.set_title(title, loc="left", fontsize=12, fontweight=600, pad=16)
+    ax.set_title(title, loc="left", fontsize=12, fontweight=700, pad=16)
     ax.text(1, 1.055, detail, transform=ax.transAxes, ha="right", va="bottom",
             fontsize=10.5, color=MUTED if memory else COLORS[0])
     labels = [
@@ -157,7 +157,7 @@ def render(groups, stem, metric):
                         bottom=1.22 / height, hspace=0.60)
     description = "Peak memory" if metric == "memory" else "Run time"
     fig.text(0.068, 1 - 0.30 / height, "FlowLog vs Soufflé",
-             fontsize=20, fontweight=600, va="top")
+             fontsize=20, fontweight=700, va="top")
     fig.text(0.068, 1 - 0.73 / height,
              f"{description}  ·  32 threads  ·  batch mode  ·  median of 3 runs",
              fontsize=10.5, color=MUTED, va="top")
@@ -234,7 +234,9 @@ FlowLog/Soufflé peak-RSS ratio was **{memory_ratio:.2f}×**.
 The panels separate graph/reasoning, program analysis, and DOOP so all labels
 remain readable. Within each panel, both charts use descending runtime speedup
 order. FlowLog uses its logo's blue (`#1576A4`); Soufflé uses muted copper
-(`#BC916B`). Inter typography and light gridlines keep the plots readable.
+(`#BC916B`). Ubuntu typography matches
+[FlowLog's brand font](https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css),
+with bold headings and light gridlines.
 
 ![All 50 runtime comparisons, grouped by workload family](all-time.png)
 
@@ -315,8 +317,8 @@ cross-version regressions are outside this comparison.
 - [Machine-readable provenance](metadata.json).
 - [Render script](render.py): reproduces the figures and this document, without rerunning benchmarks.
 
-With Python, Matplotlib, NumPy, and the Inter font installed, run from the
-repository root. On Ubuntu/Debian the font package is `fonts-inter`.
+With Python, Matplotlib, NumPy, and the Ubuntu font installed, run from the
+repository root. On Ubuntu the font package is `fonts-ubuntu`.
 SVG text is saved as outlines so the typography is preserved on other systems.
 
 ```bash
