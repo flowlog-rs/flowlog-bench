@@ -76,15 +76,17 @@ engine_compiler_run() {
     # build duration and binary size are separate diagnostic sidecars.
     local compile_t0 compile_t1
     compile_t0=$(date +%s.%N)
-    "$COMPILER_BIN" "$prog_path" \
+    if ! "$COMPILER_BIN" "$prog_path" \
         -F "$dataset_path" \
         -D - \
         -o "$binary" \
         ${fl_intern_flag} \
         ${EXTRA_FL_FLAGS:-} \
         "${build_flags[@]}" \
-        > "$compile_log" 2>&1 \
-        || die "Compilation failed for $prog_file (see $compile_log)"
+        > "$compile_log" 2>&1; then
+        log "$RED" "FAIL" "Compilation failed for $prog_file (see $compile_log)"
+        return 1
+    fi
     compile_t1=$(date +%s.%N)
     [[ -x "$binary" ]] || die "Binary not found: $binary"
     if [[ "${FLOWLOG_VERIFY_RUNTIME:-0}" == 1 ]]; then
@@ -169,9 +171,7 @@ engine_compiler_run() {
 
     # Cheap cross-validation: per-relation sizes from "[size][rel] t=() size=N"
     # log lines. cross_engine.sh diffs this against souffle's .sizes.
-    grep -oE '\[size\]\[[^]]+\] t=\(\) size=[0-9]+' "$median_log" 2>/dev/null \
-        | sed -E 's/^\[size\]\[([^]]+)\] t=\(\) size=([0-9]+)$/\1\t\2/' \
-        > "${best_log}.sizes" 2>/dev/null
+    extract_compiler_sizes "$median_log" > "${best_log}.sizes"
 
     if (( n_succeeded < NUM_RUNS )); then
         log "$YELLOW" "PARTIAL" "Compiler: only $n_succeeded/$NUM_RUNS runs succeeded for $prog_file + $dataset_name (median over $n_succeeded)"

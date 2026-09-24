@@ -86,6 +86,10 @@ PY
 extract_total_seconds() { _extract_seconds_for_pattern "$1" "Dataflow executed"; }
 extract_load_seconds()  { _extract_seconds_for_pattern "$1" "Data loaded for"; }
 
+extract_compiler_sizes() {
+    sed -nE 's/.*\[size\]\[([^]]+)\][[:space:]]+t=\(\)[[:space:]]+size=([0-9]+).*/\1\t\2/p' "$1"
+}
+
 # =============================================================================
 # Arithmetic / formatting
 # =============================================================================

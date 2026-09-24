@@ -19,7 +19,7 @@
 #   - `-F <facts>` at compile time too: Souffle validates `.input`
 #     directives against the dataset during codegen.
 #
-# Compile is cached at $LOG_DIR/sf-bin/<stem>-w<workers>; cache key
+# Compile is cached at $LOG_DIR/sf-bin/<stem>-w<workers>-unprofiled; cache key
 # includes WORKERS because of the `pfor` gating; cache is invalidated
 # on .dl mtime newer than the binary.
 #
@@ -46,12 +46,12 @@ engine_souffle_setup() {
 # Returns the binary path on stdout, non-zero exit on failure.
 _souffle_compile() {
     local stem="$1" sf_src="$2" fact_path="$3"
-    local sf_bin="${LOG_DIR}/sf-bin/${stem}-w${WORKERS}"
+    local sf_bin="${LOG_DIR}/sf-bin/${stem}-w${WORKERS}-unprofiled"
 
     if [[ ! -x "$sf_bin" || "$sf_src" -nt "$sf_bin" ]]; then
         log "$BLUE" "BUILD" "Souffle: compiling $stem with -j $WORKERS (one-off)"
         mkdir -p "$(dirname "$sf_bin")"
-        if ! "$SOUFFLE_BIN" -o "$sf_bin" -p /dev/null -j "$WORKERS" \
+        if ! "$SOUFFLE_BIN" -o "$sf_bin" -j "$WORKERS" \
                 -F "$fact_path" "$sf_src" \
                 > "${sf_bin}.compile.log" 2>&1; then
             log "$YELLOW" "WARN" "Souffle: -o compile failed for $stem (see ${sf_bin}.compile.log)"
@@ -220,7 +220,9 @@ engine_souffle_run() {
     median_rss=$(median_int "${rss_values[@]}")
     n_succeeded=$(echo "$entries" | wc -w)
     write_engine_sidecars "$best_log" "$median_log" "$median_rss" "$n_succeeded" "$median_time"
-    _souffle_profile_split "$stem" "$sf_src" "$fact_path" "$best_log"
+    if [[ "${SOUFFLE_PROFILE_SPLIT:-1}" == 1 ]]; then
+        _souffle_profile_split "$stem" "$sf_src" "$fact_path" "$best_log"
+    fi
 
     if (( n_succeeded < NUM_RUNS )); then
         log "$YELLOW" "PARTIAL" "Souffle: only $n_succeeded/$NUM_RUNS succeeded for $prog_file + $dataset_name"
