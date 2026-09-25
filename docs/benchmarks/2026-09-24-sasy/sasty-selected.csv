@@ -1,0 +1,7 @@
+case,compiled_souffle_s,old_sip_s,newfix_s,old_sip_status,newfix_status
+SASY Python,64.71,55.48,137.49,complete,complete
+SASY JavaScript,6271.00,7200.00,5245.00,timeout,complete
+django,1653.10,61.79,122.00,complete,allocator-abort
+aiohttp,32.19,12.15,43.22,complete,complete
+fastify,21.17,29.31,8.18,complete,complete
+undici,27.53,10.49,29.65,complete,complete

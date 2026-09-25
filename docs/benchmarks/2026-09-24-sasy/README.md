@@ -79,6 +79,11 @@ SIP removal. The cleaner non-SIP release comparison is:
 
 ## Agent-policy results
 
+![Actual p95 compute time for all 22 policy cells](policy-census-time.png)
+
+[Vector version](policy-census-time.svg). The log scale is necessary because
+the measured cells span more than five orders of magnitude.
+
 At 256 turns, latest FlowLog wins:
 
 - Airline linear and fan-in;
@@ -114,6 +119,11 @@ Sasty's taint policy has no forward form, so this rewrite does not affect the
 SAST results.
 
 ## Sasty engine-only results
+
+![Representative Sasty engine times and SIP trade-offs](sasty-selected-time.png)
+
+[Vector version](sasty-selected-time.svg). Hatched bars are incomplete runs,
+not successful completion times.
 
 Times are median seconds. `DNF` means the run exceeded the 7,200-second limit.
 `ALLOC` means the process aborted in the allocator.
@@ -163,6 +173,10 @@ JavaScript scan. Both SIP builds time out on SASY JavaScript, while the no-SIP
 builds finish in about 5,270 seconds.
 
 ## Incremental SAST
+
+![Actual wall time for the six incremental SAST steps](incremental-sast-time.png)
+
+[Vector version](incremental-sast-time.svg).
 
 The six-commit replay covers 638 Python files and about 1.16 million unique
 facts. FlowLog applies inserts and removals; Souffle reruns from scratch.
@@ -243,3 +257,11 @@ stage bound with every engine.
 
 Machine-readable run settings and the publication boundary are recorded in
 [metadata.json](metadata.json).
+
+The figures are generated from [policy-census.csv](policy-census.csv),
+[sasty-selected.csv](sasty-selected.csv), and
+[incremental-sast.csv](incremental-sast.csv):
+
+```bash
+python3 docs/benchmarks/2026-09-24-sasy/render.py
+```

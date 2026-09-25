@@ -28,7 +28,8 @@
       "correctness summaries",
       "methodology",
       "compatibility findings",
-      "incomplete-run bounds"
+      "incomplete-run bounds",
+      "reproducible aggregate-data figures"
     ],
     "excluded": [
       "private source code",
