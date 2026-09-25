@@ -2,12 +2,6 @@
 
 Performance benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog) Datalog engine. 
 
-## Standalone experiments
-
-- [`range-join/`](range-join/) evaluates merge and directional-seek range
-  joins directly in Differential Dataflow. It is isolated from the compiler
-  so the runtime algorithm and cost model can evolve independently.
-
 ## Setup
 
 Ubuntu only. ~50 GB free for the FlowLog build cache + dataset cache.
