@@ -1,0 +1,19 @@
+[package]
+name = "rangejoin-toy"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+# Mirrors the profile FlowLog writes into generated crates.
+[profile.release]
+opt-level = 2
+panic = "abort"
+
+[dependencies]
+timely = "0.31"
+differential-dataflow = "0.25"
+mimalloc = "0.1"
+# The status-quo baseline calls the exact join FlowLog ships today.
+flowlog-runtime = "0.5.0"
