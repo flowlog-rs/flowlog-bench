@@ -41,7 +41,7 @@ z
      <g id="line2d_1"/>
      <g id="text_1">
       <!-- SASY Python -->
-      <g style="fill: #5c6b75" transform="translate(102.475961 389.426491)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(102.475961 389.426491)rotate(-20)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-53" d="M 1581 442
 Q 2554 442 2554 1107
@@ -300,7 +300,7 @@ z
      <g id="line2d_2"/>
      <g id="text_2">
       <!-- SASY JavaScript -->
-      <g style="fill: #5c6b75" transform="translate(230.112088 394.235615)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(230.112088 394.235615)rotate(-20)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-4a" d="M 2682 1427
 Q 2682 1107 2614 832
@@ -503,7 +503,7 @@ z
      <g id="line2d_3"/>
      <g id="text_3">
       <!-- django -->
-      <g style="fill: #5c6b75" transform="translate(409.695846 380.129956)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(409.695846 380.129956)rotate(-20)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-64" d="M 2662 2624
 Q 2554 2714 2349 2797
@@ -614,7 +614,7 @@ z
      <g id="line2d_4"/>
      <g id="text_4">
       <!-- aiohttp -->
-      <g style="fill: #5c6b75" transform="translate(548.449712 380.892554)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(548.449712 380.892554)rotate(-20)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-61"/>
        <use xlink:href="#Ubuntu-69" x="52.199997"/>
        <use xlink:href="#Ubuntu-6f" x="77.499985"/>
@@ -629,7 +629,7 @@ z
      <g id="line2d_5"/>
      <g id="text_5">
       <!-- fastify -->
-      <g style="fill: #5c6b75" transform="translate(693.210517 379.461414)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(693.210517 379.461414)rotate(-20)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-66" d="M 1811 4966
 Q 2074 4966 2262 4928
@@ -702,7 +702,7 @@ z
      <g id="line2d_6"/>
      <g id="text_6">
       <!-- undici -->
-      <g style="fill: #5c6b75" transform="translate(835.962481 378.768823)rotate(-20)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(835.962481 378.768823)rotate(-20)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-75" d="M 3162 96
 Q 2957 45 2621 -12
@@ -746,7 +746,7 @@ L 955.349062 333.493841
      <g id="line2d_8"/>
      <g id="text_7">
       <!-- 10 -->
-      <g style="fill: #5c6b75" transform="translate(47.261563 337.373528)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(47.261563 337.373528)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-31" d="M 595 3520
 Q 960 3661 1305 3881
@@ -806,7 +806,7 @@ L 955.349062 240.091368
      <g id="line2d_10"/>
      <g id="text_8">
       <!-- 100 -->
-      <g style="fill: #5c6b75" transform="translate(41.620938 243.971055)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(41.620938 243.971055)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="112.799988"/>
@@ -822,7 +822,7 @@ L 955.349062 146.688895
      <g id="line2d_12"/>
      <g id="text_9">
       <!-- 1,000 -->
-      <g style="fill: #5c6b75" transform="translate(33.520938 150.568582)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(33.520938 150.568582)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-2c" d="M 1139 730
 Q 1146 678 1146 630
@@ -855,7 +855,7 @@ L 955.349062 53.286422
      <g id="line2d_14"/>
      <g id="text_10">
       <!-- 10,000 -->
-      <g style="fill: #5c6b75" transform="translate(27.880313 57.166109)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.880313 57.166109)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-2c" x="112.799988"/>
@@ -867,7 +867,7 @@ L 955.349062 53.286422
     </g>
     <g id="text_11">
      <!-- Engine wall time (seconds, log) -->
-     <g style="fill: #5c6b75" transform="translate(15.812656 272.221125)rotate(-90)scale(0.11 -0.11)">
+     <g style="fill: #555f6c" transform="translate(15.812656 272.221125)rotate(-90)scale(0.11 -0.11)">
       <defs>
        <path id="Ubuntu-45" d="M 550 0
 L 550 4435
@@ -1116,7 +1116,7 @@ L 175.453472 93829.369339
 L 175.453472 263.989656
 L 140.243739 263.989656
 z
-" clip-path="url(#peac1598b0a)" style="fill: #193447"/>
+" clip-path="url(#peac1598b0a)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_10">
     <path d="M 281.082672 93829.369339
@@ -1124,7 +1124,7 @@ L 316.292405 93829.369339
 L 316.292405 66.611919
 L 281.082672 66.611919
 z
-" clip-path="url(#peac1598b0a)" style="fill: url(#h1c2149adfa); stroke: #193447; stroke-linejoin: miter"/>
+" clip-path="url(#peac1598b0a)" style="fill: url(#he421bda52e); stroke: #5f2d12; stroke-linejoin: miter"/>
    </g>
    <g id="patch_11">
     <path d="M 421.921604 93829.369339
@@ -1132,7 +1132,7 @@ L 457.131338 93829.369339
 L 457.131338 259.620125
 L 421.921604 259.620125
 z
-" clip-path="url(#peac1598b0a)" style="fill: #193447"/>
+" clip-path="url(#peac1598b0a)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_12">
     <path d="M 562.760537 93829.369339
@@ -1140,7 +1140,7 @@ L 597.970271 93829.369339
 L 597.970271 325.594207
 L 562.760537 325.594207
 z
-" clip-path="url(#peac1598b0a)" style="fill: #193447"/>
+" clip-path="url(#peac1598b0a)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_13">
     <path d="M 703.59947 93829.369339
@@ -1148,7 +1148,7 @@ L 738.809203 93829.369339
 L 738.809203 289.873408
 L 703.59947 289.873408
 z
-" clip-path="url(#peac1598b0a)" style="fill: #193447"/>
+" clip-path="url(#peac1598b0a)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_14">
     <path d="M 844.438403 93829.369339
@@ -1156,7 +1156,7 @@ L 879.648136 93829.369339
 L 879.648136 331.553359
 L 844.438403 331.553359
 z
-" clip-path="url(#peac1598b0a)" style="fill: #193447"/>
+" clip-path="url(#peac1598b0a)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_15">
     <path d="M 175.453472 93829.369339
@@ -1213,7 +1213,7 @@ L 955.349063 354.215062
    </g>
    <g id="text_12">
     <!-- DNF -->
-    <g style="fill: #193447" transform="translate(289.385898 61.825058)scale(0.09 -0.09)">
+    <g style="fill: #2a2f36" transform="translate(289.385898 61.825058)scale(0.09 -0.09)">
      <defs>
       <path id="Ubuntu-Bold-44" d="M 1510 813
 Q 1581 806 1673 803
@@ -1280,7 +1280,7 @@ z
    </g>
    <g id="text_13">
     <!-- ALLOC -->
-    <g style="fill: #193447" transform="translate(460.044407 224.690817)scale(0.09 -0.09)">
+    <g style="fill: #2a2f36" transform="translate(460.044407 224.690817)scale(0.09 -0.09)">
      <defs>
       <path id="Ubuntu-Bold-41" d="M 3482 0
 Q 3411 230 3324 473
@@ -1399,7 +1399,7 @@ z
    </g>
    <g id="text_14">
     <!-- Hatched bars are incomplete runs: DNF is the 7,200 s timeout; ALLOC is the observed 122 s allocator abort, not completion time. -->
-    <g style="fill: #5c6b75" transform="translate(73.450875 433.559062)scale(0.09 -0.09)">
+    <g style="fill: #555f6c" transform="translate(73.450875 433.559062)scale(0.09 -0.09)">
      <defs>
       <path id="Ubuntu-48" d="M 3341 4435
 L 3962 4435
@@ -1831,7 +1831,7 @@ z
    </g>
    <g id="text_15">
     <!-- Sasty: actual engine time and SIP trade-offs -->
-    <g style="fill: #193447" transform="translate(64.542813 18.839062)scale(0.15 -0.15)">
+    <g style="fill: #2a2f36" transform="translate(64.542813 18.839062)scale(0.15 -0.15)">
      <defs>
       <path id="Ubuntu-Bold-53" d="M 1722 762
 Q 1933 762 2070 797
@@ -2417,7 +2417,7 @@ z
     </g>
     <g id="text_16">
      <!-- Compiled Souffle -->
-     <g style="fill: #193447" transform="translate(604.877109 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(604.877109 54.436406)scale(0.105 -0.105)">
       <use xlink:href="#Ubuntu-43"/>
       <use xlink:href="#Ubuntu-6f" x="60.499985"/>
       <use xlink:href="#Ubuntu-6d" x="119.499969"/>
@@ -2442,11 +2442,11 @@ L 718.802109 54.436406
 L 718.802109 47.086406
 L 704.102109 47.086406
 z
-" style="fill: #193447"/>
+" style="fill: #5f2d12"/>
     </g>
     <g id="text_17">
      <!-- Shipped old-SIP -->
-     <g style="fill: #193447" transform="translate(727.202109 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(727.202109 54.436406)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-2d" d="M 166 2195
 L 1747 2195
@@ -2490,7 +2490,7 @@ z
     </g>
     <g id="text_18">
      <!-- FlowLog main + guard -->
-     <g style="fill: #193447" transform="translate(841.371563 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(841.371563 54.436406)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-2b" d="M 339 2170
 L 1549 2170
@@ -2539,7 +2539,7 @@ z
   </clipPath>
  </defs>
  <defs>
-  <pattern id="h1c2149adfa" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
+  <pattern id="he421bda52e" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
    <rect x="0" y="0" width="73" height="73" fill="#ffffff"/>
    <path d="M -36 36
 L 36 -36
@@ -2567,7 +2567,7 @@ M 30 102
 L 102 30
 M 36 108
 L 108 36
-" style="fill: #193447; stroke: #193447; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter"/>
+" style="fill: #5f2d12; stroke: #5f2d12; stroke-width: 1.0; stroke-linecap: butt; stroke-linejoin: miter"/>
   </pattern>
   <pattern id="h8851888bac" patternUnits="userSpaceOnUse" x="0" y="0" width="72" height="72">
    <rect x="0" y="0" width="73" height="73" fill="#ffffff"/>

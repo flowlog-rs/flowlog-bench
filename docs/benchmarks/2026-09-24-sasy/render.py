@@ -16,10 +16,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 FLOWLOG = "#0087B9"
 SOUFFLE = "#F5A623"
-INK = "#193447"
-MUTED = "#5C6B75"
+ACCENT_BROWN = "#5F2D12"
+INK = "#2A2F36"
+MUTED = "#555F6C"
 GRID = "#E8EEF2"
-OLD_SIP = INK
 
 
 def configure_style() -> None:
@@ -150,13 +150,19 @@ def sasty_selected() -> None:
 
     fig, ax = plt.subplots(figsize=(13.5, 6.4))
     ax.bar(x - width, souffle, width, color=SOUFFLE, label="Compiled Souffle")
-    old_bars = ax.bar(x, old_sip, width, color=OLD_SIP, label="Shipped old-SIP")
+    old_bars = ax.bar(
+        x,
+        old_sip,
+        width,
+        color=ACCENT_BROWN,
+        label="Shipped old-SIP",
+    )
     new_bars = ax.bar(x + width, newfix, width, color=FLOWLOG, label="FlowLog main + guard")
 
     for index, row in enumerate(data):
         if row["old_sip_status"] != "complete":
             old_bars[index].set_facecolor("white")
-            old_bars[index].set_edgecolor(OLD_SIP)
+            old_bars[index].set_edgecolor(ACCENT_BROWN)
             old_bars[index].set_hatch("//")
             ax.text(
                 x[index],
@@ -235,7 +241,13 @@ def incremental_sast() -> None:
     fig, ax = plt.subplots(figsize=(12.5, 5.6))
     ax.bar(x - width, flowlog, width, color=FLOWLOG, label="FlowLog main")
     ax.bar(x, compiled, width, color=SOUFFLE, label="Compiled Souffle")
-    ax.bar(x + width, interpreted, width, color=OLD_SIP, label="Interpreted Souffle")
+    ax.bar(
+        x + width,
+        interpreted,
+        width,
+        color=ACCENT_BROWN,
+        label="Interpreted Souffle",
+    )
     ax.set_xticks(x, labels)
     ax.set_ylabel("Wall time (seconds)")
     ax.set_title(

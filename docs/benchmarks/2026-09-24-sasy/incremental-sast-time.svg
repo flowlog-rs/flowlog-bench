@@ -41,7 +41,7 @@ z
      <g id="line2d_1"/>
      <g id="text_1">
       <!-- initial -->
-      <g style="fill: #5c6b75" transform="translate(115.232671 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(115.232671 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-69" d="M 1107 0
 L 512 0
@@ -181,7 +181,7 @@ z
      <g id="line2d_2"/>
      <g id="text_2">
       <!-- commit-1 -->
-      <g style="fill: #5c6b75" transform="translate(240.089415 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(240.089415 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-63" d="M 1958 -77
 Q 1555 -77 1251 51
@@ -318,7 +318,7 @@ z
      <g id="line2d_3"/>
      <g id="text_3">
       <!-- commit-2 -->
-      <g style="fill: #5c6b75" transform="translate(373.514909 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(373.514909 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-32" d="M 2989 3302
 Q 2989 3072 2896 2857
@@ -375,7 +375,7 @@ z
      <g id="line2d_4"/>
      <g id="text_4">
       <!-- commit-3 -->
-      <g style="fill: #5c6b75" transform="translate(506.940403 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(506.940403 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-33" d="M 1446 435
 Q 2016 435 2262 659
@@ -441,7 +441,7 @@ z
      <g id="line2d_5"/>
      <g id="text_5">
       <!-- commit-4 -->
-      <g style="fill: #5c6b75" transform="translate(640.365897 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(640.365897 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-34" d="M 256 1536
 Q 378 1818 589 2192
@@ -484,7 +484,7 @@ z
      <g id="line2d_6"/>
      <g id="text_6">
       <!-- commit-5 -->
-      <g style="fill: #5c6b75" transform="translate(773.791391 383.875937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(773.791391 383.875937)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-35" d="M 1274 2726
 Q 2240 2688 2691 2304
@@ -544,7 +544,7 @@ L 883.404531 368.116562
      <g id="line2d_8"/>
      <g id="text_7">
       <!-- 0 -->
-      <g style="fill: #5c6b75" transform="translate(27.847656 371.99625)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.847656 371.99625)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-30" d="M 320 2221
 Q 320 3334 713 3936
@@ -589,7 +589,7 @@ L 883.404531 295.168035
      <g id="line2d_10"/>
      <g id="text_8">
       <!-- 2 -->
-      <g style="fill: #5c6b75" transform="translate(27.847656 299.047723)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.847656 299.047723)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-32"/>
       </g>
      </g>
@@ -603,7 +603,7 @@ L 883.404531 222.219508
      <g id="line2d_12"/>
      <g id="text_9">
       <!-- 4 -->
-      <g style="fill: #5c6b75" transform="translate(27.847656 226.099195)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.847656 226.099195)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-34"/>
       </g>
      </g>
@@ -617,7 +617,7 @@ L 883.404531 149.27098
      <g id="line2d_14"/>
      <g id="text_10">
       <!-- 6 -->
-      <g style="fill: #5c6b75" transform="translate(27.847656 153.150668)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.847656 153.150668)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-36" d="M 403 1779
 Q 403 2426 582 2922
@@ -673,7 +673,7 @@ L 883.404531 76.322453
      <g id="line2d_16"/>
      <g id="text_11">
       <!-- 8 -->
-      <g style="fill: #5c6b75" transform="translate(27.847656 80.20214)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(27.847656 80.20214)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-38" d="M 3258 1152
 Q 3258 883 3165 656
@@ -743,7 +743,7 @@ z
     </g>
     <g id="text_12">
      <!-- Wall time (seconds) -->
-     <g style="fill: #5c6b75" transform="translate(15.812656 250.931953)rotate(-90)scale(0.11 -0.11)">
+     <g style="fill: #555f6c" transform="translate(15.812656 250.931953)rotate(-90)scale(0.11 -0.11)">
       <defs>
        <path id="Ubuntu-57" d="M 2976 3008
 Q 2707 2150 2432 1420
@@ -1025,7 +1025,7 @@ L 177.917231 368.116562
 L 177.917231 58.450064
 L 144.560858 58.450064
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_16">
     <path d="M 277.986352 368.116562
@@ -1033,7 +1033,7 @@ L 311.342725 368.116562
 L 311.342725 61.003262
 L 277.986352 61.003262
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_17">
     <path d="M 411.411846 368.116562
@@ -1041,7 +1041,7 @@ L 444.768219 368.116562
 L 444.768219 60.273777
 L 411.411846 60.273777
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_18">
     <path d="M 544.83734 368.116562
@@ -1049,7 +1049,7 @@ L 578.193714 368.116562
 L 578.193714 52.614182
 L 544.83734 52.614182
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_19">
     <path d="M 678.262834 368.116562
@@ -1057,7 +1057,7 @@ L 711.619208 368.116562
 L 711.619208 54.802637
 L 678.262834 54.802637
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_20">
     <path d="M 811.688328 368.116562
@@ -1065,7 +1065,7 @@ L 845.044702 368.116562
 L 845.044702 52.978924
 L 811.688328 52.978924
 z
-" clip-path="url(#p742686c1fd)" style="fill: #193447"/>
+" clip-path="url(#p742686c1fd)" style="fill: #5f2d12"/>
    </g>
    <g id="patch_21">
     <path d="M 39.488281 368.116562
@@ -1074,7 +1074,7 @@ L 883.404531 368.116562
    </g>
    <g id="text_13">
     <!-- SAST incremental replay: actual time per step -->
-    <g style="fill: #193447" transform="translate(39.488281 18.839062)scale(0.15 -0.15)">
+    <g style="fill: #2a2f36" transform="translate(39.488281 18.839062)scale(0.15 -0.15)">
      <defs>
       <path id="Ubuntu-Bold-53" d="M 1722 762
 Q 1933 762 2070 797
@@ -1577,7 +1577,7 @@ z
     </g>
     <g id="text_14">
      <!-- FlowLog main -->
-     <g style="fill: #193447" transform="translate(553.54375 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(553.54375 54.436406)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-46" d="M 550 0
 L 550 4435
@@ -1697,7 +1697,7 @@ z
     </g>
     <g id="text_15">
      <!-- Compiled Souffle -->
-     <g style="fill: #193447" transform="translate(659.38375 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(659.38375 54.436406)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-43" d="M 2458 -96
 Q 1990 -96 1606 57
@@ -1870,11 +1870,11 @@ L 773.30875 54.436406
 L 773.30875 47.086406
 L 758.60875 47.086406
 z
-" style="fill: #193447"/>
+" style="fill: #5f2d12"/>
     </g>
     <g id="text_16">
      <!-- Interpreted Souffle -->
-     <g style="fill: #193447" transform="translate(781.70875 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(781.70875 54.436406)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-49" d="M 550 4435
 L 1171 4435

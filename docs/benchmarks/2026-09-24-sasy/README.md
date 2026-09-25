@@ -272,6 +272,6 @@ The figures are generated from [policy-census.csv](policy-census.csv),
 python3 docs/benchmarks/2026-09-24-sasy/render.py
 ```
 
-Rendering uses FlowLog's Ubuntu typography. On Ubuntu, install
-`fonts-ubuntu`; an extracted font directory can instead be supplied through
-`FLOWLOG_BENCH_FONT_DIR`.
+Rendering uses FlowLog's Ubuntu typography and website blue/brown accents.
+On Ubuntu, install `fonts-ubuntu`; an extracted font directory can instead
+be supplied through `FLOWLOG_BENCH_FONT_DIR`.

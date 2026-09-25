@@ -46,7 +46,7 @@ L 118.581753 56.99075
      <g id="line2d_2"/>
      <g id="text_1">
       <!-- 10 -->
-      <g style="fill: #5c6b75" transform="translate(112.941128 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(112.941128 550.375125)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-31" d="M 595 3520
 Q 960 3661 1305 3881
@@ -106,7 +106,7 @@ L 198.364755 56.99075
      <g id="line2d_4"/>
      <g id="text_2">
       <!-- 100 -->
-      <g style="fill: #5c6b75" transform="translate(189.903817 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(189.903817 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="112.799988"/>
@@ -122,7 +122,7 @@ L 278.147756 56.99075
      <g id="line2d_6"/>
      <g id="text_3">
       <!-- 1,000 -->
-      <g style="fill: #5c6b75" transform="translate(265.636818 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(265.636818 550.375125)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-2c" d="M 1139 730
 Q 1146 678 1146 630
@@ -155,7 +155,7 @@ L 357.930757 56.99075
      <g id="line2d_8"/>
      <g id="text_4">
       <!-- 10,000 -->
-      <g style="fill: #5c6b75" transform="translate(342.599507 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(342.599507 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-2c" x="112.799988"/>
@@ -174,7 +174,7 @@ L 437.713758 56.99075
      <g id="line2d_10"/>
      <g id="text_5">
       <!-- 100,000 -->
-      <g style="fill: #5c6b75" transform="translate(419.562196 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(419.562196 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="112.799988"/>
@@ -194,7 +194,7 @@ L 517.49676 56.99075
      <g id="line2d_12"/>
      <g id="text_6">
       <!-- 1,000,000 -->
-      <g style="fill: #5c6b75" transform="translate(495.295197 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(495.295197 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-2c" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="80.999985"/>
@@ -209,7 +209,7 @@ L 517.49676 56.99075
     </g>
     <g id="text_7">
      <!-- p95 compute per action (microseconds, log) -->
-     <g style="fill: #5c6b75" transform="translate(207.577422 570.837781)scale(0.11 -0.11)">
+     <g style="fill: #555f6c" transform="translate(207.577422 570.837781)scale(0.11 -0.11)">
       <defs>
        <path id="Ubuntu-70" d="M 2822 1658
 Q 2822 2240 2534 2553
@@ -793,7 +793,7 @@ z
      <g id="line2d_13"/>
      <g id="text_8">
       <!-- Airline -->
-      <g style="fill: #5c6b75" transform="translate(49.601562 97.314128)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(49.601562 97.314128)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-41" d="M 3514 0
 Q 3405 288 3309 566
@@ -835,7 +835,7 @@ z
      <g id="line2d_14"/>
      <g id="text_9">
       <!-- Copilot Security -->
-      <g style="fill: #5c6b75" transform="translate(7.2 137.98789)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(7.2 137.98789)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-43" d="M 2458 -96
 Q 1990 -96 1606 57
@@ -964,7 +964,7 @@ z
      <g id="line2d_15"/>
      <g id="text_10">
       <!-- DLP Guard -->
-      <g style="fill: #5c6b75" transform="translate(31.070312 178.661652)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(31.070312 178.661652)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-44" d="M 4192 2221
 Q 4192 1645 4013 1219
@@ -1082,7 +1082,7 @@ z
      <g id="line2d_16"/>
      <g id="text_11">
       <!-- LLM Content -->
-      <g style="fill: #5c6b75" transform="translate(20.848437 219.335414)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(20.848437 219.335414)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-4d" d="M 2541 614
 Q 2477 768 2371 1005
@@ -1140,7 +1140,7 @@ z
      <g id="line2d_17"/>
      <g id="text_12">
       <!-- MALADE -->
-      <g style="fill: #5c6b75" transform="translate(38.9375 260.009176)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(38.9375 260.009176)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-45" d="M 550 0
 L 550 4435
@@ -1171,7 +1171,7 @@ z
      <g id="line2d_18"/>
      <g id="text_13">
       <!-- MLS -->
-      <g style="fill: #5c6b75" transform="translate(59.853125 300.682937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(59.853125 300.682937)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-4d"/>
        <use xlink:href="#Ubuntu-4c" x="87.099991"/>
        <use xlink:href="#Ubuntu-53" x="140.374985"/>
@@ -1182,7 +1182,7 @@ z
      <g id="line2d_19"/>
      <g id="text_14">
       <!-- OpenClaw -->
-      <g style="fill: #5c6b75" transform="translate(32.414062 341.356699)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(32.414062 341.356699)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-4f" d="M 371 2221
 Q 371 2790 540 3225
@@ -1269,7 +1269,7 @@ z
      <g id="line2d_20"/>
      <g id="text_15">
       <!-- Policy Skill -->
-      <g style="fill: #5c6b75" transform="translate(31.6125 382.030461)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(31.6125 382.030461)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-6b" d="M 1715 1830
 Q 1907 1683 2121 1465
@@ -1317,7 +1317,7 @@ z
      <g id="line2d_21"/>
      <g id="text_16">
       <!-- Retail -->
-      <g style="fill: #5c6b75" transform="translate(52.829687 422.704223)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(52.829687 422.704223)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-52" d="M 2720 1856
 Q 2822 1728 2979 1520
@@ -1370,7 +1370,7 @@ z
      <g id="line2d_22"/>
      <g id="text_17">
       <!-- Security -->
-      <g style="fill: #5c6b75" transform="translate(42.529688 463.363141)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(42.529688 463.363141)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-53"/>
        <use xlink:href="#Ubuntu-65" x="53.199997"/>
        <use xlink:href="#Ubuntu-63" x="109.099991"/>
@@ -1386,7 +1386,7 @@ z
      <g id="line2d_23"/>
      <g id="text_18">
       <!-- Toxic Flow -->
-      <g style="fill: #5c6b75" transform="translate(32.142187 504.051747)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(32.142187 504.051747)scale(0.1 -0.1)">
        <defs>
         <path id="Ubuntu-54" d="M 3514 4435
 L 3514 3898
@@ -1633,7 +1633,7 @@ L 547.480937 536.61575
    </g>
    <g id="text_19">
     <!-- Linear graph -->
-    <g style="fill: #193447" transform="translate(85.210938 42.99075)scale(0.12 -0.12)">
+    <g style="fill: #2a2f36" transform="translate(85.210938 42.99075)scale(0.12 -0.12)">
      <defs>
       <path id="Ubuntu-Bold-4c" d="M 3475 858
 L 3475 0
@@ -1899,7 +1899,7 @@ L 670.641753 56.99075
      <g id="line2d_25"/>
      <g id="text_20">
       <!-- 10 -->
-      <g style="fill: #5c6b75" transform="translate(665.001128 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(665.001128 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
       </g>
@@ -1914,7 +1914,7 @@ L 750.424755 56.99075
      <g id="line2d_27"/>
      <g id="text_21">
       <!-- 100 -->
-      <g style="fill: #5c6b75" transform="translate(741.963817 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(741.963817 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="112.799988"/>
@@ -1930,7 +1930,7 @@ L 830.207756 56.99075
      <g id="line2d_29"/>
      <g id="text_22">
       <!-- 1,000 -->
-      <g style="fill: #5c6b75" transform="translate(817.696818 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(817.696818 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-2c" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="80.999985"/>
@@ -1948,7 +1948,7 @@ L 909.990757 56.99075
      <g id="line2d_31"/>
      <g id="text_23">
       <!-- 10,000 -->
-      <g style="fill: #5c6b75" transform="translate(894.659507 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(894.659507 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-2c" x="112.799988"/>
@@ -1967,7 +1967,7 @@ L 989.773758 56.99075
      <g id="line2d_33"/>
      <g id="text_24">
       <!-- 100,000 -->
-      <g style="fill: #5c6b75" transform="translate(971.622196 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(971.622196 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-30" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="112.799988"/>
@@ -1987,7 +1987,7 @@ L 1069.55676 56.99075
      <g id="line2d_35"/>
      <g id="text_25">
       <!-- 1,000,000 -->
-      <g style="fill: #5c6b75" transform="translate(1047.355197 550.375125)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(1047.355197 550.375125)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-31"/>
        <use xlink:href="#Ubuntu-2c" x="56.399994"/>
        <use xlink:href="#Ubuntu-30" x="80.999985"/>
@@ -2002,7 +2002,7 @@ L 1069.55676 56.99075
     </g>
     <g id="text_26">
      <!-- p95 compute per action (microseconds, log) -->
-     <g style="fill: #5c6b75" transform="translate(759.637422 570.837781)scale(0.11 -0.11)">
+     <g style="fill: #555f6c" transform="translate(759.637422 570.837781)scale(0.11 -0.11)">
       <use xlink:href="#Ubuntu-70"/>
       <use xlink:href="#Ubuntu-39" x="58.899994"/>
       <use xlink:href="#Ubuntu-35" x="115.299988"/>
@@ -2053,7 +2053,7 @@ L 1069.55676 56.99075
      <g id="line2d_36"/>
      <g id="text_27">
       <!-- Airline -->
-      <g style="fill: #5c6b75" transform="translate(601.661562 97.314128)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(601.661562 97.314128)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-41"/>
        <use xlink:href="#Ubuntu-69" x="66.299988"/>
        <use xlink:href="#Ubuntu-72" x="91.599976"/>
@@ -2068,7 +2068,7 @@ L 1069.55676 56.99075
      <g id="line2d_37"/>
      <g id="text_28">
       <!-- Copilot Security -->
-      <g style="fill: #5c6b75" transform="translate(559.26 137.98789)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(559.26 137.98789)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-43"/>
        <use xlink:href="#Ubuntu-6f" x="60.499985"/>
        <use xlink:href="#Ubuntu-70" x="119.499969"/>
@@ -2092,7 +2092,7 @@ L 1069.55676 56.99075
      <g id="line2d_38"/>
      <g id="text_29">
       <!-- DLP Guard -->
-      <g style="fill: #5c6b75" transform="translate(583.130312 178.661652)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(583.130312 178.661652)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-44"/>
        <use xlink:href="#Ubuntu-4c" x="71.299988"/>
        <use xlink:href="#Ubuntu-50" x="123.199982"/>
@@ -2109,7 +2109,7 @@ L 1069.55676 56.99075
      <g id="line2d_39"/>
      <g id="text_30">
       <!-- LLM Content -->
-      <g style="fill: #5c6b75" transform="translate(572.908437 219.335414)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(572.908437 219.335414)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-4c"/>
        <use xlink:href="#Ubuntu-4c" x="51.899994"/>
        <use xlink:href="#Ubuntu-4d" x="103.799988"/>
@@ -2128,7 +2128,7 @@ L 1069.55676 56.99075
      <g id="line2d_40"/>
      <g id="text_31">
       <!-- MALADE -->
-      <g style="fill: #5c6b75" transform="translate(590.9975 260.009176)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(590.9975 260.009176)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-4d"/>
        <use xlink:href="#Ubuntu-41" x="87.099991"/>
        <use xlink:href="#Ubuntu-4c" x="153.399979"/>
@@ -2142,7 +2142,7 @@ L 1069.55676 56.99075
      <g id="line2d_41"/>
      <g id="text_32">
       <!-- MLS -->
-      <g style="fill: #5c6b75" transform="translate(611.913125 300.682937)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(611.913125 300.682937)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-4d"/>
        <use xlink:href="#Ubuntu-4c" x="87.099991"/>
        <use xlink:href="#Ubuntu-53" x="140.374985"/>
@@ -2153,7 +2153,7 @@ L 1069.55676 56.99075
      <g id="line2d_42"/>
      <g id="text_33">
       <!-- OpenClaw -->
-      <g style="fill: #5c6b75" transform="translate(584.474062 341.356699)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(584.474062 341.356699)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-4f"/>
        <use xlink:href="#Ubuntu-70" x="77.799988"/>
        <use xlink:href="#Ubuntu-65" x="136.699982"/>
@@ -2169,7 +2169,7 @@ L 1069.55676 56.99075
      <g id="line2d_43"/>
      <g id="text_34">
       <!-- Policy Skill -->
-      <g style="fill: #5c6b75" transform="translate(583.6725 382.030461)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(583.6725 382.030461)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-50"/>
        <use xlink:href="#Ubuntu-6f" x="58.674988"/>
        <use xlink:href="#Ubuntu-6c" x="117.674973"/>
@@ -2189,7 +2189,7 @@ L 1069.55676 56.99075
      <g id="line2d_44"/>
      <g id="text_35">
       <!-- Retail -->
-      <g style="fill: #5c6b75" transform="translate(604.889687 422.704223)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(604.889687 422.704223)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-52"/>
        <use xlink:href="#Ubuntu-65" x="62.899994"/>
        <use xlink:href="#Ubuntu-74" x="118.799988"/>
@@ -2203,7 +2203,7 @@ L 1069.55676 56.99075
      <g id="line2d_45"/>
      <g id="text_36">
       <!-- Security -->
-      <g style="fill: #5c6b75" transform="translate(594.589687 463.363141)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(594.589687 463.363141)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-53"/>
        <use xlink:href="#Ubuntu-65" x="53.199997"/>
        <use xlink:href="#Ubuntu-63" x="109.099991"/>
@@ -2219,7 +2219,7 @@ L 1069.55676 56.99075
      <g id="line2d_46"/>
      <g id="text_37">
       <!-- Toxic Flow -->
-      <g style="fill: #5c6b75" transform="translate(584.202187 504.051747)scale(0.1 -0.1)">
+      <g style="fill: #555f6c" transform="translate(584.202187 504.051747)scale(0.1 -0.1)">
        <use xlink:href="#Ubuntu-54"/>
        <use xlink:href="#Ubuntu-6f" x="50.999985"/>
        <use xlink:href="#Ubuntu-78" x="108.249969"/>
@@ -2417,7 +2417,7 @@ L 1099.540938 536.61575
    </g>
    <g id="text_38">
     <!-- Fan-in graph -->
-    <g style="fill: #193447" transform="translate(637.270937 42.99075)scale(0.12 -0.12)">
+    <g style="fill: #2a2f36" transform="translate(637.270937 42.99075)scale(0.12 -0.12)">
      <defs>
       <path id="Ubuntu-Bold-46" d="M 512 0
 L 512 4435
@@ -2457,7 +2457,7 @@ z
   </g>
   <g id="text_39">
    <!-- Agent-policy census: actual p95 compute time at 256 turns -->
-   <g style="fill: #193447" transform="translate(73.540937 18.839062)scale(0.15 -0.15)">
+   <g style="fill: #2a2f36" transform="translate(73.540937 18.839062)scale(0.15 -0.15)">
     <defs>
      <path id="Ubuntu-Bold-41" d="M 3482 0
 Q 3411 230 3324 473
@@ -2935,7 +2935,7 @@ z
    </g>
    <g id="text_40">
     <!-- FlowLog main -->
-    <g style="fill: #193447" transform="translate(932.020938 31.539312)scale(0.11 -0.11)">
+    <g style="fill: #2a2f36" transform="translate(932.020938 31.539312)scale(0.11 -0.11)">
      <use xlink:href="#Ubuntu-46"/>
      <use xlink:href="#Ubuntu-6c" x="53.699997"/>
      <use xlink:href="#Ubuntu-6f" x="80.999985"/>
@@ -2960,7 +2960,7 @@ z
    </g>
    <g id="text_41">
     <!-- Souffle -->
-    <g style="fill: #193447" transform="translate(1042.900938 31.539312)scale(0.11 -0.11)">
+    <g style="fill: #2a2f36" transform="translate(1042.900938 31.539312)scale(0.11 -0.11)">
      <defs>
       <path id="Ubuntu-66" d="M 1811 4966
 Q 2074 4966 2262 4928
