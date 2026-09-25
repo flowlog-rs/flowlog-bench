@@ -1,0 +1,40 @@
+{
+  "measurement_date": "2026-09-24",
+  "publication_date": "2026-09-25",
+  "host": {
+    "cpu": "AMD EPYC 7763",
+    "physical_cores": 32,
+    "logical_cpus": 64,
+    "memory_gib": 503,
+    "swap_gib": 0
+  },
+  "execution": {
+    "flowlog_workers": 1,
+    "souffle_workers": 1,
+    "sast_timeout_seconds": 7200,
+    "sast_rss_cap_gib": 250
+  },
+  "engines": {
+    "souffle": "2.5",
+    "flowlog_old_commit": "6c111b7",
+    "flowlog_mid_commit": "fed4211",
+    "flowlog_main_commit": "07ffd67",
+    "flowlog_main_local_guard": "c8af77a"
+  },
+  "publication_boundary": {
+    "included": [
+      "aggregate timing results",
+      "aggregate peak-RSS results",
+      "correctness summaries",
+      "methodology",
+      "compatibility findings",
+      "incomplete-run bounds"
+    ],
+    "excluded": [
+      "private source code",
+      "extracted source facts",
+      "generated evaluator binaries",
+      "multi-gigabyte run directories"
+    ]
+  }
+}
