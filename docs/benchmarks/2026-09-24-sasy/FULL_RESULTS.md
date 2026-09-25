@@ -1,6 +1,7 @@
 # FlowLog vs Souffle on SASY/Sasty: full results appendix
 
-Generated 2026-09-24. Every number was measured on this VM in this session, unless marked otherwise.
+Generated 2026-09-24; the Sasty results were rerun on 2026-09-25 with the reordered rule #337
+(section 4). Every number was measured on this VM in this session, unless marked otherwise.
 Ratios are always **Souffle time  /  FlowLog time**, so **>1 means FlowLog is faster**.
 
 For the concise findings and publication boundary, see [README.md](README.md).
@@ -24,8 +25,8 @@ For the concise findings and publication boundary, see [README.md](README.md).
 | In-budget ladders (section 2) | p95 compute per action | wins 10/77, 0.075x (old 0.068x); forward forms: 12/77, 0.13x | CSE gain grows with fan-in: F32 1.10x, F64 1.19x, F128 1.32x; linear ~1.03x |
 | Guard profile (section 3) | p95 compute per action | 0.09-0.35x; no-gate variant 0.14-1.43x | from the ratio columns: linear ~0.9-1.0x, fan-in 1.14-1.25x |
 | SAST incremental, 6 real commits (section 6) | per-commit update vs from-scratch | 4.0-5.1x faster than compiled Souffle; 5.2-6.9x faster than interpreted (steps 1-5) | 1.03x |
-| SAST end-to-end, production `sasty scan` (section 5) | whole scan | python-off: 0.81x (179.7 s vs 145.0 s); shipped old-sip 1.49x. JS-off: every engine hits the 900 s stage timeout | shipped old-sip 97.2 s -> newfix 179.7 s (0.54x); main has no SIP |
-| SAST batch, engine-only (section 4) | one evaluation | main (SIP off): geomean 1.94x vs interpreted Souffle (wins 17/18, only loss python-off 0.74x); 1.09x vs compiled Souffle (wins 10/19). JS-off: 5,245 s vs 6,271 s compiled, >7,200 s interpreted. django: every no-SIP build aborts at a 172 GiB allocator ceiling, while shipped old-sip needs 62 s vs Souffle's 2,097 s. JS-XL: Souffle, Souffle-c and main all DNF at 7,200 s | shipped old-sip -> main: 1.34x geomean, but 0.28-0.40x on aiohttp, undici and python-off, <0.51x on django, while on JS-off old-sip DNFs where main finishes (5,245 s). With SIP off in both, CSE and the other main changes give 1.07x |
+| SAST end-to-end, production `sasty scan` (section 5) | whole scan | python-off: 1.44x (79.0 s vs 113.9 s); shipped old-sip 1.15x (99.1 s). JS-off (original policy): every engine hits the 900 s stage timeout | shipped old-sip 99.1 s -> newfix 79.0 s (1.25x); main has no SIP |
+| SAST batch, engine-only (section 4) | one evaluation | main (SIP off): geomean 3.01x vs interpreted Souffle (wins 19/19); 1.68x vs compiled Souffle (wins 17/20), 1.96x on inputs >= 1 s (wins 15/16, only loss starlette 0.90x). JS-off: 4,894 s vs 6,259 s compiled, >7,200 s interpreted. django: 44.0 s vs 209.8 s compiled. JS-XL: only main finishes (7,129 s) | shipped old-sip -> main: 2.11x geomean, faster on all 19 inputs (1.25-3.80x). With SIP off in both, CSE and the other main changes give 1.07x |
 
 **Policy workloads (census, ladders, guard).** FlowLog wins only where fan-in makes each
 Souffle re-run expensive: Airline, Copilot Security and Policy Skill at fan-in. Everywhere
@@ -41,27 +42,30 @@ Copilot Security and Policy Skill rewrites also drop work that Souffle skips any
 forward-form gains are not engine gains. Sasty's
 `taint.dl` has no forward form, so the rewrite does not apply to SAST.
 
-**SAST.** On Sasty's full taint policy, main without SIP beats the production Souffle
-interpreter on 17 of 18 engine-only inputs (1.94x geomean) and is slightly ahead of compiled
-Souffle (1.09x). Parity is exact on every finished run.
+**SAST.** Every Sasty engine-only number and the python-off end-to-end scan use Sasty's taint
+policy with two atoms of rule #337 swapped, for every engine; as written, that rule starts with
+a Cartesian product (section 4). On this
+policy, main without SIP beats the production Souffle interpreter on all 19 engine-only inputs
+where both finish (3.01x geomean) and compiled Souffle on 17 of 20 (1.68x). On inputs of at
+least 1 s it beats compiled Souffle on 15 of 16 (1.96x); starlette is the only loss (0.90x).
+Parity is exact on every finished run.
 
-The release comparison, though, is dominated by SIP, which main removed (#365):
-- Where SIP matters (aiohttp, undici, python-off), main is 2.5-3.6x slower than Sasty's
-  shipped build.
-- On django, every no-SIP build aborts at mimalloc v3.3.2's ceiling of about 172 GiB
-  (section 7 item 7). Even with the ceiling lifted it needs more than 240 GiB. The shipped SIP
-  build finishes in 62 s using 2.5 GiB.
-- This is why main loses end-to-end on python-off: 0.81x vs Souffle, where the shipped
-  build gets 1.49x.
+SIP no longer pays on this policy: old-nosip  /  old-sip is 0.505x and mid-nosip  /  mid-sip
+0.497x, so SIP is slower on every input. The shipped old-sip -> main upgrade is therefore
+2.11x, mostly from dropping SIP. With SIP off in both, CSE and the other main changes give
+1.07x (old-nosip  /  newfix). End-to-end on python-off, main is now the fastest engine:
+79.0 s, versus 99.1 s for the shipped build and 113.9 s for Souffle.
 
-CSE's own contribution is about 1.07x (old-nosip  /  newfix).
+FlowLog still costs memory: 1.4-4.6x compiled Souffle's peak RSS (2.9x geomean where both
+finish), for example 2.4 GiB on python-off where compiled Souffle uses 0.75 GiB, and 125 GiB on
+JS-off where it uses 51 GiB.
 
-FlowLog also costs memory: 6.8-20 GiB where Souffle uses 0.25-1.5 GiB (undici, aiohttp,
-python-off), and 125 GiB on JS-off, where compiled Souffle uses 51 GiB.
+With the original rule, main was only 1.09x faster than compiled Souffle (10/19), SIP was worth
+2.5-3.7x on aiohttp, undici and python-off, and every no-SIP build aborted on django at
+mimalloc's 172 GiB ceiling. Those results are kept at the end of section 4.
 
 First-party JavaScript (JS-off) exceeds Sasty's 900 s stage bound with every engine; the
-fastest is main at 5,245 s, and both SIP builds time out at 7,200 s. JS-XL does not finish
-within 2 h on any of the three engines run (Souffle, Souffle-c, main).
+fastest is main at 4,894 s. On JS-XL only main finishes, at 7,129 s, just under the 2 h limit.
 
 The incremental path is where FlowLog clearly wins: each real SASY commit update (steps 1-5)
 is 4.0-5.1x faster than a compiled-Souffle rerun (section 6).
@@ -422,8 +426,9 @@ Souffle/FlowLog per-action compute; p95 (mean). >1 = FlowLog faster.
 
 ## 4. SAST batch: Sasty's taint policy, engine-only
 
-**Workload.** Sasty's production taint policy (`taint.dl`) evaluated on byte-identical fact
-directories captured from real `sasty scan` runs (section 8 lists the capture settings).
+**Workload.** Sasty's production taint policy (`taint.dl`, 851 rules) with one join
+reordered (see below), evaluated on byte-identical fact directories captured from real
+`sasty scan` runs (section 8 lists the capture settings).
 
 The corpora are:
 - the 18 pinned public differential corpora (10 Python, 8 JavaScript);
@@ -432,10 +437,42 @@ The corpora are:
   `node_modules` closure. Its limits were raised past production defaults, because the
   production scan refuses it (see section 5).
 
+**Policy change: rule #337.** The body of rule #337 lists a call atom that shares no
+variable with the atoms before it, ahead of the atom that connects it to the rest of the
+body. Evaluated in written order, the rule therefore starts with a Cartesian product.
+- FlowLog plans each rule left-deep in written order and materialized the product: up to
+  168 million tuples, and 83-84% of FlowLog's compute on aiohttp and undici (18-70% on
+  requests, starlette, uvicorn and werkzeug).
+- Souffle runs the same order as a streaming nested loop, 3.8-4.5x cheaper per tuple, but
+  the rule still took 9.3 s of Souffle's 32 s on aiohttp.
+- SIP semijoin-reduces both sides of the product (1,504 x 3,129 = 4.7 million tuples on
+  aiohttp, 0.85 s instead of 35.5 s). That is why SIP helped on the original policy. SIP
+  also adds pairwise semijoins to every rule with three or more atoms, which costs time
+  elsewhere, for example 17.5 s instead of 6.0 s in starlette's recursive `CallableCtx`
+  stratum.
+
+Every engine below evaluates the policy with those two atoms swapped. The Souffle-to-FlowLog
+adapter keeps the body atom order, and no `.plan` directives are used. FlowLog joins in
+written order; with default settings, `souffle --show=transformed-ram` shows no loop nest
+that differs from strict written order (`-P RamSIPS:strict`); 86 `IF` lines in 60 rule
+versions differ only in conjunct order. Check-only atoms run early in both engines (hoisted
+existence checks in Souffle, semijoins folded into a covering atom in FlowLog), and their
+exact placement can differ. All seven public relations are unchanged on every corpus where a
+reference finished, and on the end-to-end Python scan (section 5). The original-policy
+results are kept at the end of this section.
+
 Timing protocol:
-- each (case, engine) gets one warm-up plus 5/3/1/0 measured runs, depending on the
-  warm-up wall time;
-- timeout 7,200 s; per-run RSS cap 250 GB; one job per L3 domain.
+- three measured runs per (case, engine), no warm-up, in rep-major order (every cell's first
+  run before any second run, longest corpora first); a single run on the two JavaScript
+  scans;
+- timeout 7,200 s; per-run RSS guards of 100-200 GB, none reached;
+- one job per L3 domain, except the two interpreted-Souffle JavaScript runs, which shared
+  one domain; timing runs shared the host with evaluator builds and the end-to-end scans on
+  the other domains;
+- every evaluator was rebuilt from the reordered policy (FlowLog builds took 596-658 s
+  without SIP and 2,162-2,231 s with SIP);
+- old and mid FlowLog were not rerun on the two JavaScript scans, which take hours per run.
+  The swap changes FlowLog's JavaScript times by only about 7%.
 
 Parity compares Sasty's seven `PUBLIC_RELATIONS` (sorted lines, SHA-256) against
 interpreted Souffle: the six public result relations plus the `Stat` diagnostics.
@@ -444,22 +481,157 @@ interpreted Souffle: the six public result relations plus the `Stat` diagnostics
 exceeded 4 GiB of *dependency facts* (more than 5x JS-XL) after 20 min. FlowLog already needed
 140 GiB on the 0.8 GiB JS-XL input, so this case is infeasible on a 503 GB host.
 
-**django without SIP (`ALLOC` below).** old-nosip, mid-nosip and newfix each abort at
-about 122 s with an identical 172 GiB peak. In a diagnostic rerun, 242 GiB was still
-available at the moment of the abort. The cause is an allocator ceiling in mimalloc
-v3.3.2, not the host (section 7 item 7). Even with that ceiling removed, the no-SIP plan needs
-more than 240 GiB, so these cells are lower bounds only.
+**JS-XL.** Only newfix finishes, in 7,129 s, just under the limit. No reference finished, but
+the two relations that compiled and interpreted Souffle wrote before their timeouts
+(`SourceFound`, 523 rows, and the empty `PatternFinding`) match newfix exactly, as do
+interpreted Souffle's partial JS-off outputs.
 
-**SIP builds on JS-off.** old-sip and mid-sip both hit the 7,200 s timeout with a 158 GiB
-peak. The no-SIP builds of the same releases finish in about 5,270 s, so on JS-off SIP makes
-evaluation more than 1.36x slower. This is the reverse of django, where SIP is the only way
-to finish.
+### Engine-only Sasty benchmark (reordered rule #337)
 
-**Older releases on JS-XL.** A first attempt ran old-nosip on JS-XL. It reached 75 GiB after
-1 min, 125 GiB at 16 min and 152 GiB at 23 min before it was stopped by hand. For that reason
-only Souffle, Souffle-c and newfix were run on JS-XL.
+Median wall seconds of 3 runs per cell (n = finished runs; n=0 means a single run was the measurement, as on the two JavaScript corpora). Every engine evaluates the same policy with the rule-#337 atom swap. Souffle = production interpreter; Souffle-c = compiled `souffle -o` binary of the same taint.dl. * = longer than Sasty's default 900 s stage timeout (the production scan would fail closed); DNF = killed by the 7,200 s timeout.
 
-### Engine-only Sasty benchmark (w1)
+| case | fact rows | MiB | souffle | souffle-c | old-sip | old-nosip | mid-sip | mid-nosip | newfix | n |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sasy-python-off | 2,730,964 | 227 | 69.65 | 42.55 | 55.13 | 36.88 | 54.99 | 36.69 | 36.38 | 3/3/3/3/3/3/3 |
+| sasy-javascript-off | 6,681,913 | 524 | DNF>7206s | 6259.00 * | - | - | - | - | 4894.00 * | -/0/-/-/-/-/0 |
+| starlette | 503,832 | 35 | 14.42 | 8.12 | 20.79 | 8.61 | 20.73 | 8.58 | 9.06 | 3/3/3/3/3/3/3 |
+| werkzeug | 579,462 | 38 | 6.82 | 4.26 | 4.60 | 2.40 | 4.49 | 2.32 | 2.28 | 3/3/3/3/3/3/3 |
+| itsdangerous | 264,222 | 24 | 1.32 | 0.37 | 1.18 | 0.56 | 1.14 | 0.52 | 0.51 | 3/3/3/3/3/3/3 |
+| httpx | 419,796 | 30 | 4.66 | 2.82 | 3.00 | 1.46 | 2.94 | 1.41 | 1.34 | 3/3/3/3/3/3/3 |
+| fastapi | 1,181,935 | 81 | 22.18 | 12.61 | 9.42 | 7.63 | 9.33 | 7.58 | 7.53 | 3/3/3/3/3/3/3 |
+| aiohttp | 1,368,261 | 78 | 30.33 | 22.81 | 11.24 | 8.01 | 11.22 | 7.85 | 7.68 | 3/3/3/3/3/3/3 |
+| flask | 398,762 | 29 | 2.71 | 1.44 | 2.25 | 1.08 | 2.23 | 1.02 | 0.98 | 3/3/3/3/3/3/3 |
+| django | 6,166,453 | 366 | 301.62 | 209.79 | 58.21 | 45.93 | 58.26 | 45.21 | 44.00 | 3/3/3/3/3/3/3 |
+| requests | 359,385 | 28 | 2.27 | 1.10 | 2.36 | 1.08 | 2.34 | 1.04 | 1.00 | 3/3/3/3/3/3/3 |
+| uvicorn | 447,845 | 33 | 3.75 | 2.32 | 2.58 | 1.61 | 2.59 | 1.55 | 1.51 | 3/3/3/3/3/3/3 |
+| execa | 867,857 | 51 | 4.54 | 3.31 | 3.54 | 1.91 | 3.46 | 1.85 | 1.67 | 3/3/3/3/3/3/3 |
+| body-parser | 302,255 | 25 | 1.47 | 0.51 | 1.38 | 0.55 | 1.36 | 0.54 | 0.50 | 3/3/3/3/3/3/3 |
+| cookie-parser | 254,952 | 23 | 1.23 | 0.29 | 1.13 | 0.44 | 1.11 | 0.42 | 0.45 | 3/3/3/3/3/3/3 |
+| koa | 336,090 | 27 | 1.70 | 0.77 | 1.51 | 0.62 | 1.49 | 0.60 | 0.58 | 3/3/3/3/3/3/3 |
+| fastify | 1,188,147 | 66 | 27.92 | 20.97 | 29.04 | 8.27 | 29.22 | 8.33 | 7.64 | 3/3/3/3/3/3/3 |
+| axios | 674,500 | 46 | 5.35 | 4.72 | 3.23 | 1.45 | 3.18 | 1.41 | 1.28 | 3/3/3/3/3/3/3 |
+| express | 504,320 | 34 | 2.40 | 1.47 | 1.99 | 0.90 | 1.96 | 0.88 | 0.80 | 3/3/3/3/3/3/3 |
+| undici | 1,797,035 | 95 | 21.93 | 21.71 | 10.37 | 5.76 | 10.32 | 5.67 | 5.20 | 3/3/3/3/3/3/3 |
+| sasy-javascript-reachable-xl | 10,028,546 | 821 | DNF>7206s | DNF>7204s | - | - | - | - | 7129.00 * | -/-/-/-/-/-/0 |
+
+#### Speedup of each FlowLog evaluator (Souffle time  /  FlowLog time; >1 = FlowLog faster)
+
+| evaluator | vs Souffle interpreted: geomean | wins | range | vs Souffle compiled: geomean | wins | range |
+|---|---|---|---|---|---|---|
+| old-sip | 1.426x | 16/19 | 0.694-5.182x | 0.804x | 5/19 | 0.257-3.604x |
+| old-nosip | 2.825x | 19/19 | 1.675-6.567x | 1.593x | 15/19 | 0.659-4.568x |
+| mid-sip | 1.442x | 16/19 | 0.696-5.177x | 0.813x | 5/19 | 0.261-3.601x |
+| mid-nosip | 2.902x | 19/19 | 1.681-6.672x | 1.637x | 15/19 | 0.690-4.640x |
+| newfix | 3.013x | 19/19 | 1.592-6.855x | 1.675x | 17/20 | 0.644-4.768x |
+
+Runs that did not finish: killed by the timeout or the memory guard, or aborted by an allocation failure (not in the geomeans):
+
+- sasy-javascript-off souffle: Souffle interpreted killed (DNF>7206s)
+- sasy-javascript-off newfix: Souffle interpreted killed (DNF>7206s) -> speedup > 1.472x
+- sasy-javascript-reachable-xl souffle: Souffle interpreted killed (DNF>7206s)
+- sasy-javascript-reachable-xl souffle-c: Souffle compiled killed (DNF>7204s)
+- sasy-javascript-reachable-xl newfix: Souffle interpreted killed (DNF>7206s) -> speedup > 1.011x
+- sasy-javascript-reachable-xl newfix: Souffle compiled killed (DNF>7204s) -> speedup > 1.011x
+
+Souffle compiled vs interpreted: geomean 1.773x faster (19 cases).
+
+#### FlowLog vs FlowLog on the same facts (time of A  /  time of B; >1 = B faster)
+
+| case | old-nosip  /  newfix | mid-nosip  /  newfix | old-nosip  /  mid-nosip | old-nosip  /  old-sip | mid-nosip  /  mid-sip | old-sip  /  newfix |
+|---|---|---|---|---|---|---|
+| sasy-python-off | 1.014x | 1.009x | 1.005x | 0.669x | 0.667x | 1.515x |
+| sasy-javascript-off | - | - | - | - | - | - |
+| starlette | 0.950x | 0.947x | 1.003x | 0.414x | 0.414x | 2.295x |
+| werkzeug | 1.053x | 1.018x | 1.034x | 0.522x | 0.517x | 2.018x |
+| itsdangerous | 1.098x | 1.020x | 1.077x | 0.475x | 0.456x | 2.314x |
+| httpx | 1.090x | 1.052x | 1.035x | 0.487x | 0.480x | 2.239x |
+| fastapi | 1.013x | 1.007x | 1.007x | 0.810x | 0.812x | 1.251x |
+| aiohttp | 1.043x | 1.022x | 1.020x | 0.713x | 0.700x | 1.464x |
+| flask | 1.102x | 1.041x | 1.059x | 0.480x | 0.457x | 2.296x |
+| django | 1.044x | 1.028x | 1.016x | 0.789x | 0.776x | 1.323x |
+| requests | 1.080x | 1.040x | 1.038x | 0.458x | 0.444x | 2.360x |
+| uvicorn | 1.066x | 1.026x | 1.039x | 0.624x | 0.598x | 1.709x |
+| execa | 1.144x | 1.108x | 1.032x | 0.540x | 0.535x | 2.120x |
+| body-parser | 1.100x | 1.080x | 1.019x | 0.399x | 0.397x | 2.760x |
+| cookie-parser | 0.978x | 0.933x | 1.048x | 0.389x | 0.378x | 2.511x |
+| koa | 1.069x | 1.034x | 1.033x | 0.411x | 0.403x | 2.603x |
+| fastify | 1.082x | 1.090x | 0.993x | 0.285x | 0.285x | 3.801x |
+| axios | 1.133x | 1.102x | 1.028x | 0.449x | 0.443x | 2.523x |
+| express | 1.125x | 1.100x | 1.023x | 0.452x | 0.449x | 2.487x |
+| undici | 1.108x | 1.090x | 1.016x | 0.555x | 0.549x | 1.994x |
+| sasy-javascript-reachable-xl | - | - | - | - | - | - |
+| **geomean (both finished)** | **1.067x** (19) | **1.038x** (19) | **1.028x** (19) | **0.505x** (19) | **0.497x** (19) | **2.113x** (19) |
+
+- old-nosip  /  newfix: CSE and other main changes, SIP off in both
+- mid-nosip  /  newfix: mid -> main, SIP off in both
+- old-nosip  /  mid-nosip: old -> mid, SIP off in both
+- old-nosip  /  old-sip: SIP on the old release
+- mid-nosip  /  mid-sip: SIP on the mid release
+- old-sip  /  newfix: upgrade: Sasty's shipped build -> main (SIP removed)
+
+#### Parity of the seven public relations vs Souffle interpreted (sorted lines, SHA-256)
+
+Where interpreted Souffle did not finish, the cell names the reference used instead.
+
+| case | souffle-c | old-sip | old-nosip | mid-sip | mid-nosip | newfix |
+|---|---|---|---|---|---|---|
+| sasy-python-off | exact | exact | exact | exact | exact | exact |
+| sasy-javascript-off | exact vs newfix | n/a | n/a | n/a | n/a | exact vs souffle-c |
+| starlette | exact | exact | exact | exact | exact | exact |
+| werkzeug | exact | exact | exact | exact | exact | exact |
+| itsdangerous | exact | exact | exact | exact | exact | exact |
+| httpx | exact | exact | exact | exact | exact | exact |
+| fastapi | exact | exact | exact | exact | exact | exact |
+| aiohttp | exact | exact | exact | exact | exact | exact |
+| flask | exact | exact | exact | exact | exact | exact |
+| django | exact | exact | exact | exact | exact | exact |
+| requests | exact | exact | exact | exact | exact | exact |
+| uvicorn | exact | exact | exact | exact | exact | exact |
+| execa | exact | exact | exact | exact | exact | exact |
+| body-parser | exact | exact | exact | exact | exact | exact |
+| cookie-parser | exact | exact | exact | exact | exact | exact |
+| koa | exact | exact | exact | exact | exact | exact |
+| fastify | exact | exact | exact | exact | exact | exact |
+| axios | exact | exact | exact | exact | exact | exact |
+| express | exact | exact | exact | exact | exact | exact |
+| undici | exact | exact | exact | exact | exact | exact |
+| sasy-javascript-reachable-xl | n/a | n/a | n/a | n/a | n/a | no reference finished |
+
+#### Peak RSS (MiB, median) and CPU utilisation ((user+sys)/wall)
+
+| case | souffle RSS | souffle-c RSS | old-sip RSS | old-nosip RSS | mid-sip RSS | mid-nosip RSS | newfix RSS | souffle cpu | souffle-c cpu | old-sip cpu | old-nosip cpu | mid-sip cpu | mid-nosip cpu | newfix cpu |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| sasy-python-off | 1490 | 766 | 3594 | 2471 | 3602 | 2482 | 2466 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| sasy-javascript-off | >=81609 | 51800 | - | - | - | - | 127757 | - | 1.00 | - | - | - | - | 1.00 |
+| starlette | 576 | 421 | 1829 | 1248 | 1774 | 1268 | 1236 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| werkzeug | 126 | 106 | 495 | 286 | 484 | 291 | 270 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| itsdangerous | 84 | 57 | 462 | 256 | 453 | 249 | 236 | 1.00 | 0.97 | 1.01 | 1.00 | 1.00 | 1.00 | 1.00 |
+| httpx | 106 | 83 | 487 | 278 | 479 | 273 | 258 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.99 | 1.00 |
+| fastapi | 210 | 183 | 713 | 848 | 715 | 853 | 844 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| aiohttp | 253 | 232 | 707 | 499 | 707 | 493 | 485 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| flask | 96 | 74 | 488 | 270 | 471 | 269 | 252 | 1.00 | 0.99 | 1.00 | 1.00 | 1.00 | 1.00 | 1.01 |
+| django | 1402 | 1334 | 2599 | 4405 | 2582 | 4231 | 3815 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| requests | 91 | 68 | 481 | 262 | 468 | 285 | 246 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| uvicorn | 107 | 85 | 486 | 276 | 475 | 282 | 260 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| execa | 178 | 154 | 537 | 315 | 536 | 309 | 288 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| body-parser | 79 | 53 | 415 | 210 | 412 | 208 | 200 | 0.99 | 0.98 | 1.00 | 1.00 | 1.00 | 1.00 | 1.02 |
+| cookie-parser | 75 | 47 | 407 | 202 | 404 | 202 | 192 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.98 | 1.00 |
+| koa | 81 | 56 | 418 | 215 | 416 | 215 | 204 | 1.00 | 0.99 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| fastify | 577 | 503 | 2036 | 1118 | 2028 | 1109 | 1108 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| axios | 128 | 107 | 507 | 290 | 511 | 287 | 268 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| express | 106 | 82 | 459 | 246 | 456 | 252 | 228 | 1.00 | 0.99 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| undici | 455 | 434 | 902 | 665 | 916 | 670 | 602 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
+| sasy-javascript-reachable-xl | >=74835 | >=55051 | - | - | - | - | 143330 | - | - | - | - | - | - | 1.00 |
+
+FlowLog runs with any stderr output (would fail Sasty's reject_stderr path): none
+
+### Original policy (superseded)
+
+<details>
+<summary><strong>Engine-only results with Sasty's unmodified rule #337</strong></summary>
+
+These were the first published results. They used the campaign protocol: one warm-up plus
+5/3/1/0 measured runs depending on the warm-up wall time, and a 250 GB RSS cap.
 
 Median wall seconds of the measured reps (n = measured reps after one warm-up; n=0 means the warm-up alone was the measurement). Souffle = production interpreter; Souffle-c = compiled `souffle -o` binary of the same taint.dl. * = longer than Sasty's default 900 s stage timeout (the production scan would fail closed); DNF/MEM = killed by the 7,200 s timeout or the 250 GB RSS cap; ALLOC = the evaluator aborted with `memory allocation of ... failed` (peak RSS@time).
 
@@ -487,8 +659,6 @@ Median wall seconds of the measured reps (n = measured reps after one warm-up; n
 | undici | 1,797,035 | 95 | 30.88 | 27.53 | 10.49 | 30.81 | 10.36 | 29.99 | 29.65 | 5/5/5/5/5/5/5 |
 | sasy-javascript-reachable-xl | 10,028,546 | 821 | DNF>7201s | DNF>7200s | - | - | - | - | DNF>7200s | -/-/-/-/-/-/- |
 
-#### Speedup of each FlowLog evaluator (Souffle time  /  FlowLog time; >1 = FlowLog faster)
-
 | evaluator | vs Souffle interpreted: geomean | wins | range | vs Souffle compiled: geomean | wins | range |
 |---|---|---|---|---|---|---|
 | old-sip | 1.713x | 16/19 | 0.725-33.936x | 0.972x | 8/19 | 0.265-26.754x |
@@ -497,123 +667,19 @@ Median wall seconds of the measured reps (n = measured reps after one warm-up; n
 | mid-nosip | 1.866x | 17/18 | 0.733-3.253x | 1.046x | 9/19 | 0.465-2.428x |
 | newfix | 1.944x | 17/18 | 0.742-3.468x | 1.088x | 10/19 | 0.471-2.588x |
 
-Runs that did not finish: killed by the timeout or the memory guard, or aborted by an allocation failure (not in the geomeans):
+- django without SIP: old-nosip, mid-nosip and newfix each aborted at about 122 s with an
+  identical 172 GiB peak while 242 GiB was still available. The cause is an allocator ceiling
+  in mimalloc v3.3.2 (section 7 item 7); even with that ceiling removed, the no-SIP plan needed
+  more than 240 GiB.
+- SIP builds on JS-off: old-sip and mid-sip both hit the 7,200 s timeout at a 158 GiB peak,
+  while the no-SIP builds finished in about 5,270 s.
+- Older releases on JS-XL: old-nosip reached 152 GiB after 23 min and was stopped by hand, so
+  only Souffle, Souffle-c and newfix ran on JS-XL. All three hit the 7,200 s timeout.
+- newfix peak RSS: 20.1 GiB on python-off, 9.0 GiB on aiohttp and 6.8 GiB on undici, where
+  compiled Souffle used 0.75, 0.23 and 0.42 GiB.
+- Parity was exact on every finished run.
 
-- sasy-javascript-off souffle: Souffle killed (DNF>7201s)
-- sasy-javascript-off old-sip: FlowLog killed (DNF>7200s) -> speedup vs Souffle compiled < 0.871x
-- sasy-javascript-off old-nosip: Souffle interpreted killed (DNF>7201s) -> speedup > 1.366x
-- sasy-javascript-off mid-sip: FlowLog killed (DNF>7200s) -> speedup vs Souffle compiled < 0.871x
-- sasy-javascript-off mid-nosip: Souffle interpreted killed (DNF>7201s) -> speedup > 1.366x
-- sasy-javascript-off newfix: Souffle interpreted killed (DNF>7201s) -> speedup > 1.373x
-- django old-nosip: FlowLog aborted (ALLOC 172G@125s) -> speedup vs Souffle interpreted < 16.804x
-- django old-nosip: FlowLog aborted (ALLOC 172G@125s) -> speedup vs Souffle compiled < 13.247x
-- django mid-nosip: FlowLog aborted (ALLOC 172G@123s) -> speedup vs Souffle interpreted < 17.025x
-- django mid-nosip: FlowLog aborted (ALLOC 172G@123s) -> speedup vs Souffle compiled < 13.421x
-- django newfix: FlowLog aborted (ALLOC 172G@122s) -> speedup vs Souffle interpreted < 17.230x
-- django newfix: FlowLog aborted (ALLOC 172G@122s) -> speedup vs Souffle compiled < 13.583x
-- sasy-javascript-reachable-xl souffle: Souffle killed (DNF>7201s)
-- sasy-javascript-reachable-xl souffle-c: Souffle killed (DNF>7200s)
-- sasy-javascript-reachable-xl newfix: FlowLog killed (DNF>7200s); no Souffle run finished either
-
-Souffle compiled vs interpreted: geomean 1.763x faster (19 cases).
-
-#### FlowLog vs FlowLog on the same facts (time of A  /  time of B; >1 = B faster)
-
-| case | old-nosip  /  newfix | mid-nosip  /  newfix | old-nosip  /  mid-nosip | old-nosip  /  old-sip | mid-nosip  /  mid-sip | old-sip  /  newfix |
-|---|---|---|---|---|---|---|
-| sasy-python-off | 1.031x | 1.012x | 1.019x | 2.554x | 2.524x | 0.404x |
-| sasy-javascript-off | 1.005x | 1.005x | 1.000x | < 0.732x | < 0.732x | > 1.37x |
-| starlette | 0.991x | 0.966x | 1.026x | 0.518x | 0.504x | 1.914x |
-| werkzeug | 1.043x | 1.013x | 1.030x | 1.496x | 1.478x | 0.698x |
-| itsdangerous | 1.120x | 1.060x | 1.057x | 0.459x | 0.457x | 2.440x |
-| httpx | 1.069x | 1.039x | 1.028x | 0.702x | 0.699x | 1.522x |
-| fastapi | 1.035x | 1.021x | 1.014x | 1.008x | 1.007x | 1.026x |
-| aiohttp | 1.032x | 1.003x | 1.029x | 3.670x | 3.612x | 0.281x |
-| flask | 1.079x | 1.036x | 1.042x | 0.644x | 0.640x | 1.676x |
-| django | - | - | - | > 2.02x | > 1.99x | < 0.508x |
-| requests | 1.081x | 1.041x | 1.039x | 0.552x | 0.542x | 1.959x |
-| uvicorn | 1.041x | 1.011x | 1.029x | 1.732x | 1.722x | 0.601x |
-| execa | 1.152x | 1.127x | 1.022x | 0.537x | 0.533x | 2.145x |
-| body-parser | 1.120x | 1.060x | 1.057x | 0.392x | 0.381x | 2.860x |
-| cookie-parser | 1.125x | 1.075x | 1.047x | 0.385x | 0.381x | 2.925x |
-| koa | 1.109x | 1.078x | 1.029x | 0.458x | 0.454x | 2.422x |
-| fastify | 1.072x | 1.066x | 1.006x | 0.299x | 0.298x | 3.583x |
-| axios | 1.079x | 1.049x | 1.029x | 0.894x | 0.881x | 1.206x |
-| express | 1.125x | 1.100x | 1.023x | 0.443x | 0.388x | 2.537x |
-| undici | 1.039x | 1.011x | 1.027x | 2.937x | 2.895x | 0.354x |
-| sasy-javascript-reachable-xl | - | - | - | - | - | - |
-| **geomean (both finished)** | **1.070x** (19) | **1.040x** (19) | **1.029x** (19) | **0.802x** (18) | **0.787x** (18) | **1.339x** (18) |
-
-- old-nosip  /  newfix: CSE and other main changes, SIP off in both
-- mid-nosip  /  newfix: mid -> main, SIP off in both
-- old-nosip  /  mid-nosip: old -> mid, SIP off in both
-- old-nosip  /  old-sip: SIP on the old release
-- mid-nosip  /  mid-sip: SIP on the mid release
-- old-sip  /  newfix: upgrade: Sasty's shipped build -> main (SIP removed)
-
-#### Parity of the seven public relations vs Souffle interpreted (sorted lines, SHA-256)
-
-Where interpreted Souffle did not finish, the cell names the reference used instead.
-
-| case | souffle-c | old-sip | old-nosip | mid-sip | mid-nosip | newfix |
-|---|---|---|---|---|---|---|
-| sasy-python-off | exact | exact | exact | exact | exact | exact |
-| sasy-javascript-off | exact vs old-nosip | n/a | exact vs souffle-c | n/a | exact vs souffle-c | exact vs souffle-c |
-| starlette | exact | exact | exact | exact | exact | exact |
-| werkzeug | exact | exact | exact | exact | exact | exact |
-| itsdangerous | exact | exact | exact | exact | exact | exact |
-| httpx | exact | exact | exact | exact | exact | exact |
-| fastapi | exact | exact | exact | exact | exact | exact |
-| aiohttp | exact | exact | exact | exact | exact | exact |
-| flask | exact | exact | exact | exact | exact | exact |
-| django | exact | exact | n/a | exact | n/a | n/a |
-| requests | exact | exact | exact | exact | exact | exact |
-| uvicorn | exact | exact | exact | exact | exact | exact |
-| execa | exact | exact | exact | exact | exact | exact |
-| body-parser | exact | exact | exact | exact | exact | exact |
-| cookie-parser | exact | exact | exact | exact | exact | exact |
-| koa | exact | exact | exact | exact | exact | exact |
-| fastify | exact | exact | exact | exact | exact | exact |
-| axios | exact | exact | exact | exact | exact | exact |
-| express | exact | exact | exact | exact | exact | exact |
-| undici | exact | exact | exact | exact | exact | exact |
-| sasy-javascript-reachable-xl | n/a | n/a | n/a | n/a | n/a | n/a |
-
-#### Peak RSS (MiB, median) and CPU utilisation ((user+sys)/wall)
-
-| case | souffle RSS | souffle-c RSS | old-sip RSS | old-nosip RSS | mid-sip RSS | mid-nosip RSS | newfix RSS | souffle cpu | souffle-c cpu | old-sip cpu | old-nosip cpu | mid-sip cpu | mid-nosip cpu | newfix cpu |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| sasy-python-off | 1490 | 766 | 3598 | 20579 | 3601 | 20588 | 20602 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| sasy-javascript-off | >=80400 | 51801 | >=162281 | 127336 | >=162168 | 127225 | 127791 | - | 1.00 | - | 1.00 | - | 1.00 | 1.00 |
-| starlette | 576 | 422 | 1867 | 1237 | 1812 | 1250 | 1226 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| werkzeug | 126 | 107 | 502 | 1693 | 486 | 1694 | 1677 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| itsdangerous | 84 | 56 | 464 | 254 | 457 | 249 | 232 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| httpx | 106 | 83 | 488 | 480 | 480 | 483 | 472 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| fastapi | 209 | 184 | 715 | 955 | 708 | 958 | 946 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| aiohttp | 254 | 231 | 870 | 9182 | 867 | 9185 | 9183 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| flask | 96 | 74 | 489 | 373 | 475 | 377 | 359 | 1.00 | 0.99 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| django | 1402 | 1335 | 2580 | >=176018 | 2618 | >=176015 | >=176014 | 1.00 | 1.00 | 1.00 | - | 1.00 | - | - |
-| requests | 91 | 68 | 477 | 310 | 470 | 315 | 300 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| uvicorn | 107 | 85 | 489 | 1230 | 483 | 1230 | 1211 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| execa | 178 | 154 | 534 | 315 | 533 | 306 | 292 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| body-parser | 79 | 53 | 417 | 210 | 414 | 209 | 198 | 1.00 | 0.98 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| cookie-parser | 75 | 48 | 407 | 202 | 408 | 202 | 190 | 1.00 | 0.97 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| koa | 81 | 56 | 420 | 238 | 420 | 237 | 222 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| fastify | 577 | 503 | 2033 | 1113 | 2040 | 1110 | 1075 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| axios | 128 | 107 | 507 | 768 | 504 | 767 | 746 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| express | 105 | 83 | 457 | 248 | 452 | 253 | 230 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| undici | 455 | 434 | 910 | 7142 | 929 | 7116 | 7005 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| sasy-javascript-reachable-xl | >=74834 | >=55052 | - | - | - | - | >=142875 | - | - | - | - | - | - | - |
-
-FlowLog runs with any stderr output (would fail Sasty's reject_stderr path): none
-
-#### JS-XL memory trajectory (max RSS GiB within each 10-minute window; samples before minute 50 were taken by hand)
-
-| engine | 10-20 min | 20-30 min | 30-40 min | 40-50 min | 50-60 min | 60-70 min | 70-80 min | 80-90 min | 90-100 min | 100-110 min | 110-120 min |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| souffle | 5 | 18 | 45 | 65 | 66 | 66 | 68 | 73 | 66 | 67 | 68 |
-| souffle-c | 8 | 21 | 47 | 47 | 52 | 47 | 47 | 47 | 51 | 54 | 54 |
-| newfix | 107 | 140 | 106 | 104 | 66 | 46 | 64 | 90 | 71 | 77 | 111 |
+</details>
 
 ## 5. SAST end-to-end (Sasty's standard protocol)
 
@@ -629,9 +695,18 @@ runs**, whichever engine is selected:
 
 The engine is therefore irrelevant for those scans today.
 
+**Policy.** The `sasy-python-off` rows use the reordered rule #337 (section 4), with every
+evaluator rebuilt from that policy. Their public CSVs are byte-identical to the
+original-policy scan's. With the original policy, python-off took 145.0 s with Souffle, 97.2 s
+with old-sip and 179.7 s with newfix (20 GiB). The JS-off and reachable rows were measured with
+the original policy and not rerun: the reachable scans fail before any engine runs, and JS-off's
+engine-only time with the reordered rule (at least 4,894 s) still far exceeds the 900 s stage
+bound. The python-off rerun shared the host with engine-only timing jobs on the other three L3
+domains.
+
 **JS-off (first-party JavaScript only) hits the 900 s stage timeout with every engine.**
 Souffle, old-sip and newfix all exit with rc=124 after about 923 s (23 s of extraction plus
-900 s of analysis). At the kill their RSS was 20, 32 and 60 GB. section 4 shows how long the engines
+900 s of analysis). At the kill their RSS was 20, 32 and 60 GB. Section 4 shows how long the engines
 actually need without a bound. One committed generated file,
 `packages/sasty/src/sasty/resources/extract_js.bundle.js` (Sasty's own 3.5 MiB minified bun
 bundle), supplies half of JS-off's expression facts (638K of 1.26M `SrcExpr` rows, across 646
@@ -651,9 +726,9 @@ that 900 s bound.
 | sasy-javascript-reachable | souffle | 0/1 | failed (rc=[2]) | - | 2576 | - | - | dependency discovery failed: JavaScript dependency import planning refuses a source file larger than 4 MiB: .../typescript.js |
 | sasy-javascript-reachable | old-sip | 0/1 | failed (rc=[2]) | - | 1331 | - | - | dependency discovery failed: JavaScript dependency import planning refuses a source file larger than 4 MiB: .../typescript.js |
 | sasy-javascript-reachable | newfix | 0/1 | failed (rc=[2]) | - | 2048 | - | - | dependency discovery failed: JavaScript dependency import planning refuses a source file larger than 4 MiB: .../typescript.js |
-| sasy-python-off | souffle | 6/6 | 145.0 (5) | 142.3-146.0 | 1490 | - | reference | - |
-| sasy-python-off | old-sip | 6/6 | 97.2 (5) | 96.5-98.5 | 3598 | 1.493x | exact | - |
-| sasy-python-off | newfix | 6/6 | 179.7 (5) | 178.2-181.0 | 20597 | 0.807x | exact | - |
+| sasy-python-off | souffle | 6/6 | 113.9 (5) | 112.7-115.6 | 1489 | - | reference | - |
+| sasy-python-off | old-sip | 6/6 | 99.1 (5) | 98.7-102.0 | 3635 | 1.150x | exact | - |
+| sasy-python-off | newfix | 6/6 | 79.0 (5) | 78.2-79.3 | 2469 | 1.442x | exact | - |
 | sasy-python-reachable | souffle | 0/1 | failed (rc=[2]) | - | 164 | - | - | dependency discovery failed: dependency source exceeds --dependency-byte-limit-mib=64 (64.0 MiB selected) |
 | sasy-python-reachable | old-sip | 0/1 | failed (rc=[2]) | - | 164 | - | - | dependency discovery failed: dependency source exceeds --dependency-byte-limit-mib=64 (64.0 MiB selected) |
 | sasy-python-reachable | newfix | 0/1 | failed (rc=[2]) | - | 164 | - | - | dependency discovery failed: dependency source exceeds --dependency-byte-limit-mib=64 (64.0 MiB selected) |
@@ -702,8 +777,10 @@ newfix vs old: 1.030x (steps 1-5); step 0 1.037x
 3. **SIP was removed on main** (#365, `691eb0d`).
    - Sasty's default FlowLog build arguments include `--sip`, so Sasty cannot build its engine
      against main unchanged.
-   - The new release is therefore always measured without SIP. section 4 shows the SIP effect
-     separately (`old-nosip  /  old-sip`, `mid-nosip  /  mid-sip`).
+   - The new release is therefore always measured without SIP. Section 4 shows the SIP effect
+     separately (`old-nosip  /  old-sip`, `mid-nosip  /  mid-sip`). With the reordered rule
+     #337, SIP is slower on every input (no-SIP time is 0.50x SIP time, geomean); with the
+     original rule it was worth 2.5-3.7x on aiohttp, undici and python-off.
 4. **API renames** (`DatalogInc` -> `Inc`, `IncrementalEngine`) required harness edits on mid
    and new.
 5. **Evaluator build cost** (Sasty, single policy):
@@ -714,12 +791,14 @@ newfix vs old: 1.030x (steps 1-5); step 0 1.037x
    | SIP | 2,229-2,573 s | 769-855 MB |
 
    One old-SIP build attempt died when the disk filled (ENOSPC); that was the host, not FlowLog.
+   The rebuilds from the reordered policy took 596-658 s (noSIP) and 2,162-2,231 s (SIP), with
+   the same binary sizes.
 6. **Silent bad input.** Upstream FlowLog loads missing or malformed fact files as empty,
    printing a stderr diagnostic. Sasty's build smoke test therefore cannot pass on these
    builds, so it ran in report-only mode (`SASTY_BENCH_SMOKE_REPORT_ONLY=1`). At scan time,
    Sasty's `reject_stderr` path still rejects any FlowLog stderr output.
-7. **Allocator ceiling at about 172 GiB (all three releases).** The generated evaluators
-   use `mimalloc = "0.1"` as the global allocator. The newest crates (mimalloc 0.1.52,
+7. **Allocator ceiling at about 172 GiB (all three releases, original policy).** The generated
+   evaluators use `mimalloc = "0.1"` as the global allocator. The newest crates (mimalloc 0.1.52,
    libmimalloc-sys 0.1.49, May 22) bundle **mimalloc v3.3.2** by default.
    - Diagnosis (newfix on django, `MIMALLOC_VERBOSE=1`, `diag_maps.py`):
      - v3.3.2 reserved 8 arenas each of 1, 2, 4 and 8 GiB.
@@ -747,9 +826,17 @@ newfix vs old: 1.030x (steps 1-5); step 0 1.037x
      the same input needs 2.5 GiB and finishes in 62 s.
    - On JS-off, old-sip and mid-sip were at 158 GiB when the timeout killed them. That is
      within about 2 GiB of the RSS at which django's runs fell back to per-page mappings.
+   - With the reordered rule #337, newfix finishes django in 44 s at 3.7 GiB. Its largest
+     peaks, 125 GiB on JS-off and 140 GiB on JS-XL, stay below the point where arena
+     reservation stops (about 160 GiB).
 
 ## 8. Deviations, substitutions and blockers
 
+- **Sasty policy.** Rule #337 of `taint.dl` has two body atoms swapped, for every engine, in
+  all Sasty engine-only results and the python-off end-to-end rows (sections 4 and 5).
+  Outputs are unchanged. The incremental replay's policy (section 6) has no such rule and is
+  unmodified. The first published version of this report used the unmodified rule; its
+  engine-only results are kept at the end of section 4.
 - **Corpus pins.** `differential-corpora.yml` lists **18** corpora, not 20. Three pins do
   not exist on GitHub (HTTP 422), so each was replaced by the default-branch commit that
   shares its prefix at the YAML's commit time:

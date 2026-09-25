@@ -1568,16 +1568,16 @@ z
    </g>
    <g id="legend_1">
     <g id="patch_22">
-     <path d="M 530.44375 54.436406
-L 545.14375 54.436406
-L 545.14375 47.086406
-L 530.44375 47.086406
+     <path d="M 533.59375 28.565391
+L 548.29375 28.565391
+L 548.29375 21.215391
+L 533.59375 21.215391
 z
 " style="fill: #0087b9"/>
     </g>
     <g id="text_14">
      <!-- FlowLog main -->
-     <g style="fill: #2a2f36" transform="translate(553.54375 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(556.69375 28.565391)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-46" d="M 550 0
 L 550 4435
@@ -1688,16 +1688,16 @@ z
      </g>
     </g>
     <g id="patch_23">
-     <path d="M 636.28375 54.436406
-L 650.98375 54.436406
-L 650.98375 47.086406
-L 636.28375 47.086406
+     <path d="M 639.43375 28.565391
+L 654.13375 28.565391
+L 654.13375 21.215391
+L 639.43375 21.215391
 z
 " style="fill: #f5a623"/>
     </g>
     <g id="text_15">
      <!-- Compiled Souffle -->
-     <g style="fill: #2a2f36" transform="translate(659.38375 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(662.53375 28.565391)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-43" d="M 2458 -96
 Q 1990 -96 1606 57
@@ -1865,16 +1865,16 @@ z
      </g>
     </g>
     <g id="patch_24">
-     <path d="M 758.60875 54.436406
-L 773.30875 54.436406
-L 773.30875 47.086406
-L 758.60875 47.086406
+     <path d="M 761.75875 28.565391
+L 776.45875 28.565391
+L 776.45875 21.215391
+L 761.75875 21.215391
 z
 " style="fill: #5f2d12"/>
     </g>
     <g id="text_16">
      <!-- Interpreted Souffle -->
-     <g style="fill: #2a2f36" transform="translate(781.70875 54.436406)scale(0.105 -0.105)">
+     <g style="fill: #2a2f36" transform="translate(784.85875 28.565391)scale(0.105 -0.105)">
       <defs>
        <path id="Ubuntu-49" d="M 550 4435
 L 1171 4435

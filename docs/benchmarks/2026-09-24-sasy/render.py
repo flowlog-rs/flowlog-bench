@@ -8,6 +8,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 from matplotlib import font_manager
+from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
 import numpy as np
@@ -20,6 +21,11 @@ ACCENT_BROWN = "#5F2D12"
 INK = "#2A2F36"
 MUTED = "#555F6C"
 GRID = "#E8EEF2"
+ENGINES = (
+    ("flowlog_main", "FlowLog main", FLOWLOG),
+    ("souffle_compiled", "Compiled Souffle", SOUFFLE),
+    ("souffle_interpreted", "Interpreted Souffle", ACCENT_BROWN),
+)
 
 
 def configure_style() -> None:
@@ -88,6 +94,21 @@ def style_axis(ax: plt.Axes) -> None:
     ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
 
 
+def header_legend(ax: plt.Axes) -> None:
+    # Solid swatches above the plot area, so bars never sit under the legend.
+    ax.legend(
+        handles=[Patch(facecolor=color, label=label) for _, label, color in ENGINES],
+        frameon=False,
+        ncol=len(ENGINES),
+        loc="lower right",
+        bbox_to_anchor=(1.0, 1.0),
+        borderaxespad=0.2,
+        handlelength=1.4,
+        columnspacing=1.6,
+        fontsize=10.5,
+    )
+
+
 def policy_census() -> None:
     data = rows("policy-census.csv")
     fig, axes = plt.subplots(1, 2, figsize=(15.5, 8.2), sharex=True)
@@ -141,47 +162,24 @@ def policy_census() -> None:
 
 def sasty_selected() -> None:
     data = rows("sasty-selected.csv")
-    labels = [row["case"] for row in data]
-    souffle = np.array([float(row["compiled_souffle_s"]) for row in data])
-    old_sip = np.array([float(row["old_sip_s"]) for row in data])
-    newfix = np.array([float(row["newfix_s"]) for row in data])
+    labels = [row["case"].replace(" ", "\n", 1) for row in data]
     x = np.arange(len(data))
     width = 0.25
 
     fig, ax = plt.subplots(figsize=(13.5, 6.4))
-    ax.bar(x - width, souffle, width, color=SOUFFLE, label="Compiled Souffle")
-    old_bars = ax.bar(
-        x,
-        old_sip,
-        width,
-        color=ACCENT_BROWN,
-        label="Shipped old-SIP",
-    )
-    new_bars = ax.bar(x + width, newfix, width, color=FLOWLOG, label="FlowLog main + guard")
-
-    for index, row in enumerate(data):
-        if row["old_sip_status"] != "complete":
-            old_bars[index].set_facecolor("white")
-            old_bars[index].set_edgecolor(ACCENT_BROWN)
-            old_bars[index].set_hatch("//")
+    for offset, (key, _, color) in zip((-width, 0, width), ENGINES, strict=True):
+        values = np.array([float(row[f"{key}_s"]) for row in data])
+        bars = ax.bar(x + offset, values, width, color=color)
+        for index, row in enumerate(data):
+            if row[f"{key}_status"] == "complete":
+                continue
+            bars[index].set_facecolor("white")
+            bars[index].set_edgecolor(color)
+            bars[index].set_hatch("//")
             ax.text(
-                x[index],
-                old_sip[index] * 1.08,
+                x[index] + offset,
+                values[index] * 1.08,
                 "DNF",
-                ha="center",
-                va="bottom",
-                color=INK,
-                fontsize=9,
-                fontweight=700,
-            )
-        if row["newfix_status"] != "complete":
-            new_bars[index].set_facecolor("white")
-            new_bars[index].set_edgecolor(FLOWLOG)
-            new_bars[index].set_hatch("//")
-            ax.text(
-                x[index] + width,
-                newfix[index] * 1.15,
-                "ALLOC",
                 ha="center",
                 va="bottom",
                 color=INK,
@@ -190,16 +188,16 @@ def sasty_selected() -> None:
             )
 
     ax.set_yscale("log")
-    ax.set_ylim(6, 15000)
+    ax.set_ylim(1, 20000)
     ax.yaxis.set_major_locator(LogLocator(base=10))
     ax.yaxis.set_minor_locator(NullLocator())
     ax.yaxis.set_major_formatter(
         FuncFormatter(lambda value, _: f"{value:,.0f}")
     )
-    ax.set_xticks(x, labels, rotation=20, ha="right")
+    ax.set_xticks(x, labels)
     ax.set_ylabel("Engine wall time (seconds, log)")
     ax.set_title(
-        "Sasty: actual engine time and SIP trade-offs",
+        "Sasty: actual engine time on the largest corpora",
         loc="left",
         fontsize=15,
         fontweight=700,
@@ -207,10 +205,10 @@ def sasty_selected() -> None:
         pad=18,
     )
     ax.text(
-        0.01,
-        -0.25,
-        "Hatched bars are incomplete runs: DNF is the 7,200 s timeout; "
-        "ALLOC is the observed 122 s allocator abort, not completion time.",
+        0.0,
+        -0.16,
+        "Corpora where compiled Souffle needs more than 5 s. "
+        "Hatched bars did not finish: DNF is the 7,200 s timeout.",
         transform=ax.transAxes,
         color=MUTED,
         fontsize=9,
@@ -218,36 +216,20 @@ def sasty_selected() -> None:
     ax.grid(axis="y", color=GRID, linewidth=0.7)
     ax.tick_params(axis="x", length=0, pad=8, labelsize=10)
     ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
-    ax.legend(
-        frameon=False,
-        ncol=3,
-        loc="upper right",
-        handlelength=1.4,
-        columnspacing=1.6,
-        fontsize=10.5,
-    )
+    header_legend(ax)
     finish(fig, "sasty-selected-time")
 
 
 def incremental_sast() -> None:
     data = rows("incremental-sast.csv")
     labels = [row["step"] for row in data]
-    flowlog = np.array([float(row["flowlog_main_s"]) for row in data])
-    compiled = np.array([float(row["souffle_compiled_s"]) for row in data])
-    interpreted = np.array([float(row["souffle_interpreted_s"]) for row in data])
     x = np.arange(len(data))
     width = 0.25
 
     fig, ax = plt.subplots(figsize=(12.5, 5.6))
-    ax.bar(x - width, flowlog, width, color=FLOWLOG, label="FlowLog main")
-    ax.bar(x, compiled, width, color=SOUFFLE, label="Compiled Souffle")
-    ax.bar(
-        x + width,
-        interpreted,
-        width,
-        color=ACCENT_BROWN,
-        label="Interpreted Souffle",
-    )
+    for offset, (key, _, color) in zip((-width, 0, width), ENGINES, strict=True):
+        values = np.array([float(row[f"{key}_s"]) for row in data])
+        ax.bar(x + offset, values, width, color=color)
     ax.set_xticks(x, labels)
     ax.set_ylabel("Wall time (seconds)")
     ax.set_title(
@@ -261,14 +243,7 @@ def incremental_sast() -> None:
     ax.grid(axis="y", color=GRID, linewidth=0.7)
     ax.tick_params(axis="x", length=0, pad=8, labelsize=10)
     ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
-    ax.legend(
-        frameon=False,
-        ncol=3,
-        loc="upper right",
-        handlelength=1.4,
-        columnspacing=1.6,
-        fontsize=10.5,
-    )
+    header_legend(ax)
     finish(fig, "incremental-sast-time")
 
 

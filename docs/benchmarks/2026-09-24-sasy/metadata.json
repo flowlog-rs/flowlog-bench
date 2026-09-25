@@ -1,6 +1,7 @@
 {
   "measurement_date": "2026-09-24",
   "publication_date": "2026-09-25",
+  "sast_measurement_date": "2026-09-25",
   "host": {
     "cpu": "AMD EPYC 7763",
     "physical_cores": 32,
@@ -12,7 +13,13 @@
     "flowlog_workers": 1,
     "souffle_workers": 1,
     "sast_timeout_seconds": 7200,
-    "sast_rss_cap_gib": 250
+    "sast_runs_per_cell": 3,
+    "sast_javascript_runs_per_cell": 1,
+    "sast_rss_guard_gb": [
+      100,
+      200
+    ],
+    "sast_rss_guard_reached": false
   },
   "engines": {
     "souffle": "2.5",
@@ -20,6 +27,17 @@
     "flowlog_mid_commit": "fed4211",
     "flowlog_main_commit": "07ffd67",
     "flowlog_main_local_guard": "c8af77a"
+  },
+  "sast_policy": {
+    "source": "Sasty taint.dl, 851 rules",
+    "modification": "rule #337: two body atoms swapped so its join no longer starts with a Cartesian product",
+    "engines": "identical policy for every engine",
+    "applies_to": [
+      "Sasty engine-only results",
+      "python-off end-to-end results"
+    ],
+    "outputs_changed": false,
+    "original_policy_results": "FULL_RESULTS.md, end of section 4"
   },
   "publication_boundary": {
     "included": [
