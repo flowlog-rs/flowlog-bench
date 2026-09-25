@@ -197,13 +197,15 @@ keys, entered recursive traces, and 1/3-worker execution.
 ### Reviewed measurements
 
 September 25, 2026, AMD EPYC 7763 host, one worker pinned to CPU 0.
+Measured source: `48a7271f2714b5e5800088c96028b42e5fcf8039`, with a
+clean working tree and source/binary hashes retained in both manifests.
 The full matrix used seed 7, one warm-up and three measured runs per
 method, Rust 1.96.0, DD 0.25.1, Timely 0.31.0, FlowLog runtime 0.5.0,
 and mimalloc 0.1.52. Commands:
 
 ```bash
-./bench.sh full --output results/review-full-20260925
-./bench.sh quick --workers 3 --output results/review-3w-20260925
+./bench.sh full --output results/review-full-clean-20260925
+./bench.sh quick --workers 3 --output results/review-3w-clean-20260925
 ```
 
 All full-matrix batch cases are below. Times are **median total
@@ -212,16 +214,16 @@ are actual left/right row counts, not requested sizes.
 
 | Case | Input rows L/R | `cross` | `cross-shadow` | `range` | `seek` | `auto` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Selective self join | 30000 / 30000 | 2570.190 | 2616.911 | 9.238 | 14.135 | 9.353 |
-| Empty range | 30000 / 30000 | 2564.878 | 2608.080 | 5.235 | 4.653 | 5.387 |
-| Dense range | 800 / 800 | 5.817 | 5.923 | 4.212 | 8.526 | 4.077 |
-| Tiny key groups | 2856 / 2843 | 1.200 | 1.393 | 1.340 | 1.281 | 1.347 |
-| Keyed selective | 95210 / 95178 | 57.164 | 59.498 | 30.120 | 41.794 | 31.926 |
-| Keyed skew | 24587 / 24512 | 56.521 | 58.987 | 12.914 | 19.705 | 13.221 |
-| Variable intervals | 29995 / 30000 | 2593.298 | 2597.048 | 10.356 | 14.765 | 10.673 |
-| Few intervals | 30 / 30000 | 5.887 | 5.788 | 2.837 | 1.873 | 1.948 |
-| Object conflicts | 30000 / 30000 | 3281.490 | 3395.798 | 30.238 | 42.270 | 30.691 |
-| Recursive reachability | 1 / 10000 | 771.739 | 775.723 | 328.278 | 50.715 | 49.685 |
+| Selective self join | 30000 / 30000 | 2565.886 | 2621.726 | 8.921 | 14.038 | 9.186 |
+| Empty range | 30000 / 30000 | 2568.881 | 2610.148 | 5.218 | 4.707 | 5.438 |
+| Dense range | 800 / 800 | 5.695 | 5.813 | 4.262 | 8.674 | 4.131 |
+| Tiny key groups | 2856 / 2843 | 1.278 | 1.219 | 1.175 | 1.250 | 1.439 |
+| Keyed selective | 95210 / 95178 | 57.403 | 59.577 | 30.394 | 41.771 | 31.673 |
+| Keyed skew | 24587 / 24512 | 56.795 | 59.750 | 12.814 | 20.144 | 13.711 |
+| Variable intervals | 29995 / 30000 | 2590.578 | 2589.491 | 10.348 | 14.528 | 10.720 |
+| Few intervals | 30 / 30000 | 5.888 | 5.808 | 2.813 | 1.892 | 1.836 |
+| Object conflicts | 30000 / 30000 | 3270.098 | 3382.750 | 29.885 | 41.622 | 30.399 |
+| Recursive reachability | 1 / 10000 | 770.805 | 773.459 | 331.939 | 50.465 | 51.408 |
 
 For transactions, these are **median milliseconds per transaction**,
 excluding preload: 30000 initial rows per side, 20 rounds, and 10 fresh
@@ -229,9 +231,9 @@ rows per selected side per round.
 
 | Updated side | `cross` | `cross-shadow` | `range` | `seek` | `auto` |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Left | 2.801 | 2.837 | 0.856 | 0.025 | 0.025 |
-| Right | 2.801 | 2.827 | 0.885 | 1.037 | 0.027 |
-| Both | 6.465 | 6.687 | 2.559 | 1.085 | 0.043 |
+| Left | 2.810 | 2.837 | 0.863 | 0.026 | 0.026 |
+| Right | 2.797 | 2.805 | 0.888 | 1.038 | 0.026 |
+| Both | 6.411 | 6.636 | 2.572 | 1.080 | 0.044 |
 
 Each completed matrix contains 101 case/method summaries and 404 checked
 process runs, including warm-ups. The three-worker quick matrix used
