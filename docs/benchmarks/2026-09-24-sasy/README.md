@@ -79,7 +79,9 @@ SIP removal. The cleaner non-SIP release comparison is:
 
 ## Agent-policy results
 
-![Actual p95 compute time for all 22 policy cells](policy-census-time.png)
+<p align="center">
+  <img src="policy-census-time.png" alt="Actual p95 compute time for all 22 policy cells" width="820"/>
+</p>
 
 [Vector version](policy-census-time.svg). The log scale is necessary because
 the measured cells span more than five orders of magnitude.
@@ -120,7 +122,9 @@ SAST results.
 
 ## Sasty engine-only results
 
-![Representative Sasty engine times and SIP trade-offs](sasty-selected-time.png)
+<p align="center">
+  <img src="sasty-selected-time.png" alt="Representative Sasty engine times and SIP trade-offs" width="820"/>
+</p>
 
 [Vector version](sasty-selected-time.svg). Hatched bars are incomplete runs,
 not successful completion times.
@@ -174,7 +178,9 @@ builds finish in about 5,270 seconds.
 
 ## Incremental SAST
 
-![Actual wall time for the six incremental SAST steps](incremental-sast-time.png)
+<p align="center">
+  <img src="incremental-sast-time.png" alt="Actual wall time for the six incremental SAST steps" width="820"/>
+</p>
 
 [Vector version](incremental-sast-time.svg).
 
@@ -265,3 +271,7 @@ The figures are generated from [policy-census.csv](policy-census.csv),
 ```bash
 python3 docs/benchmarks/2026-09-24-sasy/render.py
 ```
+
+Rendering uses FlowLog's Ubuntu typography. On Ubuntu, install
+`fonts-ubuntu`; an extracted font directory can instead be supplied through
+`FLOWLOG_BENCH_FONT_DIR`.

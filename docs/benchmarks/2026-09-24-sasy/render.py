@@ -1,18 +1,69 @@
 #!/usr/bin/env python3
 
 import csv
+import os
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+from matplotlib import font_manager
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
 import numpy as np
 
 
 ROOT = Path(__file__).resolve().parent
 FLOWLOG = "#0087B9"
 SOUFFLE = "#F5A623"
-OLD_SIP = "#626C78"
-GRID = "#D8DEE5"
-TEXT = "#1F2933"
+INK = "#193447"
+MUTED = "#5C6B75"
+GRID = "#E8EEF2"
+OLD_SIP = INK
+
+
+def configure_style() -> None:
+    font_paths = font_manager.findSystemFonts()
+    extra = os.environ.get("FLOWLOG_BENCH_FONT_DIR")
+    if extra:
+        font_paths.extend(font_manager.findSystemFonts(fontpaths=[extra]))
+    for font in sorted(font_paths):
+        if Path(font).stem in {
+            "Ubuntu-R",
+            "Ubuntu-B",
+            "Ubuntu-Regular",
+            "Ubuntu-Bold",
+        }:
+            font_manager.fontManager.addfont(font)
+    try:
+        font_manager.findfont("Ubuntu", fallback_to_default=False)
+    except ValueError as error:
+        raise RuntimeError(
+            "Rendering requires the Ubuntu font. Install the Ubuntu package "
+            "fonts-ubuntu, or set FLOWLOG_BENCH_FONT_DIR to an extracted copy."
+        ) from error
+
+    plt.rcParams.update(
+        {
+            "font.family": "Ubuntu",
+            "font.size": 11,
+            "text.color": INK,
+            "axes.labelcolor": MUTED,
+            "axes.labelpad": 10,
+            "axes.edgecolor": "#C8D3DA",
+            "axes.linewidth": 0.7,
+            "xtick.color": MUTED,
+            "ytick.color": MUTED,
+            "axes.spines.left": False,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.axisbelow": True,
+            "figure.facecolor": "white",
+            "savefig.facecolor": "white",
+            "svg.fonttype": "path",
+            "svg.hashsalt": "flowlog-sasy-2026-09-24",
+        }
+    )
 
 
 def rows(name: str) -> list[dict[str, str]]:
@@ -22,22 +73,24 @@ def rows(name: str) -> list[dict[str, str]]:
 
 def finish(fig: plt.Figure, stem: str) -> None:
     fig.tight_layout()
-    fig.savefig(ROOT / f"{stem}.png", dpi=180, bbox_inches="tight")
-    fig.savefig(ROOT / f"{stem}.svg", bbox_inches="tight")
+    fig.savefig(ROOT / f"{stem}.png", dpi=160, bbox_inches="tight")
+    svg = ROOT / f"{stem}.svg"
+    fig.savefig(svg, bbox_inches="tight", metadata={"Date": None})
+    svg.write_text(
+        "\n".join(line.rstrip() for line in svg.read_text().splitlines()) + "\n"
+    )
     plt.close(fig)
 
 
 def style_axis(ax: plt.Axes) -> None:
-    ax.set_axisbelow(True)
     ax.grid(axis="x", color=GRID, linewidth=0.8)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(colors=TEXT)
+    ax.tick_params(axis="x", length=0, pad=6, labelsize=10)
+    ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
 
 
 def policy_census() -> None:
     data = rows("policy-census.csv")
-    fig, axes = plt.subplots(1, 2, figsize=(13.5, 7.4), sharex=True)
+    fig, axes = plt.subplots(1, 2, figsize=(15.5, 8.2), sharex=True)
     for ax, shape in zip(axes, ("linear", "fan-in"), strict=True):
         selected = [row for row in data if row["shape"] == shape]
         labels = [row["workload"] for row in selected]
@@ -50,15 +103,38 @@ def policy_census() -> None:
         ax.set_yticks(y, labels)
         ax.invert_yaxis()
         ax.set_xscale("log")
-        ax.set_title(f"{shape.capitalize()} graph", weight="bold", color=TEXT)
-        ax.set_xlabel("p95 compute per action (microseconds, log scale)")
+        ax.xaxis.set_major_locator(LogLocator(base=10))
+        ax.xaxis.set_minor_locator(NullLocator())
+        ax.xaxis.set_major_formatter(
+            FuncFormatter(lambda value, _: f"{value:,.0f}")
+        )
+        ax.set_title(
+            f"{shape.capitalize()} graph",
+            loc="left",
+            fontsize=12,
+            fontweight=700,
+            pad=14,
+        )
+        ax.set_xlabel("p95 compute per action (microseconds, log)")
         style_axis(ax)
-    axes[0].legend(frameon=False, loc="lower right")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="upper right",
+        ncol=2,
+        frameon=False,
+        bbox_to_anchor=(0.98, 0.97),
+        handlelength=1.4,
+        columnspacing=1.6,
+    )
     fig.suptitle(
         "Agent-policy census: actual p95 compute time at 256 turns",
-        fontsize=16,
-        weight="bold",
-        color=TEXT,
+        x=0.07,
+        ha="left",
+        fontsize=15,
+        fontweight=700,
+        color=INK,
     )
     finish(fig, "policy-census-time")
 
@@ -72,7 +148,7 @@ def sasty_selected() -> None:
     x = np.arange(len(data))
     width = 0.25
 
-    fig, ax = plt.subplots(figsize=(12.5, 6.6))
+    fig, ax = plt.subplots(figsize=(13.5, 6.4))
     ax.bar(x - width, souffle, width, color=SOUFFLE, label="Compiled Souffle")
     old_bars = ax.bar(x, old_sip, width, color=OLD_SIP, label="Shipped old-SIP")
     new_bars = ax.bar(x + width, newfix, width, color=FLOWLOG, label="FlowLog main + guard")
@@ -84,13 +160,13 @@ def sasty_selected() -> None:
             old_bars[index].set_hatch("//")
             ax.text(
                 x[index],
-                old_sip[index] * 1.15,
+                old_sip[index] * 1.08,
                 "DNF",
                 ha="center",
                 va="bottom",
-                color=TEXT,
+                color=INK,
                 fontsize=9,
-                weight="bold",
+                fontweight=700,
             )
         if row["newfix_status"] != "complete":
             new_bars[index].set_facecolor("white")
@@ -102,19 +178,27 @@ def sasty_selected() -> None:
                 "ALLOC",
                 ha="center",
                 va="bottom",
-                color=TEXT,
+                color=INK,
                 fontsize=9,
-                weight="bold",
+                fontweight=700,
             )
 
     ax.set_yscale("log")
+    ax.set_ylim(6, 15000)
+    ax.yaxis.set_major_locator(LogLocator(base=10))
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.yaxis.set_major_formatter(
+        FuncFormatter(lambda value, _: f"{value:,.0f}")
+    )
     ax.set_xticks(x, labels, rotation=20, ha="right")
-    ax.set_ylabel("Engine wall time (seconds, log scale)")
+    ax.set_ylabel("Engine wall time (seconds, log)")
     ax.set_title(
         "Sasty: actual engine time and SIP trade-offs",
-        fontsize=16,
-        weight="bold",
-        color=TEXT,
+        loc="left",
+        fontsize=15,
+        fontweight=700,
+        color=INK,
+        pad=18,
     )
     ax.text(
         0.01,
@@ -122,14 +206,20 @@ def sasty_selected() -> None:
         "Hatched bars are incomplete runs: DNF is the 7,200 s timeout; "
         "ALLOC is the observed 122 s allocator abort, not completion time.",
         transform=ax.transAxes,
-        color=TEXT,
+        color=MUTED,
         fontsize=9,
     )
-    ax.set_axisbelow(True)
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.legend(frameon=False, ncol=3, loc="upper center")
+    ax.grid(axis="y", color=GRID, linewidth=0.7)
+    ax.tick_params(axis="x", length=0, pad=8, labelsize=10)
+    ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
+    ax.legend(
+        frameon=False,
+        ncol=3,
+        loc="upper right",
+        handlelength=1.4,
+        columnspacing=1.6,
+        fontsize=10.5,
+    )
     finish(fig, "sasty-selected-time")
 
 
@@ -142,7 +232,7 @@ def incremental_sast() -> None:
     x = np.arange(len(data))
     width = 0.25
 
-    fig, ax = plt.subplots(figsize=(10.5, 5.8))
+    fig, ax = plt.subplots(figsize=(12.5, 5.6))
     ax.bar(x - width, flowlog, width, color=FLOWLOG, label="FlowLog main")
     ax.bar(x, compiled, width, color=SOUFFLE, label="Compiled Souffle")
     ax.bar(x + width, interpreted, width, color=OLD_SIP, label="Interpreted Souffle")
@@ -150,28 +240,28 @@ def incremental_sast() -> None:
     ax.set_ylabel("Wall time (seconds)")
     ax.set_title(
         "SAST incremental replay: actual time per step",
-        fontsize=16,
-        weight="bold",
-        color=TEXT,
+        loc="left",
+        fontsize=15,
+        fontweight=700,
+        color=INK,
+        pad=18,
     )
-    ax.set_axisbelow(True)
-    ax.grid(axis="y", color=GRID, linewidth=0.8)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.legend(frameon=False, ncol=3, loc="upper center")
+    ax.grid(axis="y", color=GRID, linewidth=0.7)
+    ax.tick_params(axis="x", length=0, pad=8, labelsize=10)
+    ax.tick_params(axis="y", length=0, pad=6, labelsize=10)
+    ax.legend(
+        frameon=False,
+        ncol=3,
+        loc="upper right",
+        handlelength=1.4,
+        columnspacing=1.6,
+        fontsize=10.5,
+    )
     finish(fig, "incremental-sast-time")
 
 
 def main() -> None:
-    plt.rcParams.update(
-        {
-            "font.family": "DejaVu Sans",
-            "font.size": 10,
-            "axes.labelcolor": TEXT,
-            "text.color": TEXT,
-            "svg.fonttype": "path",
-        }
-    )
+    configure_style()
     policy_census()
     sasty_selected()
     incremental_sast()
