@@ -17,9 +17,9 @@ pub fn partition_point_from<X>(
     let (lo, hi) = if hint < len && before(&items[hint]) {
         // Everything through `hint` passes, so the answer lies beyond it.
         let mut lo = hint + 1;
-        let mut step = 1;
+        let mut step: usize = 1;
         loop {
-            let probe = hint + step;
+            let probe = hint.saturating_add(step);
             if probe >= len {
                 break (lo, len);
             }
@@ -27,7 +27,7 @@ pub fn partition_point_from<X>(
                 break (lo, probe);
             }
             lo = probe + 1;
-            step *= 2;
+            step = step.saturating_mul(2);
         }
     } else {
         // `hint` fails (or is the end), so the answer lies at or before it.
@@ -42,7 +42,7 @@ pub fn partition_point_from<X>(
                 break (probe + 1, hi);
             }
             hi = probe;
-            step *= 2;
+            step = step.saturating_mul(2);
         }
     };
     lo + items[lo..hi].partition_point(before)

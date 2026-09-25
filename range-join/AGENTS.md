@@ -15,6 +15,8 @@ for sorted range joins before integrating them into FlowLog.
    traces, recursion, and multiple workers.
 5. Run `cargo test --release` and
    `cargo clippy --release --all-targets -- -D warnings` after code changes.
+   Run `python3 -m unittest discover -s tests -p 'test_*.py' -v` for the
+   benchmark driver. Build measurements with `--locked`.
 6. Use `check=1` for focused benchmark runs so results are compared with the
    direct oracle.
 7. Keep generated datasets manageable. This module studies algorithmic

@@ -2,16 +2,16 @@
 //! whole key groups.
 //!
 //! [`range_join`](crate::range_join) merges: it reads every right value
-//! under a matching key, `O(|L_k| + |R_k| + output)`. That suits batch
+//! under a matching key, then searches that flat group. That suits batch
 //! evaluation, where both sides are large, but not incremental or
 //! recursive evaluation, where a small fresh batch meets a large
 //! accumulated trace and every round would pay for the whole key group.
 //! Seeking instead searches for each left value's run with the cursor's
-//! `seek_val`, an exponential search over the sorted batch, for
-//! `O(|L_k| * log |R_k| + output)`. Seeking back is the mirror image: it
-//! searches the left values whose ranges hold each right value, for
-//! `O(|R_k| * log |L_k| + output)`, and serves a small fresh batch on the
-//! right. Each unit of work picks one plan from its batch sizes, the choice
+//! `seek_val`. Each outer value probes every inner batch; a conservative
+//! probe can also scan nonmatching values before reaching the run.
+//! Seeking back is the mirror image: it searches the left values whose
+//! ranges hold each right value, and serves a small fresh right batch.
+//! Each unit of work picks one plan from its batch sizes, the choice
 //! an optimizer makes between a merge join and an index nested-loop join
 //! into either input.
 //!
@@ -21,7 +21,7 @@
 //! whose range reaches `right`, and ranges that rise with the left values:
 //! for each right value, `locate` must answer `Greater`, then `Equal`, then
 //! `Less` across a key's left values. Ranges of constant width do; arbitrary
-//! intervals do not, and must not seek back. Values must be read as `&V1`
+//! intervals generally do not. Values must be read as `&V1`
 //! and `&V2` (true of vector-backed arrangements, entered or not) so that
 //! owned values can serve as probes.
 
@@ -67,8 +67,34 @@ pub enum Strategy {
     Seek,
     /// Seek each right value's run in the left batches.
     SeekBack,
-    /// Pick the cheapest available plan from the batch sizes.
+    /// Pick a plan using a coarse batch-size heuristic, not measured costs.
     Auto,
+}
+
+fn choose_strategy(
+    left: usize,
+    right: usize,
+    left_batches: usize,
+    right_batches: usize,
+    can_seek_back: bool,
+) -> Strategy {
+    let search = |len: usize, batches: usize| {
+        ((usize::BITS - len.leading_zeros()) as usize).saturating_mul(batches)
+    };
+    let merge = left.saturating_add(right);
+    let seek = left.saturating_mul(search(right, right_batches));
+    let back = if can_seek_back {
+        right.saturating_mul(search(left, left_batches))
+    } else {
+        usize::MAX
+    };
+    if merge <= seek.min(back) {
+        Strategy::Merge
+    } else if seek <= back {
+        Strategy::Seek
+    } else {
+        Strategy::SeekBack
+    }
 }
 
 /// [`range_join`](crate::range_join) that may seek, per `strategy`, but
@@ -101,8 +127,19 @@ where
     F: for<'a> Fn(KC::ReadItem<'a>, BatchVal<'a, Tr1>) -> V2 + 'static,
     L: FnMut(KC::ReadItem<'_>, BatchVal<'_, Tr1>, BatchVal<'_, Tr2>) -> I + 'static,
 {
-    assert!(strategy != Strategy::SeekBack, "seeking back needs `lower_back`");
-    join(arranged1, arranged2, locate, lower, None::<NoLowerBack<Tr1, Tr2, V1>>, strategy, result)
+    assert!(
+        strategy != Strategy::SeekBack,
+        "seeking back needs `lower_back`"
+    );
+    join(
+        arranged1,
+        arranged2,
+        locate,
+        lower,
+        None::<NoLowerBack<Tr1, Tr2, V1>>,
+        strategy,
+        result,
+    )
 }
 
 /// The type of the `lower_back` that [`seek_range_join`] never has.
@@ -140,7 +177,15 @@ where
     G: for<'a> Fn(KC::ReadItem<'a>, BatchVal<'a, Tr2>) -> V1 + 'static,
     L: FnMut(KC::ReadItem<'_>, BatchVal<'_, Tr1>, BatchVal<'_, Tr2>) -> I + 'static,
 {
-    join(arranged1, arranged2, locate, lower, Some(lower_back), strategy, result)
+    join(
+        arranged1,
+        arranged2,
+        locate,
+        lower,
+        Some(lower_back),
+        strategy,
+        result,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -182,7 +227,9 @@ where
             output.push_into((datum, time.clone(), diff.clone()));
         }
     };
-    let tactic = SeekTactic::<Tr1::Batch, Tr2::Batch, _, _, _, _, _>::new(locate, lower, lower_back, strategy, logic);
+    let tactic = SeekTactic::<Tr1::Batch, Tr2::Batch, _, _, _, _, _>::new(
+        locate, lower, lower_back, strategy, logic,
+    );
     join_with_tactic(arranged1, arranged2, tactic).as_collection()
 }
 
@@ -215,7 +262,8 @@ impl<B0, B1, P, F, G, L, CB> SeekTactic<B0, B1, P, F, G, L, CB> {
     }
 }
 
-impl<B0, B1, V1, V2, P, F, G, L, CB> JoinTactic<B0, B1, CB::Container> for SeekTactic<B0, B1, P, F, G, L, CB>
+impl<B0, B1, V1, V2, P, F, G, L, CB> JoinTactic<B0, B1, CB::Container>
+    for SeekTactic<B0, B1, P, F, G, L, CB>
 where
     B0: BatchReader + Navigable + 'static,
     B1: BatchReader<Time = B0::Time> + Navigable + 'static,
@@ -251,35 +299,36 @@ where
     ) -> Box<dyn Iterator<Item = CB::Container>> {
         let plan = match self.strategy {
             Strategy::Auto => {
-                let left: usize = input0.iter().map(BatchReader::len).sum();
-                let right: usize = input1.iter().map(BatchReader::len).sum();
-                // A merge reads both sides; a seek searches every batch on
-                // the other side once per value on its own side.
-                let search = |len: usize, batches: usize| (usize::BITS - len.leading_zeros()) as usize * batches;
-                let merge = left + right;
-                let seek = left.saturating_mul(search(right, input1.len()));
-                let back = match self.lower_back {
-                    Some(_) => right.saturating_mul(search(left, input0.len())),
-                    None => usize::MAX,
-                };
-                if merge <= seek.min(back) {
-                    Strategy::Merge
-                } else if seek <= back {
-                    Strategy::Seek
-                } else {
-                    Strategy::SeekBack
-                }
+                let left = input0
+                    .iter()
+                    .map(BatchReader::len)
+                    .fold(0usize, usize::saturating_add);
+                let right = input1
+                    .iter()
+                    .map(BatchReader::len)
+                    .fold(0usize, usize::saturating_add);
+                // Counts are edits across all keys, not distinct values or
+                // selectivity statistics. Output and compaction are not modeled.
+                choose_strategy(
+                    left,
+                    right,
+                    input0.len(),
+                    input1.len(),
+                    self.lower_back.is_some(),
+                )
             }
+
             fixed => fixed,
         };
         let (locate, logic) = (Rc::clone(&self.locate), Rc::clone(&self.logic));
         let lower_back = match plan {
             Strategy::Seek => None,
             Strategy::SeekBack => self.lower_back.clone(),
-            _ => {
+            Strategy::Merge => {
                 let (left, right) = (cursor_list(input0), cursor_list(input1));
                 return Box::new(RangeIter::new(left, right, fresh, meet, locate, logic));
             }
+            Strategy::Auto => unreachable!("automatic strategy was resolved above"),
         };
         let (advance1, advance2) = match fresh {
             Fresh::Input0 => (false, true),
@@ -339,7 +388,13 @@ impl<T, V1, V2, B0, B1, P, F, G, L, CB> SeekIter<T, B0, B1, P, F, G, L, CB>
 where
     T: Timestamp + Lattice,
     B0: Navigable<Cursor: for<'a> Cursor<Val<'a> = &'a V1, Time = T>>,
-    B1: Navigable<Cursor: for<'a> Cursor<Key<'a> = <B0::Cursor as Cursor>::Key<'a>, Val<'a> = &'a V2, Time = T>>,
+    B1: Navigable<
+        Cursor: for<'a> Cursor<
+            Key<'a> = <B0::Cursor as Cursor>::Key<'a>,
+            Val<'a> = &'a V2,
+            Time = T,
+        >,
+    >,
     V1: 'static,
     V2: 'static,
     CB: ContainerBuilder,
@@ -365,7 +420,9 @@ where
     /// every left batch is spent.
     fn seek_runs(&mut self) -> bool {
         let (cursors2, batches2) = (&mut self.cursors2, &self.batches2);
-        let Some(cursor1) = self.cursors1.get_mut(self.outer) else { return false };
+        let Some(cursor1) = self.cursors1.get_mut(self.outer) else {
+            return false;
+        };
         let batch1 = &self.batches1[self.outer];
         let Some(key) = cursor1.get_key(batch1) else {
             self.outer += 1;
@@ -391,7 +448,10 @@ where
                     }
                     // Seeks only move forward: restart from the key's first
                     // value unless the cursor is below the run.
-                    if cursor2.get_val(batch2).is_none_or(|val2| locate(key, val1, val2) != Ordering::Less) {
+                    if cursor2
+                        .get_val(batch2)
+                        .is_none_or(|val2| locate(key, val1, val2) != Ordering::Less)
+                    {
                         cursor2.rewind_vals(batch2);
                     }
                     cursor2.seek_val(batch2, &probe);
@@ -402,7 +462,15 @@ where
                                 load_edits(cursor2, batch2, meet2, &mut self.edits2);
                                 for (time2, diff2) in self.edits2.iter() {
                                     for (time1, diff1) in self.edits1.iter() {
-                                        logic(key, val1, val2, time1.join(time2), diff1, diff2, &mut self.builder);
+                                        logic(
+                                            key,
+                                            val1,
+                                            val2,
+                                            time1.join(time2),
+                                            diff1,
+                                            diff2,
+                                            &mut self.builder,
+                                        );
                                     }
                                 }
                             }
@@ -423,7 +491,9 @@ where
     /// they seek in the left batches.
     fn seek_runs_back(&mut self) -> bool {
         let (cursors1, batches1) = (&mut self.cursors1, &self.batches1);
-        let Some(cursor2) = self.cursors2.get_mut(self.outer) else { return false };
+        let Some(cursor2) = self.cursors2.get_mut(self.outer) else {
+            return false;
+        };
         let batch2 = &self.batches2[self.outer];
         let Some(key) = cursor2.get_key(batch2) else {
             self.outer += 1;
@@ -438,7 +508,10 @@ where
         let meet1 = self.advance1.then_some(&self.meet);
         let meet2 = self.advance2.then_some(&self.meet);
         let locate = &*self.locate;
-        let lower_back = self.lower_back.as_deref().expect("seeking back needs `lower_back`");
+        let lower_back = self
+            .lower_back
+            .as_deref()
+            .expect("seeking back needs `lower_back`");
         let mut logic = self.logic.borrow_mut();
         while let Some(val2) = cursor2.get_val(batch2) {
             load_edits(cursor2, batch2, meet2, &mut self.edits2);
@@ -448,7 +521,10 @@ where
                     if cursor1.get_key(batch1) != Some(key) {
                         continue;
                     }
-                    if cursor1.get_val(batch1).is_none_or(|val1| locate(key, val1, val2) != Ordering::Greater) {
+                    if cursor1
+                        .get_val(batch1)
+                        .is_none_or(|val1| locate(key, val1, val2) != Ordering::Greater)
+                    {
                         cursor1.rewind_vals(batch1);
                     }
                     cursor1.seek_val(batch1, &probe);
@@ -459,7 +535,15 @@ where
                                 load_edits(cursor1, batch1, meet1, &mut self.edits1);
                                 for (time1, diff1) in self.edits1.iter() {
                                     for (time2, diff2) in self.edits2.iter() {
-                                        logic(key, val1, val2, time1.join(time2), diff1, diff2, &mut self.builder);
+                                        logic(
+                                            key,
+                                            val1,
+                                            val2,
+                                            time1.join(time2),
+                                            diff1,
+                                            diff2,
+                                            &mut self.builder,
+                                        );
                                     }
                                 }
                             }
@@ -480,7 +564,13 @@ impl<T, V1, V2, B0, B1, P, F, G, L, CB> Iterator for SeekIter<T, B0, B1, P, F, G
 where
     T: Timestamp + Lattice,
     B0: Navigable<Cursor: for<'a> Cursor<Val<'a> = &'a V1, Time = T>>,
-    B1: Navigable<Cursor: for<'a> Cursor<Key<'a> = <B0::Cursor as Cursor>::Key<'a>, Val<'a> = &'a V2, Time = T>>,
+    B1: Navigable<
+        Cursor: for<'a> Cursor<
+            Key<'a> = <B0::Cursor as Cursor>::Key<'a>,
+            Val<'a> = &'a V2,
+            Time = T,
+        >,
+    >,
     V1: 'static,
     V2: 'static,
     CB: ContainerBuilder<Container: Default>,
@@ -512,7 +602,11 @@ where
             if self.done {
                 return None;
             }
-            let more = if self.lower_back.is_some() { self.seek_runs_back() } else { self.seek_runs() };
+            let more = if self.lower_back.is_some() {
+                self.seek_runs_back()
+            } else {
+                self.seek_runs()
+            };
             if more {
                 while let Some(container) = self.builder.extract() {
                     self.ready.push_back(std::mem::take(container));
@@ -524,5 +618,23 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Strategy, choose_strategy};
+
+    #[test]
+    fn batch_size_heuristic_handles_both_directions_and_missing_inverse() {
+        assert_eq!(choose_strategy(1_000, 1_000, 1, 1, true), Strategy::Merge);
+        assert_eq!(choose_strategy(1, 10_000, 1, 4, true), Strategy::Seek);
+        assert_eq!(choose_strategy(10_000, 1, 4, 1, true), Strategy::SeekBack);
+        assert_eq!(choose_strategy(10_000, 1, 4, 1, false), Strategy::Seek);
+        assert_eq!(choose_strategy(0, 0, 0, 0, true), Strategy::Merge);
+        assert_eq!(
+            choose_strategy(usize::MAX, usize::MAX, 2, 2, true),
+            Strategy::Merge
+        );
     }
 }

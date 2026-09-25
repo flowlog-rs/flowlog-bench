@@ -15,5 +15,5 @@ panic = "abort"
 timely = "0.31"
 differential-dataflow = "0.25"
 mimalloc = "0.1"
-# The status-quo baseline calls the exact join FlowLog ships today.
+# Published baseline, pinned by Cargo.lock; not a rolling "latest FlowLog".
 flowlog-runtime = "0.5.0"

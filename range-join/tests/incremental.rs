@@ -58,7 +58,11 @@ fn churn<D: Ord + Clone>(
             let mut touched = BTreeSet::new();
             for _ in 0..per_round {
                 if !live.is_empty() && rng.below(3) == 0 {
-                    let victim = live.iter().nth(rng.below(live.len() as u64) as usize).cloned().unwrap();
+                    let victim = live
+                        .iter()
+                        .nth(rng.below(live.len() as u64) as usize)
+                        .cloned()
+                        .unwrap();
                     if touched.insert(victim.clone()) {
                         live.remove(&victim);
                         batch.push((victim, -1));
@@ -165,7 +169,11 @@ fn run_keyed(join: Option<Strategy>, band: bool, workers: usize, seed: u64) {
     let mut rng = Rng(seed);
     let left = Arc::new(churn(rounds, 40, &mut rng, |rng| {
         let (key, lo) = (key(rng), rng.below(60) as i64);
-        if band { (key, lo, lo, lo + BAND) } else { (key, rng.below(50) as i64, lo, lo + rng.below(15) as i64) }
+        if band {
+            (key, lo, lo, lo + BAND)
+        } else {
+            (key, rng.below(50) as i64, lo, lo + rng.below(15) as i64)
+        }
     }));
     let right = Arc::new(churn(rounds, if band { 4 } else { 40 }, &mut rng, |rng| {
         (key(rng), rng.below(70) as i64, rng.below(3) as i64)
@@ -181,7 +189,9 @@ fn run_keyed(join: Option<Strategy>, band: bool, workers: usize, seed: u64) {
             let (mut left_in, mut right_in) = worker.dataflow::<u64, _, _>(|scope| {
                 let (left_in, l) = scope.new_collection::<Left, isize>();
                 let (right_in, r) = scope.new_collection::<Right, isize>();
-                let la = l.map(|(k, tag, lo, hi)| (k, (tag, lo, hi))).arrange_by_key();
+                let la = l
+                    .map(|(k, tag, lo, hi)| (k, (tag, lo, hi)))
+                    .arrange_by_key();
                 let ra = r.map(|(k, y, w)| (k, (y, w))).arrange_by_key();
                 match join {
                     None => range_join(la, ra, keyed_locate, keyed_result),
@@ -194,9 +204,13 @@ fn run_keyed(join: Option<Strategy>, band: bool, workers: usize, seed: u64) {
                         strategy,
                         keyed_result,
                     ),
-                    Some(strategy) => seek_range_join(la, ra, keyed_locate, keyed_lower, strategy, keyed_result),
+                    Some(strategy) => {
+                        seek_range_join(la, ra, keyed_locate, keyed_lower, strategy, keyed_result)
+                    }
                 }
-                .inspect(move |(row, time, diff)| captured.lock().unwrap().push((*row, *time, *diff)))
+                .inspect(move |(row, time, diff)| {
+                    captured.lock().unwrap().push((*row, *time, *diff))
+                })
                 .probe_with(&probe);
                 (left_in, right_in)
             });
@@ -221,7 +235,9 @@ fn run_keyed(join: Option<Strategy>, band: bool, workers: usize, seed: u64) {
         }
     })
     .unwrap()
-    .join();
+    .join()
+    .into_iter()
+    .for_each(|result| result.expect("keyed worker failed"));
 
     let captured = captured.lock().unwrap();
     let mut nonempty = 0;
@@ -334,7 +350,9 @@ fn run_recursive(join: Option<Strategy>, workers: usize, seed: u64) {
                         .concat(sources.enter(scope))
                         .distinct()
                     })
-                    .inspect(move |(row, time, diff)| captured.lock().unwrap().push((*row, *time, *diff)))
+                    .inspect(move |(row, time, diff)| {
+                        captured.lock().unwrap().push((*row, *time, *diff))
+                    })
                     .probe_with(&probe);
                 (source_in, points_in)
             });
@@ -357,7 +375,9 @@ fn run_recursive(join: Option<Strategy>, workers: usize, seed: u64) {
         }
     })
     .unwrap()
-    .join();
+    .join()
+    .into_iter()
+    .for_each(|result| result.expect("recursive worker failed"));
 
     let captured = captured.lock().unwrap();
     let mut longest = 0;
@@ -370,7 +390,10 @@ fn run_recursive(join: Option<Strategy>, workers: usize, seed: u64) {
             "round {round}, {workers} workers, {join:?}"
         );
     }
-    assert!(longest > 8, "chains should span several iterations, got {longest}");
+    assert!(
+        longest > 8,
+        "chains should span several iterations, got {longest}"
+    );
 }
 
 #[test]

@@ -5,9 +5,12 @@
 //! inequalities between a left column and the *leading* right value column
 //! (`l.a < r.0`, `r.0 <= l.b`, ...), the right values that satisfy them for
 //! a fixed left value form a single run of that sorted order. The tactic
-//! finds the run by exponential search and touches nothing outside it, so a
-//! key costs `O(|L_k| + |R_k| + output)` instead of the `O(|L_k| * |R_k|)`
-//! of an equijoin followed by a filter.
+//! flattens the right key group, then finds each run by exponential search.
+//! With one update per value, arbitrary left bounds cost
+//! `O(|R_k| + |L_k| * log(|R_k| + 1) + matching_pairs)`. Monotone run starts
+//! amortize the searches to a linear scan. Multiple timestamp histories
+//! and residual filters add work; final output cardinality alone does not
+//! describe that cost.
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -278,7 +281,15 @@ where
                                 hint = start;
                                 for (val2, time2, diff2) in &flat2[start..end] {
                                     for (time1, diff1) in edits1.iter() {
-                                        logic(key1, val1, *val2, time1.join(time2), diff1, diff2, builder);
+                                        logic(
+                                            key1,
+                                            val1,
+                                            *val2,
+                                            time1.join(time2),
+                                            diff1,
+                                            diff2,
+                                            builder,
+                                        );
                                     }
                                 }
                             }
@@ -333,16 +344,6 @@ pub(crate) fn load_edits<C: Cursor>(
     edits: &mut Vec<(C::Time, C::Diff)>,
 ) {
     edits.clear();
-    push_edits(cursor, storage, meet, edits);
-    consolidate(edits);
-}
-
-fn push_edits<C: Cursor>(
-    cursor: &mut C,
-    storage: &C::Storage,
-    meet: Option<&C::Time>,
-    edits: &mut Vec<(C::Time, C::Diff)>,
-) {
     cursor.map_times(storage, |time, diff| {
         let mut time = C::owned_time(time);
         if let Some(meet) = meet {
@@ -350,4 +351,5 @@ fn push_edits<C: Cursor>(
         }
         edits.push((time, C::owned_diff(diff)));
     });
+    consolidate(edits);
 }

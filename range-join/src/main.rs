@@ -1,12 +1,12 @@
-//! End-to-end timings of FlowLog's current range-join lowering (an
-//! equijoin plus a fused filter) against the sorted range join.
+//! Timings of hand-written DD dataflows, not compiler-generated programs.
 //!
 //! Usage: `rangejoin-toy <workload> <method> [key=value ...]`
 //!
-//! Workloads (all FlowLog batch semantics: `Present` weights, `()` time):
+//! Batch workloads use `Present` weights and `()` time:
 //!   band      Out(x,y)   :- R(x), R(y), x < y, y < x + width.
 //!   keyed     Out(k,y,z) :- R(k,y), S(k,z), y < z, z < y + width.
 //!   interval  Out(s,e,p) :- I(s,e), P(p), s <= p, p < e.
+//!   objects   DDISASM's object-conflict rule; synthetic (address,size,type) candidates.
 //!   hop       Reach(y) :- Src(y).  Reach(y) :- Reach(x), P(y), x < y, y < x + width.
 //!             (recursive; signed weights, so it runs in a DD `iterate`)
 //!   txn       Out(x,y) :- L(x), R(y), x < y, y < x + width.
@@ -14,7 +14,8 @@
 //!             insert `delta` points into the relations named by `side`)
 //!
 //! Methods:
-//!   cross    today's plan: `flowlog_join` with every predicate in the filter
+//!   cross    flowlog-runtime 0.5.0's `flowlog_join` with a fused filter
+//!   cross-shadow  the same join with the sorted plans' shadow-column layout
 //!   nested   the range tactic told every pair is in range (isolates overhead)
 //!   range1   only the lower bound is a range predicate, as var-var planning
 //!            yields for `y < x + width` (band, keyed); `s <= p` (interval)
@@ -23,22 +24,26 @@
 //!   seek     `range`, but each left value seeks its run in the right
 //!            arrangement rather than the right key group being read whole
 //!   back     `range`, but each right value seeks its run in the left
-//!            arrangement (not `interval`: its ranges don't rise with `s`)
+//!            arrangement (not `interval` or `objects`: arbitrary ends
+//!            don't rise with their starts)
 //!   auto     `range`, `seek` or `back`, chosen per unit of work from batch
 //!            sizes
-//!   arrange  build the inputs' arrangements only (the fixed cost)
+//!   arrange  build native input arrangements only (a separate diagnostic)
 //!
 //! Options: n, m, gap, width, keys, skew, rounds, delta, side, workers, seed,
 //! check=1.
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
+use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU64;
+use std::sync::atomic::AtomicUsize;
 use std::time::Duration;
 use std::time::Instant;
 
+use differential_dataflow::AsCollection;
 use differential_dataflow::Data;
 use differential_dataflow::VecCollection;
 use differential_dataflow::difference::Present;
@@ -49,7 +54,6 @@ use mimalloc::MiMalloc;
 use rangejoin_toy::range_join;
 use rangejoin_toy::seek_range_join;
 use rangejoin_toy::seek_range_join_both;
-use rangejoin_toy::seek_join::Strategy;
 use timely::dataflow::operators::Inspect;
 use timely::dataflow::operators::Probe;
 use timely::dataflow::operators::probe::Handle;
@@ -60,106 +64,9 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 type Ts = ();
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Method {
-    Arrange,
-    Cross,
-    Nested,
-    Range1,
-    Range,
-    Seek,
-    Back,
-    Auto,
-}
-
-impl Method {
-    fn parse(text: &str) -> Method {
-        match text {
-            "arrange" => Method::Arrange,
-            "cross" => Method::Cross,
-            "nested" => Method::Nested,
-            "range1" => Method::Range1,
-            "range" => Method::Range,
-            "seek" => Method::Seek,
-            "back" => Method::Back,
-            "auto" => Method::Auto,
-            other => panic!("unknown method '{other}'"),
-        }
-    }
-
-    /// The seeking join's strategy, for the methods that use it.
-    fn strategy(self) -> Strategy {
-        match self {
-            Method::Seek => Strategy::Seek,
-            Method::Back => Strategy::SeekBack,
-            _ => Strategy::Auto,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct Args {
-    workload: String,
-    method: Method,
-    n: usize,
-    m: usize,
-    gap: i64,
-    width: i64,
-    keys: usize,
-    skew: f64,
-    rounds: usize,
-    delta: usize,
-    side: String,
-    workers: usize,
-    seed: u64,
-    check: bool,
-}
-
-impl Args {
-    fn parse() -> Args {
-        let mut argv = std::env::args().skip(1);
-        let workload = argv.next().expect("missing workload");
-        let method = Method::parse(&argv.next().expect("missing method"));
-        let mut args = Args {
-            workload,
-            method,
-            n: 10_000,
-            m: 0,
-            gap: 10,
-            width: 100,
-            keys: 1_000,
-            skew: 1.0,
-            rounds: 20,
-            delta: 10,
-            side: "l".to_string(),
-            workers: 1,
-            seed: 7,
-            check: false,
-        };
-        for option in argv {
-            let (name, value) = option.split_once('=').expect("options are key=value");
-            match name {
-                "n" => args.n = value.parse().unwrap(),
-                "m" => args.m = value.parse().unwrap(),
-                "gap" => args.gap = value.parse().unwrap(),
-                "width" => args.width = value.parse().unwrap(),
-                "keys" => args.keys = value.parse().unwrap(),
-                "skew" => args.skew = value.parse().unwrap(),
-                "rounds" => args.rounds = value.parse().unwrap(),
-                "delta" => args.delta = value.parse().unwrap(),
-                "side" => args.side = value.to_string(),
-                "workers" | "w" => args.workers = value.parse().unwrap(),
-                "seed" => args.seed = value.parse().unwrap(),
-                "check" => args.check = value == "1" || value == "true",
-                other => panic!("unknown option '{other}'"),
-            }
-        }
-        if args.m == 0 {
-            args.m = args.n;
-        }
-        args
-    }
-}
+mod args;
+mod objects;
+use args::{Args, Method};
 
 /// Output cardinality and an order-insensitive fingerprint of the rows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -174,7 +81,9 @@ impl Summary {
     }
     fn add_weighted<D: Fingerprint>(&mut self, datum: &D, weight: u64) {
         self.count = self.count.wrapping_add(weight);
-        self.sum = self.sum.wrapping_add(datum.fingerprint().wrapping_mul(weight));
+        self.sum = self
+            .sum
+            .wrapping_add(datum.fingerprint().wrapping_mul(weight));
     }
 }
 
@@ -244,20 +153,34 @@ fn tally<T: Timestamp, D: Data + Fingerprint, R: Weight + 'static>(
     output: VecCollection<'_, T, D, R>,
     tally: Arc<Tally>,
 ) {
-    output.inner.inspect_batch(move |_, batch| {
-        let mut local = Summary::default();
-        for (datum, _, weight) in batch.iter() {
-            local.add_weighted(datum, weight.weight());
-        }
-        let relaxed = std::sync::atomic::Ordering::Relaxed;
-        tally.count.fetch_add(local.count, relaxed);
-        tally.sum.fetch_add(local.sum, relaxed);
-    });
+    observed(output, tally);
+}
+
+fn observed<'scope, T: Timestamp, D: Data + Fingerprint, R: Weight + 'static>(
+    output: VecCollection<'scope, T, D, R>,
+    tally: Arc<Tally>,
+) -> VecCollection<'scope, T, D, R> {
+    output
+        .inner
+        .inspect_batch(move |_, batch| {
+            let mut local = Summary::default();
+            for (datum, _, weight) in batch.iter() {
+                local.add_weighted(datum, weight.weight());
+            }
+            let relaxed = std::sync::atomic::Ordering::Relaxed;
+            tally.count.fetch_add(local.count, relaxed);
+            tally.sum.fetch_add(local.sum, relaxed);
+        })
+        .as_collection()
 }
 
 /// Places `value` against the open range `(lower, ∞)`.
 fn locate_above(lower: i64, value: i64) -> Ordering {
-    if value <= lower { Ordering::Less } else { Ordering::Equal }
+    if value <= lower {
+        Ordering::Less
+    } else {
+        Ordering::Equal
+    }
 }
 
 /// Places `value` against the open range `(lower, upper)`.
@@ -312,7 +235,7 @@ fn points(n: usize, gap: i64, rng: &mut Rng) -> Vec<i64> {
         .collect()
 }
 
-/// `n` distinct `(key, value)` pairs; key frequencies follow `u^skew`.
+/// Up to `n` distinct `(key, value)` pairs; key frequencies follow `u^skew`.
 fn keyed_pairs(n: usize, keys: usize, span: i64, skew: f64, rng: &mut Rng) -> Vec<(i64, i64)> {
     let mut pairs: Vec<(i64, i64)> = (0..n)
         .map(|_| {
@@ -333,8 +256,8 @@ struct Outcome {
     elapsed: Duration,
     output: Summary,
     expected: Option<Summary>,
-    /// Workload-specific measurements, appended to the report.
-    detail: String,
+    input_rows: (usize, usize),
+    phases: Option<(Duration, Duration)>,
 }
 
 fn run<F>(workers: usize, logic: F) -> Duration
@@ -348,6 +271,13 @@ where
         .into_iter()
         .for_each(|result| result.expect("worker failed"));
     start.elapsed()
+}
+
+fn await_peers(worker: &mut timely::worker::Worker, arrived: &AtomicUsize, checkpoint: usize) {
+    let target = checkpoint * worker.peers();
+    arrived.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    // Keep driving progress while waiting: a blocking OS barrier can strand peers.
+    worker.step_while(|| arrived.load(std::sync::atomic::Ordering::Acquire) < target);
 }
 
 /// `Out(x,y) :- R(x), R(y), x < y, y < x + width.`
@@ -400,18 +330,22 @@ fn band(args: &Args) -> Outcome {
                         ),
                         output,
                     ),
-                    Method::Range => {
+                    Method::Range | Method::CrossShadow => {
                         // `x + width` as a shadow column turns the bound var-var.
                         let rl = r.map(move |x| ((), (x, x + width))).arrange_by_key();
-                        tally(
+                        let joined = if method == Method::CrossShadow {
+                            flowlog_join(rl, rr, "cross-shadow", |_, l, r| {
+                                (l.0 < r.0 && r.0 < l.1).then_some((l.0, r.0))
+                            })
+                        } else {
                             range_join(
                                 rl,
                                 rr,
                                 |_, l, r| locate_between(l.0, l.1, r.0),
                                 |_, l, r| Some((l.0, r.0)),
-                            ),
-                            output,
-                        )
+                            )
+                        };
+                        tally(joined, output);
                     }
                     Method::Seek | Method::Back | Method::Auto => {
                         let rl = r.map(move |x| ((), (x, x + width))).arrange_by_key();
@@ -438,7 +372,13 @@ fn band(args: &Args) -> Outcome {
             while worker.step() {}
         }
     });
-    Outcome { elapsed, output: output.summary(), expected, detail: String::new() }
+    Outcome {
+        elapsed,
+        output: output.summary(),
+        expected,
+        input_rows: (rows.len(), rows.len()),
+        phases: None,
+    }
 }
 
 /// `Out(k,y,z) :- R(k,y), S(k,z), y < z, z < y + width.`
@@ -451,7 +391,10 @@ fn keyed(args: &Args) -> Outcome {
         let mut summary = Summary::default();
         for &(k, y) in r_rows.iter() {
             let start = s_rows.partition_point(|&(sk, z)| (sk, z) <= (k, y));
-            for &(_, z) in s_rows[start..].iter().take_while(|&&(sk, z)| sk == k && z < y + args.width) {
+            for &(_, z) in s_rows[start..]
+                .iter()
+                .take_while(|&&(sk, z)| sk == k && z < y + args.width)
+            {
                 summary.add(&(k, y, z));
             }
         }
@@ -490,7 +433,9 @@ fn keyed(args: &Args) -> Outcome {
                                 ra,
                                 sa,
                                 |_, _, _| Ordering::Equal,
-                                move |k, l, r| (l.0 < r.0 && r.0 < l.0 + width).then_some((*k, l.0, r.0)),
+                                move |k, l, r| {
+                                    (l.0 < r.0 && r.0 < l.0 + width).then_some((*k, l.0, r.0))
+                                },
                             ),
                             output,
                         )
@@ -507,17 +452,21 @@ fn keyed(args: &Args) -> Outcome {
                             output,
                         )
                     }
-                    Method::Range => {
+                    Method::Range | Method::CrossShadow => {
                         let ra = r.map(move |(k, y)| (k, (y, y + width))).arrange_by_key();
-                        tally(
+                        let joined = if method == Method::CrossShadow {
+                            flowlog_join(ra, sa, "cross-shadow", |k, l, r| {
+                                (l.0 < r.0 && r.0 < l.1).then_some((*k, l.0, r.0))
+                            })
+                        } else {
                             range_join(
                                 ra,
                                 sa,
                                 |_, l, r| locate_between(l.0, l.1, r.0),
                                 |k, l, r| Some((*k, l.0, r.0)),
-                            ),
-                            output,
-                        )
+                            )
+                        };
+                        tally(joined, output);
                     }
                     Method::Seek | Method::Back | Method::Auto => {
                         let ra = r.map(move |(k, y)| (k, (y, y + width))).arrange_by_key();
@@ -548,19 +497,27 @@ fn keyed(args: &Args) -> Outcome {
             while worker.step() {}
         }
     });
-    Outcome { elapsed, output: output.summary(), expected, detail: String::new() }
+    Outcome {
+        elapsed,
+        output: output.summary(),
+        expected,
+        input_rows: (r_rows.len(), s_rows.len()),
+        phases: None,
+    }
 }
 
 /// `Out(s,e,p) :- I(s,e), P(p), s <= p, p < e.`
 fn interval(args: &Args) -> Outcome {
-    assert!(args.method != Method::Back, "interval ranges don't rise with the left values: no seeking back");
     let mut rng = Rng(args.seed);
     let p_rows = Arc::new(points(args.n, args.gap, &mut rng));
     let span = p_rows.last().copied().unwrap_or(1);
     let mut i_rows: Vec<(i64, i64)> = (0..args.m)
         .map(|_| {
             let start = rng.below(span as u64) as i64;
-            (start, start + 1 + rng.below((2 * args.width - 1).max(1) as u64) as i64)
+            (
+                start,
+                start + 1 + rng.below((2 * args.width - 1).max(1) as u64) as i64,
+            )
         })
         .collect();
     i_rows.sort_unstable();
@@ -594,8 +551,10 @@ fn interval(args: &Args) -> Outcome {
                         ia.stream.inspect_batch(|_, _| {});
                         pa.stream.inspect_batch(|_, _| {});
                     }
-                    Method::Cross => tally(
-                        flowlog_join(ia, pa, "cross", move |_, l, r| inside(l, r).then_some((l.0, l.1, r.0))),
+                    Method::Cross | Method::CrossShadow => tally(
+                        flowlog_join(ia, pa, "cross", move |_, l, r| {
+                            inside(l, r).then_some((l.0, l.1, r.0))
+                        }),
                         output,
                     ),
                     Method::Nested => tally(
@@ -611,15 +570,24 @@ fn interval(args: &Args) -> Outcome {
                         range_join(
                             ia,
                             pa,
-                            |_, l, r| if r.0 < l.0 { Ordering::Less } else { Ordering::Equal },
+                            |_, l, r| {
+                                if r.0 < l.0 {
+                                    Ordering::Less
+                                } else {
+                                    Ordering::Equal
+                                }
+                            },
                             |_, l, r| (r.0 < l.1).then_some((l.0, l.1, r.0)),
                         ),
                         output,
                     ),
                     Method::Range => tally(
-                        range_join(ia, pa, |_, l, r| locate_within(l.0, l.1, r.0), |_, l, r| {
-                            Some((l.0, l.1, r.0))
-                        }),
+                        range_join(
+                            ia,
+                            pa,
+                            |_, l, r| locate_within(l.0, l.1, r.0),
+                            |_, l, r| Some((l.0, l.1, r.0)),
+                        ),
                         output,
                     ),
                     Method::Back => unreachable!(),
@@ -648,7 +616,13 @@ fn interval(args: &Args) -> Outcome {
             while worker.step() {}
         }
     });
-    Outcome { elapsed, output: output.summary(), expected, detail: String::new() }
+    Outcome {
+        elapsed,
+        output: output.summary(),
+        expected,
+        input_rows: (i_rows.len(), p_rows.len()),
+        phases: None,
+    }
 }
 
 /// `Reach(y) :- Src(y).  Reach(y) :- Reach(x), P(y), x < y, y < x + width.`
@@ -686,12 +660,18 @@ fn hop(args: &Args) -> Outcome {
                 let reach = src.clone().iterate(|scope, reach| {
                     let targets = targets.enter(scope);
                     let step = match method {
-                        Method::Arrange => reach.filter(|_| false),
+                        Method::Arrange => unreachable!("validated before starting workers"),
                         Method::Cross => flowlog_join(
                             reach.map(|x| ((), (x,))).arrange_by_key(),
                             targets,
                             "cross",
                             move |_, l, r| (l.0 < r.0 && r.0 < l.0 + width).then_some(r.0),
+                        ),
+                        Method::CrossShadow => flowlog_join(
+                            reach.map(move |x| ((), (x, x + width))).arrange_by_key(),
+                            targets,
+                            "cross-shadow",
+                            |_, l, r| (l.0 < r.0 && r.0 < l.1).then_some(r.0),
                         ),
                         Method::Nested => range_join(
                             reach.map(|x| ((), (x,))).arrange_by_key(),
@@ -737,19 +717,36 @@ fn hop(args: &Args) -> Outcome {
             while worker.step() {}
         }
     });
-    Outcome { elapsed, output: output.summary(), expected, detail: String::new() }
+    Outcome {
+        elapsed,
+        output: output.summary(),
+        expected,
+        input_rows: (1, rows.len()),
+        phases: None,
+    }
 }
 
 /// `Out(x,y) :- L(x), R(y), x < y, y < x + width.` in FlowLog's incremental
 /// mode: preload `n` and `m` points, then `rounds` transactions that each
 /// insert `delta` fresh points into `L`, `R` or both (`side=l|r|lr`).
-fn txn(args: &Args) -> Outcome {
+fn txn(args: &Args) -> Result<Outcome, String> {
     let mut rng = Rng(args.seed);
     let mut l_set: BTreeSet<i64> = points(args.n, args.gap, &mut rng).into_iter().collect();
     let mut r_set: BTreeSet<i64> = points(args.m, args.gap, &mut rng).into_iter().collect();
-    let preload: Arc<(Vec<i64>, Vec<i64>)> =
-        Arc::new((l_set.iter().copied().collect(), r_set.iter().copied().collect()));
+    let preload: Arc<(Vec<i64>, Vec<i64>)> = Arc::new((
+        l_set.iter().copied().collect(),
+        r_set.iter().copied().collect(),
+    ));
     let span = args.n.max(args.m) as i64 * args.gap;
+    let needed = args.rounds * args.delta;
+    for (side, set) in [('l', &l_set), ('r', &r_set)] {
+        let available = span as usize - set.range(..span).count();
+        if args.side.contains(side) && needed > available {
+            return Err(format!(
+                "txn needs {needed} fresh {side} points but the sampling domain has only {available}; increase gap or reduce rounds/delta"
+            ));
+        }
+    }
     let fresh = |set: &mut BTreeSet<i64>, rng: &mut Rng| {
         let mut rows = Vec::new();
         while rows.len() < args.delta {
@@ -763,8 +760,16 @@ fn txn(args: &Args) -> Outcome {
     let txns: Arc<Vec<(Vec<i64>, Vec<i64>)>> = Arc::new(
         (0..args.rounds)
             .map(|_| {
-                let l = if args.side.contains('l') { fresh(&mut l_set, &mut rng) } else { Vec::new() };
-                let r = if args.side.contains('r') { fresh(&mut r_set, &mut rng) } else { Vec::new() };
+                let l = if args.side.contains('l') {
+                    fresh(&mut l_set, &mut rng)
+                } else {
+                    Vec::new()
+                };
+                let r = if args.side.contains('r') {
+                    fresh(&mut r_set, &mut rng)
+                } else {
+                    Vec::new()
+                };
                 (l, r)
             })
             .collect(),
@@ -780,12 +785,19 @@ fn txn(args: &Args) -> Outcome {
     });
     let (method, width) = (args.method, args.width);
     let output = Arc::new(Tally::default());
-    let phases = Arc::new(Mutex::new((Duration::ZERO, Duration::ZERO)));
+    let phases = Arc::new(Mutex::new(Vec::new()));
+    let arrived = Arc::new(AtomicUsize::new(0));
+    let started = Instant::now();
     let elapsed = run(args.workers, {
-        let (preload, txns, output, phases) = (preload.clone(), txns.clone(), output.clone(), phases.clone());
+        let (preload, txns, output, phases) = (
+            preload.clone(),
+            txns.clone(),
+            output.clone(),
+            phases.clone(),
+        );
         move |worker| {
             let (index, peers) = (worker.index(), worker.peers());
-            let started = Instant::now();
+            let mut checkpoints = Vec::with_capacity(txns.len() + 1);
             let probe = Handle::new();
             let output = output.clone();
             let (mut l_input, mut r_input) = worker.dataflow::<u64, _, _>(|scope| {
@@ -794,15 +806,26 @@ fn txn(args: &Args) -> Outcome {
                 let ra = r.map(|y| ((), (y,))).arrange_by_key();
                 let joined = match method {
                     Method::Arrange => {
-                        l.clone().map(|x| ((), (x,))).arrange_by_key().stream.probe_with(&probe);
+                        l.clone()
+                            .map(|x| ((), (x,)))
+                            .arrange_by_key()
+                            .stream
+                            .probe_with(&probe);
                         ra.stream.probe_with(&probe);
                         l.map(|x| (x, x)).filter(|_| false)
                     }
-                    Method::Cross => {
-                        flowlog_join(l.map(|x| ((), (x,))).arrange_by_key(), ra, "cross", move |_, l, r| {
-                            (l.0 < r.0 && r.0 < l.0 + width).then_some((l.0, r.0))
-                        })
-                    }
+                    Method::Cross => flowlog_join(
+                        l.map(|x| ((), (x,))).arrange_by_key(),
+                        ra,
+                        "cross",
+                        move |_, l, r| (l.0 < r.0 && r.0 < l.0 + width).then_some((l.0, r.0)),
+                    ),
+                    Method::CrossShadow => flowlog_join(
+                        l.map(move |x| ((), (x, x + width))).arrange_by_key(),
+                        ra,
+                        "cross-shadow",
+                        |_, l, r| (l.0 < r.0 && r.0 < l.1).then_some((l.0, r.0)),
+                    ),
                     Method::Nested => range_join(
                         l.map(|x| ((), (x,))).arrange_by_key(),
                         ra,
@@ -831,7 +854,8 @@ fn txn(args: &Args) -> Outcome {
                         |_, l, r| Some((l.0, r.0)),
                     ),
                 };
-                tally(joined.probe_with(&probe), output);
+                // Completion includes the output sink, not just the join's frontier.
+                observed(joined, output).probe_with(&probe);
                 (l_input, r_input)
             });
             for &x in preload.0.iter().skip(index).step_by(peers) {
@@ -846,7 +870,8 @@ fn txn(args: &Args) -> Outcome {
             l_input.flush();
             r_input.flush();
             worker.step_while(|| probe.less_than(&time));
-            let loaded = started.elapsed();
+            checkpoints.push(started.elapsed());
+            await_peers(worker, &arrived, checkpoints.len());
             for (l_rows, r_rows) in txns.iter() {
                 for &x in l_rows.iter().skip(index).step_by(peers) {
                     l_input.insert(x);
@@ -860,31 +885,47 @@ fn txn(args: &Args) -> Outcome {
                 l_input.flush();
                 r_input.flush();
                 worker.step_while(|| probe.less_than(&time));
+                checkpoints.push(started.elapsed());
+                await_peers(worker, &arrived, checkpoints.len());
             }
-            if index == 0 {
-                *phases.lock().unwrap() = (loaded, started.elapsed() - loaded);
-            }
+            phases.lock().unwrap().push(checkpoints);
         }
     });
-    let (loaded, updated) = *phases.lock().unwrap();
-    let detail = format!(
-        " side={} load={:.3} per_txn_ms={:.3}",
-        args.side,
-        loaded.as_secs_f64(),
-        updated.as_secs_f64() * 1e3 / args.rounds.max(1) as f64
-    );
-    Outcome { elapsed, output: output.summary(), expected, detail }
+    let phases = phases.lock().unwrap();
+    assert_eq!(phases.len(), args.workers);
+    let loaded = phases.iter().map(|times| times[0]).max().unwrap();
+    let finished = phases.iter().map(|times| times[args.rounds]).max().unwrap();
+    Ok(Outcome {
+        elapsed,
+        output: output.summary(),
+        expected,
+        input_rows: (preload.0.len(), preload.1.len()),
+        phases: Some((loaded, finished - loaded)),
+    })
 }
 
-fn main() {
-    let args = Args::parse();
+fn main() -> ExitCode {
+    let args = match Args::parse(std::env::args().skip(1)) {
+        Ok(args) => args,
+        Err(error) => {
+            eprintln!("error: {error}");
+            return ExitCode::from(2);
+        }
+    };
     let outcome = match args.workload.as_str() {
         "band" => band(&args),
         "keyed" => keyed(&args),
         "interval" => interval(&args),
+        "objects" => objects::objects(&args),
         "hop" => hop(&args),
-        "txn" => txn(&args),
-        other => panic!("unknown workload '{other}'"),
+        "txn" => match txn(&args) {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                eprintln!("error: {error}");
+                return ExitCode::from(2);
+            }
+        },
+        _ => unreachable!("validated workload"),
     };
     let verdict = match outcome.expected {
         None => "unchecked",
@@ -892,20 +933,62 @@ fn main() {
         Some(expected) if expected == outcome.output => "ok",
         Some(_) => "MISMATCH",
     };
-    println!(
-        "{:<8} {:<7} n={:<8} m={:<8} w={:<2} out={:<11} secs={:.3} check={}{}",
+    print!(
+        "{} {} n={} m={} w={} gap={} width={} keys={} skew={} seed={} side={} rounds={} delta={} left_rows={} right_rows={} out={} fingerprint={:016x} secs={:.9} check={}",
         args.workload,
-        format!("{:?}", args.method).to_lowercase(),
+        args.method.name(),
         args.n,
         args.m,
         args.workers,
+        args.gap,
+        args.width,
+        args.keys,
+        args.skew,
+        args.seed,
+        args.side,
+        args.rounds,
+        args.delta,
+        outcome.input_rows.0,
+        outcome.input_rows.1,
         outcome.output.count,
+        outcome.output.sum,
         outcome.elapsed.as_secs_f64(),
         verdict,
-        outcome.detail,
     );
+    if let Some((loaded, updated)) = outcome.phases {
+        print!(
+            " load_secs={:.9} update_secs={:.9} per_txn_ms={:.9}",
+            loaded.as_secs_f64(),
+            updated.as_secs_f64(),
+            updated.as_secs_f64() * 1e3 / args.rounds as f64,
+        );
+    }
+    println!();
     if verdict == "MISMATCH" {
-        eprintln!("expected {:?}, got {:?}", outcome.expected.unwrap(), outcome.output);
-        std::process::exit(1);
+        eprintln!(
+            "expected {:?}, got {:?}",
+            outcome.expected.unwrap(),
+            outcome.output
+        );
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Args, txn};
+
+    #[test]
+    fn exhausted_transaction_domain_is_an_error_not_a_rejection_loop() {
+        let args = Args::parse(
+            [
+                "txn", "auto", "n=2", "m=2", "gap=1", "rounds=1", "delta=2", "check=1",
+            ]
+            .map(String::from),
+        )
+        .unwrap();
+        assert!(txn(&args).err().unwrap().contains("only 1"));
     }
 }
