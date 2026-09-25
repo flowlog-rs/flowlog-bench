@@ -1,0 +1,7 @@
+step,flowlog_main_s,souffle_compiled_s,souffle_interpreted_s
+initial,5.167,6.29,8.49
+commit-1,1.304,6.34,8.42
+commit-2,1.619,6.52,8.44
+commit-3,1.398,6.39,8.65
+commit-4,1.561,6.41,8.59
+commit-5,1.261,6.41,8.64
