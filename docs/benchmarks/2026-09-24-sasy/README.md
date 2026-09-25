@@ -45,37 +45,31 @@ FlowLog.
    `newfix` build is FlowLog `07ffd67` plus a one-map fusion guard. The
    CSE commits are not the cause of the crash.
 
-## Result map
+## Results at a glance
 
-| Family | Main result | Important qualification |
-|---|---:|---|
-| Agent-policy census, 256 turns | 4/22 wins, 0.157x geomean | High fan-in wins; most small cells lose |
-| Published forward forms | 6/22 wins, 0.320x | Rewriting is shape-dependent |
-| In-budget ladders | 10/77 wins, 0.075x | CSE gain grows with fan-in |
-| Guard profile | 0.09x to 0.35x | No-gate reaches 1.43x |
-| SAST engine-only vs interpreted Souffle | 1.944x, 17/18 wins | Completed cases only |
-| SAST engine-only vs compiled Souffle | 1.088x, 10/19 wins | Completed cases only |
-| End-to-end SASY Python scan | 0.807x | Shipped old-SIP build reaches 1.493x |
-| Incremental SAST commits | 4.0x to 5.1x | Steps 1-5 after initial load |
+> **Agent policies** · 4/22 wins at 256 turns · strongest at high fan-in,
+> slower on most small relations
+
+> **One-shot SAST** · 1.09x vs compiled Souffle · competitive time,
+> substantially higher memory
+
+> **Incremental SAST** · 4.0x to 5.1x vs compiled Souffle · the clearest
+> steady-state advantage
 
 ## FlowLog versions
 
-| Label | Revision | Build/runtime/compiler | SIP |
-|---|---|---|---|
-| old | `6c111b7` | 0.4.0 / 0.3.0 / 0.5.0 | measured both on and off |
-| mid | `fed4211` | 0.5.0 / 0.4.0 / 0.6.0 | measured both on and off |
-| newfix | `07ffd67` plus local guard `c8af77a` | 0.6.0 / 0.5.0 / 0.7.0 | removed upstream |
+- **Old** `6c111b7` · build/runtime/compiler `0.4.0 / 0.3.0 / 0.5.0`
+  · measured with and without SIP.
+- **Mid** `fed4211` · `0.5.0 / 0.4.0 / 0.6.0` · measured with and
+  without SIP.
+- **Latest** `07ffd67` plus guard `c8af77a` · `0.6.0 / 0.5.0 / 0.7.0`
+  · SIP removed upstream.
 
 Sasty ships the old FlowLog release with `--sip --str-intern`. Comparing
 `old-sip` directly with `newfix` therefore combines release improvements with
-SIP removal. The cleaner non-SIP release comparison is:
-
-| Comparison | SAST geomean |
-|---|---:|
-| old-noSIP / newfix | 1.070x |
-| mid-noSIP / newfix | 1.040x |
-| old-noSIP / mid-noSIP | 1.029x |
-| old-SIP / newfix | 1.339x |
+SIP removal. With SIP disabled on both sides, latest is **1.070x** faster than
+old and **1.040x** faster than mid; mid is **1.029x** faster than old. The
+mixed old-SIP-to-latest comparison is **1.339x**.
 
 ## Agent-policy results
 
@@ -92,14 +86,9 @@ At 256 turns, latest FlowLog wins:
 - Copilot Security fan-in; and
 - Policy Skill fan-in.
 
-The largest latest-FlowLog speedups are:
-
-| Workload | Shape | Speedup |
-|---|---|---:|
-| Copilot Security | fan-in | 33.42x |
-| Policy Skill | fan-in | 23.62x |
-| Airline | fan-in | 18.38x |
-| Airline | linear | 1.16x |
+The largest latest-FlowLog speedups are **33.42x** on Copilot Security fan-in,
+**23.62x** on Policy Skill fan-in, and **18.38x** on Airline fan-in. Airline
+linear is the only linear win at **1.16x**.
 
 The 18 losing cells range down to 0.004x. These are cases where the fixed
 incremental-engine overhead exceeds the cost of a small Souffle rerun.
@@ -132,6 +121,9 @@ not successful completion times.
 Times are median seconds. `DNF` means the run exceeded the 7,200-second limit.
 `ALLOC` means the process aborted in the allocator.
 
+<details>
+<summary><strong>Exact engine times for all 21 corpora</strong></summary>
+
 | Corpus | Souffle | Souffle-c | old-SIP | old-noSIP | mid-SIP | mid-noSIP | newfix |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | SASY Python | 102.00 | 64.71 | 55.48 | 141.69 | 55.11 | 139.08 | 137.49 |
@@ -156,6 +148,8 @@ Times are median seconds. `DNF` means the run exceeded the 7,200-second limit.
 | undici | 30.88 | 27.53 | 10.49 | 30.81 | 10.36 | 29.99 | 29.65 |
 | JavaScript reachable XL | DNF | DNF | not run | not run | not run | not run | DNF |
 
+</details>
+
 Every completed execution matched the reference outputs exactly. No completed
 FlowLog execution emitted stderr.
 
@@ -163,14 +157,9 @@ Machine-readable table: [sast-engine.csv](sast-engine.csv).
 
 ## SIP trade-off
 
-SIP helps most on:
-
-| Corpus | SIP speedup on old FlowLog |
-|---|---:|
-| aiohttp | 3.67x |
-| undici | 2.94x |
-| SASY Python | 2.55x |
-| django | only SIP finishes safely |
+SIP helps most on **aiohttp (3.67x)**, **undici (2.94x)**, and
+**SASY Python (2.55x)**. On django, SIP is the only configuration that
+finishes safely.
 
 SIP hurts most on fastify, body-parser, cookie-parser, express, and the large
 JavaScript scan. Both SIP builds time out on SASY JavaScript, while the no-SIP
@@ -187,6 +176,12 @@ builds finish in about 5,270 seconds.
 The six-commit replay covers 638 Python files and about 1.16 million unique
 facts. FlowLog applies inserts and removals; Souffle reruns from scratch.
 
+> **Initial load** · 1.2x faster than compiled Souffle  
+> **Steady state** · 4.0x to 5.1x faster across the next five commits
+
+<details>
+<summary><strong>Exact timing for each incremental step</strong></summary>
+
 | Step | Main FlowLog | Souffle | Compiled Souffle | Compiled speedup |
 |---|---:|---:|---:|---:|
 | Initial load | 5.167 s | 8.49 s | 6.29 s | 1.2x |
@@ -196,11 +191,16 @@ facts. FlowLog applies inserts and removals; Souffle reruns from scratch.
 | Commit 4 | 1.561 s | 8.59 s | 6.41 s | 4.1x |
 | Commit 5 | 1.261 s | 8.64 s | 6.41 s | 5.1x |
 
+</details>
+
 Main improves steady-state FlowLog commit time by 1.03x over the old release.
 
 ## Memory and allocator finding
 
 FlowLog frequently trades memory for time:
+
+<details>
+<summary><strong>Representative peak-memory measurements</strong></summary>
 
 | Corpus | Souffle | Compiled Souffle | old-SIP | newfix |
 |---|---:|---:|---:|---:|
@@ -210,6 +210,8 @@ FlowLog frequently trades memory for time:
 | django | 1.37 GiB | 1.30 GiB | 2.52 GiB | >=171.9 GiB |
 | undici | 0.44 GiB | 0.42 GiB | 0.89 GiB | 6.84 GiB |
 
+</details>
+
 The no-SIP django runs expose a mimalloc v3.3.2 arena-growth defect. They abort
 near 172 GiB after exhausting `vm.max_map_count`, despite more than 240 GiB of
 available RAM. `MIMALLOC_ARENA_RESERVE=1792MiB` prevents mapping exhaustion,
@@ -218,12 +220,21 @@ but the evaluator still grows beyond 240 GiB. SIP finishes the same input in
 
 ## End-to-end Sasty scans
 
+The shipped old-SIP build is fastest on the completed Python scan:
+**97.2 seconds**, versus **145.0 seconds** for Souffle and **179.7 seconds**
+for latest FlowLog.
+
+<details>
+<summary><strong>Exact end-to-end outcomes</strong></summary>
+
 | Case | Souffle | old-SIP | newfix |
 |---|---:|---:|---:|
 | SASY Python, dependencies off | 145.0 s | 97.2 s | 179.7 s |
 | SASY JavaScript, dependencies off | timeout | timeout | timeout |
 | Python reachable dependencies | rejected before engine | same | same |
 | JavaScript reachable dependencies | rejected before engine | same | same |
+
+</details>
 
 The reachable scans fail in dependency discovery before either Datalog engine
 runs. The JavaScript first-party scan exceeds Sasty's 900-second production
