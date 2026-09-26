@@ -1,0 +1,53 @@
+{
+  "binaries": {
+    "old": {
+      "path": "<work>/agg-designs/build-v5-old/target/release/aggregate-designs",
+      "sha256": "796e7b04c4d1ffbfdcb3d44ebe2493cadca56ff05abb0c28a06d99a31c2c8495"
+    },
+    "final": {
+      "path": "<work>/agg-designs/build-v6-final/target/release/aggregate-designs",
+      "sha256": "e3144d23aa46225629b2daccb2c8d074dee8571c6dd2a83731d80fb19e20d0c1"
+    },
+    "foreach": {
+      "path": "<work>/agg-designs/build-v5-foreach/target/release/aggregate-designs",
+      "sha256": "37aea12fdf7c07a45030aa93ea898759fe49c27d85824a8d6ed79de10b6bcb23"
+    }
+  },
+  "pinned_cpus": "0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62",
+  "numa_node": 0,
+  "parameters": {
+    "binary": [
+      "old=<work>/agg-designs/build-v5-old/target/release/aggregate-designs",
+      "final=<work>/agg-designs/build-v6-final/target/release/aggregate-designs",
+      "foreach=<work>/agg-designs/build-v5-foreach/target/release/aggregate-designs"
+    ],
+    "output": "results/v7-w32-add",
+    "runs": 9,
+    "workers": 32,
+    "scale": 8,
+    "shapes": [
+      "small",
+      "large",
+      "small-dup",
+      "large-dup",
+      "global",
+      "global-dup"
+    ],
+    "kinds": [
+      "count",
+      "sum"
+    ],
+    "placements": [
+      "local"
+    ],
+    "variants": [
+      "old/b-main",
+      "final/b-main",
+      "foreach/b-main"
+    ],
+    "ratios": [
+      "final/b-main,old/b-main,vs-main",
+      "final/b-main,foreach/b-main,control"
+    ]
+  }
+}

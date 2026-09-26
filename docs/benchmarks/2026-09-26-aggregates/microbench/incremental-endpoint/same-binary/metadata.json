@@ -1,0 +1,42 @@
+{
+  "started": "2026-09-24T23:20:31.172044+00:00",
+  "parameters": {
+    "variant": [
+      "scan=results/extrema-investigation/build/same-binary/target/release/incremental-extrema-bench",
+      "endpoint=results/extrema-investigation/build/same-binary/target/release/incremental-extrema-bench"
+    ],
+    "mode": [
+      "scan:scan",
+      "endpoint:endpoint"
+    ],
+    "output": "results/extrema-investigation/same-binary",
+    "runs": 7,
+    "rounds": 128,
+    "groups": 128,
+    "values": 4096,
+    "workers": 1,
+    "kinds": [
+      "min",
+      "max",
+      "sum"
+    ]
+  },
+  "variants": {
+    "scan": {
+      "path": "<bench>/results/extrema-investigation/build/same-binary/target/release/incremental-extrema-bench",
+      "sha256": "6467541e6634fc7a6fd1f1b8ef14dad2d8d933d7c65f128d35695bd8ea3cae6b",
+      "mode": "scan"
+    },
+    "endpoint": {
+      "path": "<bench>/results/extrema-investigation/build/same-binary/target/release/incremental-extrema-bench",
+      "sha256": "6467541e6634fc7a6fd1f1b8ef14dad2d8d933d7c65f128d35695bd8ea3cae6b",
+      "mode": "endpoint"
+    }
+  },
+  "cpus": [
+    0
+  ],
+  "numa_node": 0,
+  "completed": "2026-09-24T23:23:23.760285+00:00",
+  "all_outputs_verified": true
+}

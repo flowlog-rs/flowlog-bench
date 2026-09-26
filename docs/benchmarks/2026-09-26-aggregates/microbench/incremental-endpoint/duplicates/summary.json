@@ -1,0 +1,74 @@
+[
+  {
+    "kind": "min",
+    "duplicates": 1,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 16384,
+    "scan_median_s": 0.136269793,
+    "endpoint_median_s": 0.136834411,
+    "median_speedup": 0.9958737133746277,
+    "paired_speedup_95pct_bootstrap_low": 0.9715797836665215,
+    "paired_speedup_95pct_bootstrap_high": 1.0467773939862266
+  },
+  {
+    "kind": "max",
+    "duplicates": 1,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 16384,
+    "scan_median_s": 0.133736748,
+    "endpoint_median_s": 0.130879737,
+    "median_speedup": 1.0218292843910588,
+    "paired_speedup_95pct_bootstrap_low": 0.9650155292843798,
+    "paired_speedup_95pct_bootstrap_high": 1.0504631499279684
+  },
+  {
+    "kind": "min",
+    "duplicates": 8,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 131072,
+    "scan_median_s": 0.123875839,
+    "endpoint_median_s": 0.122931048,
+    "median_speedup": 1.00768553604131,
+    "paired_speedup_95pct_bootstrap_low": 0.9983684375844203,
+    "paired_speedup_95pct_bootstrap_high": 1.0181279471844997
+  },
+  {
+    "kind": "max",
+    "duplicates": 8,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 131072,
+    "scan_median_s": 0.115629472,
+    "endpoint_median_s": 0.115582003,
+    "median_speedup": 1.0004106954263459,
+    "paired_speedup_95pct_bootstrap_low": 0.9732003188234657,
+    "paired_speedup_95pct_bootstrap_high": 1.0456127789635816
+  },
+  {
+    "kind": "min",
+    "duplicates": 32,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 524288,
+    "scan_median_s": 0.12938638,
+    "endpoint_median_s": 0.122804312,
+    "median_speedup": 1.0535980202388984,
+    "paired_speedup_95pct_bootstrap_low": 1.017180562696429,
+    "paired_speedup_95pct_bootstrap_high": 1.0644005253182112
+  },
+  {
+    "kind": "max",
+    "duplicates": 32,
+    "groups": 4,
+    "unique_values_per_group": 4096,
+    "source_rows": 524288,
+    "scan_median_s": 0.115407897,
+    "endpoint_median_s": 0.114510797,
+    "median_speedup": 1.007834195757104,
+    "paired_speedup_95pct_bootstrap_low": 0.987598912835987,
+    "paired_speedup_95pct_bootstrap_high": 1.0731290909068427
+  }
+]

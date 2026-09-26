@@ -1,0 +1,374 @@
+[
+  {
+    "shape": "small",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.426454034,
+      "final/b-main": 0.37485342,
+      "foreach/b-main": 0.393001091
+    },
+    "rss_kib": {
+      "old/b-main": 2293920,
+      "final/b-main": 2296792,
+      "foreach/b-main": 2320560
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9529884755969626,
+        "time_lo": 0.6513230720281629,
+        "time_hi": 1.0764817377602602,
+        "rss": 0.9955199786865966
+      },
+      "control": {
+        "time": 0.994994765965722,
+        "time_lo": 0.6413273273786945,
+        "time_hi": 1.292377523462392,
+        "rss": 1.0046136807794794
+      }
+    }
+  },
+  {
+    "shape": "small",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.428029502,
+      "final/b-main": 0.402073144,
+      "foreach/b-main": 0.398624319
+    },
+    "rss_kib": {
+      "old/b-main": 2329256,
+      "final/b-main": 2292904,
+      "foreach/b-main": 2291872
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.937036229777852,
+        "time_lo": 0.7630952653323855,
+        "time_hi": 1.0638286050848729,
+        "rss": 0.9861291027354724
+      },
+      "control": {
+        "time": 0.955674888098472,
+        "time_lo": 0.8489379386996111,
+        "time_hi": 1.2151738372157328,
+        "rss": 0.9928412500480277
+      }
+    }
+  },
+  {
+    "shape": "large",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.351613144,
+      "final/b-main": 0.387939129,
+      "foreach/b-main": 0.350760169
+    },
+    "rss_kib": {
+      "old/b-main": 2342568,
+      "final/b-main": 2331308,
+      "foreach/b-main": 2302116
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9853573558594295,
+        "time_lo": 0.8790644737716611,
+        "time_hi": 1.233154620967021,
+        "rss": 0.9889661825680811
+      },
+      "control": {
+        "time": 1.070881146942389,
+        "time_lo": 0.7652223298091637,
+        "time_hi": 1.4810872953325809,
+        "rss": 0.9964027321644998
+      }
+    }
+  },
+  {
+    "shape": "large",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.424990644,
+      "final/b-main": 0.38327322,
+      "foreach/b-main": 0.363743594
+    },
+    "rss_kib": {
+      "old/b-main": 2280080,
+      "final/b-main": 2263724,
+      "foreach/b-main": 2288800
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9157146527677442,
+        "time_lo": 0.7486907144870107,
+        "time_hi": 1.0558764809819197,
+        "rss": 0.9819766562402742
+      },
+      "control": {
+        "time": 1.0715683330833845,
+        "time_lo": 0.7089297080531756,
+        "time_hi": 1.2522800630884061,
+        "rss": 0.9811032649764182
+      }
+    }
+  },
+  {
+    "shape": "small-dup",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.246420981,
+      "final/b-main": 0.272280172,
+      "foreach/b-main": 0.271479738
+    },
+    "rss_kib": {
+      "old/b-main": 1819700,
+      "final/b-main": 1825280,
+      "foreach/b-main": 1794104
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9763654607473856,
+        "time_lo": 0.6862367277391731,
+        "time_hi": 1.2677736965912005,
+        "rss": 0.9895956448146583
+      },
+      "control": {
+        "time": 1.0207457018450787,
+        "time_lo": 0.6181177326909443,
+        "time_hi": 1.1985402759408161,
+        "rss": 1.0269755336667348
+      }
+    }
+  },
+  {
+    "shape": "small-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.240909038,
+      "final/b-main": 0.240896949,
+      "foreach/b-main": 0.242486369
+    },
+    "rss_kib": {
+      "old/b-main": 1806916,
+      "final/b-main": 1844284,
+      "foreach/b-main": 1810384
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.0317175592688659,
+        "time_lo": 0.6559477509850012,
+        "time_hi": 1.429718546315267,
+        "rss": 1.0162452093394099
+      },
+      "control": {
+        "time": 0.9599688075218004,
+        "time_lo": 0.7702230815037044,
+        "time_hi": 1.579717194209355,
+        "rss": 1.0257549880998924
+      }
+    }
+  },
+  {
+    "shape": "large-dup",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.250118043,
+      "final/b-main": 0.311174537,
+      "foreach/b-main": 0.22485331
+    },
+    "rss_kib": {
+      "old/b-main": 1823288,
+      "final/b-main": 1871940,
+      "foreach/b-main": 1839692
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.1209473348175725,
+        "time_lo": 0.750206977986577,
+        "time_hi": 1.6540257273228172,
+        "rss": 0.9955551114046369
+      },
+      "control": {
+        "time": 1.0969339010247041,
+        "time_lo": 0.8600360327493995,
+        "time_hi": 1.633786502853794,
+        "rss": 1.0162643871695773
+      }
+    }
+  },
+  {
+    "shape": "large-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.273834134,
+      "final/b-main": 0.28244851,
+      "foreach/b-main": 0.231763135
+    },
+    "rss_kib": {
+      "old/b-main": 1856060,
+      "final/b-main": 1882184,
+      "foreach/b-main": 1887820
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.045527962823382,
+        "time_lo": 0.7518433101829854,
+        "time_hi": 1.5129823207635678,
+        "rss": 0.9885740040319879
+      },
+      "control": {
+        "time": 1.0819372205961308,
+        "time_lo": 0.6305154761389634,
+        "time_hi": 1.3514064383803264,
+        "rss": 1.0241400133487302
+      }
+    }
+  },
+  {
+    "shape": "global",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.892162876,
+      "final/b-main": 0.835557097,
+      "foreach/b-main": 0.839247323
+    },
+    "rss_kib": {
+      "old/b-main": 1734876,
+      "final/b-main": 1734748,
+      "foreach/b-main": 1736312
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9336562661588431,
+        "time_lo": 0.8781669415373794,
+        "time_hi": 1.1884414529236382,
+        "rss": 0.9997694051344252
+      },
+      "control": {
+        "time": 1.0030890690281065,
+        "time_lo": 0.9855182468217347,
+        "time_hi": 1.1754955345812441,
+        "rss": 0.9988089698164846
+      }
+    }
+  },
+  {
+    "shape": "global",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.900907793,
+      "final/b-main": 0.832879747,
+      "foreach/b-main": 0.835644434
+    },
+    "rss_kib": {
+      "old/b-main": 1734856,
+      "final/b-main": 1733704,
+      "foreach/b-main": 1735696
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9265767440024585,
+        "time_lo": 0.8845180243669261,
+        "time_hi": 0.9489967191941057,
+        "rss": 0.9992922021563467
+      },
+      "control": {
+        "time": 0.9865057379177135,
+        "time_lo": 0.9379013169785183,
+        "time_hi": 1.027424345343701,
+        "rss": 1.0013451231225283
+      }
+    }
+  },
+  {
+    "shape": "global-dup",
+    "kind": "count",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.784389493,
+      "final/b-main": 0.771342283,
+      "foreach/b-main": 0.774115015
+    },
+    "rss_kib": {
+      "old/b-main": 1577072,
+      "final/b-main": 1577072,
+      "foreach/b-main": 1578360
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9838120627176434,
+        "time_lo": 0.9710488328369271,
+        "time_hi": 0.9892262862781088,
+        "rss": 0.9982560626501267
+      },
+      "control": {
+        "time": 0.9976101421133482,
+        "time_lo": 0.9792136751320392,
+        "time_hi": 1.005413762414162,
+        "rss": 1.000354422304302
+      }
+    }
+  },
+  {
+    "shape": "global-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 32,
+    "scale": 8,
+    "load_s": {
+      "old/b-main": 0.785373655,
+      "final/b-main": 0.773246966,
+      "foreach/b-main": 0.771958101
+    },
+    "rss_kib": {
+      "old/b-main": 1578848,
+      "final/b-main": 1575372,
+      "foreach/b-main": 1577140
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9883685319143217,
+        "time_lo": 0.9669291916985616,
+        "time_hi": 1.0132888554811532,
+        "rss": 0.9979582812164399
+      },
+      "control": {
+        "time": 1.0016696048636973,
+        "time_lo": 0.9836489281346437,
+        "time_hi": 1.036352692400218,
+        "rss": 0.9990764984067061
+      }
+    }
+  }
+]

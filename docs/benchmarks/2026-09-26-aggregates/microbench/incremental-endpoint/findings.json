@@ -1,0 +1,265 @@
+{
+  "finding": "The original separate-build timing comparison did not isolate the endpoint algorithm. Unchanged-source builds vary more than its purported regression.",
+  "implementation": "Original baseline fold loops are absent from candidate min/max machine code. The production runtime patch was not changed during diagnosis.",
+  "profile": {
+    "samples": 29148,
+    "history_compute_samples": 3085,
+    "fold_region_samples": 209,
+    "fold_region_percent": 0.7170303279813366,
+    "fold_region_offsets": {
+      "0x1ab0": 3,
+      "0x1ab8": 4,
+      "0x1abd": 10,
+      "0x1ac1": 3,
+      "0x1ac4": 7,
+      "0x1ac7": 37,
+      "0x1acb": 14,
+      "0x1ace": 13,
+      "0x1ad1": 22,
+      "0x1ad6": 5,
+      "0x1ada": 6,
+      "0x1add": 10,
+      "0x1ae0": 16,
+      "0x1aff": 5,
+      "0x1b03": 2,
+      "0x1b06": 24,
+      "0x1b09": 25,
+      "0x1b0e": 1,
+      "0x1b27": 1,
+      "0x1b2a": 1
+    },
+    "note": "Baseline min compute routine at 0xf4840; offsets 0x1a50..0x1b37 cover the extrema fold setup and loops."
+  },
+  "assembly": "Baseline/candidate sum HistoryReplayer::compute normalized instruction sequences match. The hot OffsetList::index prefix is byte-identical but moves from offset 32 to 48 within a 64-byte line.",
+  "causal_limit": "Build/source placement changes are demonstrated; the exact CPU microarchitectural reason for each timing shift is not isolated.",
+  "isolated_result": "Same-executable comparison: min about 0.2% faster, within uncertainty; max about 1.5% faster. Sum control about 0.9% faster, within uncertainty. Do not present same-path 7-9% min/max gains as purely algorithmic: sum also improves.",
+  "experiments": {
+    "three-way": {
+      "attempts": 54,
+      "medians_seconds": {
+        "min": {
+          "original": 1.739058688,
+          "refactor": 1.77941668,
+          "specialized": 1.731257001
+        },
+        "max": {
+          "original": 1.595303644,
+          "refactor": 1.628698553,
+          "specialized": 1.632605535
+        },
+        "sum": {
+          "original": 1.574517671,
+          "refactor": 1.609487364,
+          "specialized": 1.650445789
+        }
+      },
+      "all_outputs_verified": true,
+      "comparisons_against_first_variant": {
+        "min": {
+          "refactor": {
+            "median_speedup": 0.9773195382208062,
+            "latency_change_percent": 2.320680278272458,
+            "paired_speedup_95pct_bootstrap": [
+              0.9693472954093643,
+              0.9900054977011543
+            ]
+          },
+          "specialized": {
+            "median_speedup": 1.0045063713795779,
+            "latency_change_percent": -0.44861550986370347,
+            "paired_speedup_95pct_bootstrap": [
+              0.9928683371308172,
+              1.0135343051428085
+            ]
+          }
+        },
+        "max": {
+          "refactor": {
+            "median_speedup": 0.9794959546452056,
+            "latency_change_percent": 2.0933261906346035,
+            "paired_speedup_95pct_bootstrap": [
+              0.9716052696523921,
+              0.9974814021373403
+            ]
+          },
+          "specialized": {
+            "median_speedup": 0.977151926659369,
+            "latency_change_percent": 2.338231416965275,
+            "paired_speedup_95pct_bootstrap": [
+              0.9637496552671257,
+              0.9850422438114886
+            ]
+          }
+        },
+        "sum": {
+          "refactor": {
+            "median_speedup": 0.9782727756786539,
+            "latency_change_percent": 2.2209781220041913,
+            "paired_speedup_95pct_bootstrap": [
+              0.972141213405991,
+              0.9933833922260126
+            ]
+          },
+          "specialized": {
+            "median_speedup": 0.9539953880908717,
+            "latency_change_percent": 4.822309676065872,
+            "paired_speedup_95pct_bootstrap": [
+              0.9253775148497849,
+              0.9742496288867116
+            ]
+          }
+        }
+      }
+    },
+    "same-binary": {
+      "attempts": 48,
+      "medians_seconds": {
+        "min": {
+          "scan": 3.474513553,
+          "endpoint": 3.466742201
+        },
+        "max": {
+          "scan": 3.225880473,
+          "endpoint": 3.178756069
+        },
+        "sum": {
+          "scan": 3.253291195,
+          "endpoint": 3.225052064
+        }
+      },
+      "all_outputs_verified": true,
+      "comparisons_against_first_variant": {
+        "min": {
+          "endpoint": {
+            "median_speedup": 1.0022416873102817,
+            "latency_change_percent": -0.22366733879307654,
+            "paired_speedup_95pct_bootstrap": [
+              0.9838832215200808,
+              1.0099021859459898
+            ]
+          }
+        },
+        "max": {
+          "endpoint": {
+            "median_speedup": 1.0148247940317185,
+            "latency_change_percent": -1.460823003035061,
+            "paired_speedup_95pct_bootstrap": [
+              1.0080356000889685,
+              1.0218936023111729
+            ]
+          }
+        },
+        "sum": {
+          "endpoint": {
+            "median_speedup": 1.0087561783312655,
+            "latency_change_percent": -0.8680173186894735,
+            "paired_speedup_95pct_bootstrap": [
+              0.9934485985901982,
+              1.022660973781874
+            ]
+          }
+        }
+      }
+    },
+    "same-build-path": {
+      "attempts": 48,
+      "medians_seconds": {
+        "min": {
+          "original": 3.646734589,
+          "specialized": 3.393714996
+        },
+        "max": {
+          "original": 3.389774729,
+          "specialized": 3.100715385
+        },
+        "sum": {
+          "original": 3.392419834,
+          "specialized": 3.215697824
+        }
+      },
+      "all_outputs_verified": true,
+      "comparisons_against_first_variant": {
+        "min": {
+          "specialized": {
+            "median_speedup": 1.0745553451890395,
+            "latency_change_percent": -6.938250833038618,
+            "paired_speedup_95pct_bootstrap": [
+              1.058676382662405,
+              1.0947913966582419
+            ]
+          }
+        },
+        "max": {
+          "specialized": {
+            "median_speedup": 1.0932234365651075,
+            "latency_change_percent": -8.527390965749337,
+            "paired_speedup_95pct_bootstrap": [
+              1.0761742952325144,
+              1.0995235372125536
+            ]
+          }
+        },
+        "sum": {
+          "specialized": {
+            "median_speedup": 1.054956037436433,
+            "latency_change_percent": -5.209320150437491,
+            "paired_speedup_95pct_bootstrap": [
+              1.0335571040620817,
+              1.0764399088816328
+            ]
+          }
+        }
+      }
+    },
+    "unchanged-source-control": {
+      "attempts": 36,
+      "medians_seconds": {
+        "min": {
+          "original_build": 1.718733762,
+          "rebuilt_same_source": 1.7987719
+        },
+        "max": {
+          "original_build": 1.58529201,
+          "rebuilt_same_source": 1.676066788
+        },
+        "sum": {
+          "original_build": 1.571699065,
+          "rebuilt_same_source": 1.686323702
+        }
+      },
+      "all_outputs_verified": true,
+      "comparisons_against_first_variant": {
+        "min": {
+          "rebuilt_same_source": {
+            "median_speedup": 0.955504009152022,
+            "latency_change_percent": 4.656808388220868,
+            "paired_speedup_95pct_bootstrap": [
+              0.9405430958051997,
+              0.9695932362736549
+            ]
+          }
+        },
+        "max": {
+          "rebuilt_same_source": {
+            "median_speedup": 0.9458405961803475,
+            "latency_change_percent": 5.726060399433908,
+            "paired_speedup_95pct_bootstrap": [
+              0.9347963988133577,
+              0.9572591621101603
+            ]
+          }
+        },
+        "sum": {
+          "rebuilt_same_source": {
+            "median_speedup": 0.9320269074887261,
+            "latency_change_percent": 7.293039714317051,
+            "paired_speedup_95pct_bootstrap": [
+              0.9221941290145254,
+              0.9569198613264627
+            ]
+          }
+        }
+      }
+    }
+  }
+}

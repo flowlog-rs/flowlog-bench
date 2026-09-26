@@ -1,0 +1,17 @@
+{
+  "base": {
+    "address": "0x10d920",
+    "address_mod64": 32,
+    "hot_prefix_sha256": "637a1f009b45389efa4856b5a4ccf7e19d033ef4241a048f7c646a3403f12996"
+  },
+  "refactor": {
+    "address": "0x10c480",
+    "address_mod64": 0,
+    "hot_prefix_sha256": "637a1f009b45389efa4856b5a4ccf7e19d033ef4241a048f7c646a3403f12996"
+  },
+  "candidate": {
+    "address": "0x10d6f0",
+    "address_mod64": 48,
+    "hot_prefix_sha256": "637a1f009b45389efa4856b5a4ccf7e19d033ef4241a048f7c646a3403f12996"
+  }
+}

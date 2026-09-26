@@ -1,0 +1,72 @@
+{
+  "source": {
+    "path": "<bench>/flowlog/base/src",
+    "commit": "8d2d1a974c9bf19b31a161b88e18970ac5f005f4",
+    "patch": "",
+    "files": {
+      "flowlog-runtime/CHANGELOG.md": "dc592a2532b00e91a89f26f4196691ed87a8d485a03b80c247861a7a72a200f7",
+      "flowlog-runtime/Cargo.toml": "2023cfb492fd57bb43cdd140017169fada73438b679a8723236ceab2f84f451f",
+      "flowlog-runtime/LICENSE": "4653439d024ef543875d1195fd0e43e7ffbd21c5b35840fd36ea60b93f97996c",
+      "flowlog-runtime/README.md": "85b6e3b7953618e7f31c463f73a3426bc32c4ec06dcfcdae5e370c961b272ff4",
+      "flowlog-runtime/src/args.rs": "6b73387169f1d8926f296ae0d9aeece7a19a7c7f117ba4dc88609b339e398ea4",
+      "flowlog-runtime/src/error.rs": "735b8d401150be4391ba3aadbb66c3ac2148496a9cd1d60145383c8b3012057a",
+      "flowlog-runtime/src/intern.rs": "4f20be2dbf597881e56e16b79425f034439a6c3e92fab386f71e375c38aaa252",
+      "flowlog-runtime/src/io/input/decode.rs": "3a22ec3e8d9986a64c5e86571ca144b077b32a030a9a18063214ec2823519321",
+      "flowlog-runtime/src/io/input/decode/sqlite.rs": "d3b1da17613a8679dc5bb3277c15ee1fe21162e13a8a712fbc1f8a0e3af5c029",
+      "flowlog-runtime/src/io/input/decode/text.rs": "f3f26b786c4ccd74e44e2ee34ffeb9a3b1ec266bc3ae9a7ead2ca47dafc41dfe",
+      "flowlog-runtime/src/io/input/decode/typed.rs": "6768df1a1e5dd557c5deafd74a312ddfa756cb20994cc8b52fcb66381e46ae59",
+      "flowlog-runtime/src/io/input/loader.rs": "ff31b959e85d69e777407e41d3c9c90e223aea41a156ba727e3b06b6e7fb1097",
+      "flowlog-runtime/src/io/input/mod.rs": "3e77fc98cca85d1e10b7047013d34c4455da0b20507391838c066da3ff838394",
+      "flowlog-runtime/src/io/input/reader.rs": "bcf97b65f7ff0a6498d51d15f4b20a2a9cefc1f9ae418afb30c50be5dc70de09",
+      "flowlog-runtime/src/io/input/reader/file.rs": "d18dae0bf7678d19ef6501d23528a093a98db610e89efa824908a2ecf81f9e4e",
+      "flowlog-runtime/src/io/input/reader/host.rs": "37f94f2119d609724f8f55e37bff70b1f7cb1b5419bbf77359177f706bc657ca",
+      "flowlog-runtime/src/io/input/reader/put.rs": "749a718786d5d79c0113a0360e344bb32899905e679366ed30bb895f78b178fa",
+      "flowlog-runtime/src/io/input/reader/sqlite.rs": "a2af69c0e2ec9ce6bc09e01b1445c63808808a142b43bdc9c47fa773632f03ee",
+      "flowlog-runtime/src/io/mod.rs": "7bbe559b2c8bf72663975192137cac1344f3451da0c288b4e7accb4f02ffc35b",
+      "flowlog-runtime/src/io/output/atomic.rs": "5f64bc74109e5ed09dfa0aaf9f2dd5f15f066e62931b283c81506360062c9378",
+      "flowlog-runtime/src/io/output/emitter.rs": "3fb35bf476a1b768b142f6b537da6b8d481791cffc452bb7d365b7080b5ff2f9",
+      "flowlog-runtime/src/io/output/encode.rs": "53cb6765c06990bd2ab9248ae2b66db55b63530a9f9d9ec6296735b79d80754d",
+      "flowlog-runtime/src/io/output/encode/sqlite.rs": "8a8257854341d2c2f658774c9c392ae6a157da411536f38028538c5f191eb60e",
+      "flowlog-runtime/src/io/output/encode/text.rs": "6cb869a6cb94d93384ff23490a1895cbc7a18c590e7c2f767870f715b9e05f71",
+      "flowlog-runtime/src/io/output/encode/typed.rs": "799821c93b0cd5ea46dc3ee45487e8beb821d1c37b76d00c5c5c749f624a6ce1",
+      "flowlog-runtime/src/io/output/mod.rs": "617b895c87714e6a10ea7d8dac9038f0b28f4dccc1852b145c8293aff8b0f946",
+      "flowlog-runtime/src/io/output/sort.rs": "a32816b37c32f22b7ac5fef1ebcde2c51f98c3c7dc6a7cae3bd3fbd2fc4cda31",
+      "flowlog-runtime/src/io/output/writer.rs": "71cea7ada85217534102bcf753763049c661c65d136b3a9c371790266157e72b",
+      "flowlog-runtime/src/io/output/writer/file.rs": "ddbfa516bd703182bde0e406a02533a681457b9f424ae96f569bfec1eef34ff9",
+      "flowlog-runtime/src/io/output/writer/host.rs": "0644e618cba870fc8bed1d4493a03fb4e0a0e75296fd335066bdcaa3ce0358bf",
+      "flowlog-runtime/src/io/output/writer/sqlite.rs": "5735860d8c02b733647343587333c7ca453225b682c6e58dbd8acb617352c4f2",
+      "flowlog-runtime/src/io/output/writer/stdout.rs": "0820aaa394fc4dc438da58f96ec099b043d1a9b5fb76d897c7f95ee074a399eb",
+      "flowlog-runtime/src/io/relation.rs": "610eaf5d3c7459ab3893f26a55d91d0041f3be891ed3d1b8584e5f3e42065b78",
+      "flowlog-runtime/src/lib.rs": "2b20dd050160de81b2592ea61eb5feaa41f2ede9c4587d522e5349d2f1e32064",
+      "flowlog-runtime/src/operators/dedup.rs": "d85f82ff723875201ccd9b922bb875a2c38e9203ee6debbdd46a52feb0940d4d",
+      "flowlog-runtime/src/operators/join.rs": "091064ac3215ddbe0b163d7c6ddf07ea2b862d82abb2f216cbcd7ee2d2a780ff",
+      "flowlog-runtime/src/operators/map.rs": "faf13244668986808b182a24adc58c7b202d462f38ddd8a46706a256183c7ae5",
+      "flowlog-runtime/src/operators/mod.rs": "7b3081e5d50c90310f0106d4d145767514b20b7998a0cb7ad3e797911ca75210",
+      "flowlog-runtime/src/operators/reduce.rs": "1187cd5df4134003ec956f05a2b2bb2fd2405d2dea8696b6314c4b54d5fb6319",
+      "flowlog-runtime/src/operators/reduce/incremental.rs": "e8cdcb7820d91bf77e1b63781fff610555d0def310fd30b42837f59875097404",
+      "flowlog-runtime/src/operators/reduce/present.rs": "3968983e7925d2285b1e9bdb4ab90e52c6168f2be8e67f4ad0fe83d04ee9f12a",
+      "flowlog-runtime/src/operators/reduce/semiring.rs": "7100e5a77b1c07fd3fd2ddbb492064699715614f1604b22ca4c24cf72a9e664d",
+      "flowlog-runtime/src/txn.rs": "ac29f49481ccc530cb3a9dd2aef63dfac17e6e7e83623d2247ec93358cd3a5ea",
+      "Cargo.toml": "e87702f3862cd8b8cec9619665f526d1f245120a0a8a718242d1da0e8befbe74",
+      "Cargo.lock": "55cf6d4b7ee12dc75b982b5edac203199024aa729bae4fa40b44b32f93a1b58f"
+    }
+  },
+  "binary": {
+    "path": "results/extrema-investigation/duplicates-heavy-confirm/build/target/release/incremental-extrema-bench",
+    "sha256": "a84d5ad04c2e0bc80a5876354a8f14a37d9f9cc9509808fcb4a15937e0b21fbf"
+  },
+  "parameters": {
+    "source": "flowlog/base/src",
+    "output": "results/extrema-investigation/duplicates-heavy-confirm",
+    "runs": 15,
+    "rounds": 256,
+    "groups": 4,
+    "values": 4096,
+    "duplicates": [
+      32,
+      64
+    ]
+  },
+  "all_outputs_verified": true,
+  "semantics": "source rows differ by duplicate id, map to identical (group,value), then flowlog_dedup before reduce"
+}

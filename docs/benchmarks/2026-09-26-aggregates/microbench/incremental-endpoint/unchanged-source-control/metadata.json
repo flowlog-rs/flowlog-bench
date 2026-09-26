@@ -1,0 +1,39 @@
+{
+  "started": "2026-09-24T23:32:10.474310+00:00",
+  "parameters": {
+    "variant": [
+      "original_build=results/extrema-investigation/original-base",
+      "rebuilt_same_source=results/extrema-investigation/in-place-base"
+    ],
+    "mode": [],
+    "output": "results/extrema-investigation/unchanged-source-control",
+    "runs": 5,
+    "rounds": 64,
+    "groups": 128,
+    "values": 4096,
+    "workers": 1,
+    "kinds": [
+      "min",
+      "max",
+      "sum"
+    ]
+  },
+  "variants": {
+    "original_build": {
+      "path": "<bench>/results/extrema-investigation/original-base",
+      "sha256": "948418d58722b7d7e1a93cfd0e82bdf88f0f570df0743aaf9beb7969d0af132f",
+      "mode": null
+    },
+    "rebuilt_same_source": {
+      "path": "<bench>/results/extrema-investigation/in-place-base",
+      "sha256": "af8e0c7c79d3561d28362a0bb6e559cbf01bcc16ef4445e5206cebe3e9d668dc",
+      "mode": null
+    }
+  },
+  "cpus": [
+    0
+  ],
+  "numa_node": 0,
+  "completed": "2026-09-24T23:33:21.136854+00:00",
+  "all_outputs_verified": true
+}

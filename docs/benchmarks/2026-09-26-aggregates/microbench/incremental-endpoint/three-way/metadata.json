@@ -1,0 +1,45 @@
+{
+  "started": "2026-09-24T23:13:53.369478+00:00",
+  "parameters": {
+    "variant": [
+      "original=results/extrema-investigation/original-base",
+      "refactor=results/extrema-investigation/build/refactor/target/release/incremental-extrema-bench",
+      "specialized=results/extrema-investigation/original-candidate"
+    ],
+    "env": [],
+    "output": "results/extrema-investigation/three-way",
+    "runs": 5,
+    "rounds": 64,
+    "groups": 128,
+    "values": 4096,
+    "workers": 1,
+    "kinds": [
+      "min",
+      "max",
+      "sum"
+    ]
+  },
+  "variants": {
+    "original": {
+      "path": "<bench>/results/extrema-investigation/original-base",
+      "sha256": "948418d58722b7d7e1a93cfd0e82bdf88f0f570df0743aaf9beb7969d0af132f",
+      "environment": {}
+    },
+    "refactor": {
+      "path": "<bench>/results/extrema-investigation/build/refactor/target/release/incremental-extrema-bench",
+      "sha256": "2b504a184e3ae95f5668d7f870254818130d4a679709e98b5e959786d2cbf8e8",
+      "environment": {}
+    },
+    "specialized": {
+      "path": "<bench>/results/extrema-investigation/original-candidate",
+      "sha256": "d1da94e88fad2498b06fc78ea931ef966be1ab1367bfa0b521d57c65aec29591",
+      "environment": {}
+    }
+  },
+  "cpus": [
+    0
+  ],
+  "numa_node": 0,
+  "completed": "2026-09-24T23:15:38.554631+00:00",
+  "all_outputs_verified": true
+}

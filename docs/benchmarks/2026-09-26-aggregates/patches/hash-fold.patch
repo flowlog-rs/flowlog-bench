@@ -1,0 +1,937 @@
+From ffa4685ca6c83b4473dc50623df05f02f96daeb8 Mon Sep 17 00:00:00 2001
+From: Hangdong Zhao <67406267+hdz284@users.noreply.github.com>
+Date: Fri, 25 Sep 2026 23:24:43 +0000
+Subject: [PATCH] perf(runtime): fold batch min and max in a hash table
+
+Min and max ignore repeated rows, so batch mode already skips their
+dedup (parent commit). Their arrangement still sorted every row only to
+keep one value per group. Fold them in a hash table on the worker that
+owns each group instead:
+
+- `Semiring::IDEMPOTENT` marks min and max. Present aggregates with an
+  idempotent semiring, in loops and in the final recursive fold, go to
+  `hash_fold`, which emits each group's answer at each completed time,
+  in key order, as the threshold did.
+- A zero-sized key (a global aggregate) is folded per batch before the
+  exchange, so its single owner receives one weight per batch.
+- The lift consumes one input batch at a time, instead of holding all
+  of a timestamp's batches beside their lifted copy.
+- Count, sum, and average keep dedup plus arrangement: after the dedup,
+  a hash table measured no faster and used up to 1.3x the memory.
+- The profiler's plan counts the hash fold's operators.
+
+Measured at 32 workers against main (medians of interleaved runs):
+
+  harness, min and max, 6 shapes   2.8-5x faster, 66-96% memory
+  harness, count and sum           unchanged; global up to 1.08x faster
+  cc, livejournal/orkut/arabic     2.0-2.5x faster, 39-74% memory
+  LDBC IC13, SF3                   1.7x faster, 69% memory
+  sssp, livejournal                1.16x faster, same memory
+
+Against the parent commit, min and max ran 1.5-2.8x faster in 87-101%
+of its memory. Outputs of cc, sssp, and IC13 are identical to main.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+Copilot-Session: f7d0db5c-c3c6-46b2-bc73-14ab6b4aff73
+Signed-off-by: Hangdong Zhao <67406267+hdz284@users.noreply.github.com>
+---
+ flowlog-build/src/codegen/aggregation.rs      |  22 +-
+ .../src/codegen/flow/non_recursive.rs         |  12 +-
+ flowlog-build/src/codegen/flow/recursive.rs   |  25 +-
+ flowlog-profiler/src/plan/builder.rs          |  14 +-
+ flowlog-profiler/src/plan/steps.rs            |  19 +-
+ flowlog-runtime/src/operators/reduce.rs       |  80 +++++-
+ .../src/operators/reduce/incremental.rs       |   5 +-
+ .../src/operators/reduce/present.rs           | 271 ++++++++++++++++--
+ .../src/operators/reduce/semiring.rs          |  50 +++-
+ 9 files changed, 432 insertions(+), 66 deletions(-)
+
+diff --git a/flowlog-build/src/codegen/aggregation.rs b/flowlog-build/src/codegen/aggregation.rs
+index 3a5e0ff..b709f5d 100644
+--- a/flowlog-build/src/codegen/aggregation.rs
++++ b/flowlog-build/src/codegen/aggregation.rs
+@@ -5,8 +5,9 @@
+ //! column and put its result back. [`aggregation_empty_key`] identifies a
+ //! group that exists without input. The runtime owns accumulation and
+ //! decides whether that group has a defined empty result.
+-//! [`union_needs_dedup`] decides whether a relation's union of rule heads
+-//! is deduplicated before an aggregate reads it.
++//! [`aggregation_is_idempotent`] marks the aggregates a repeated row cannot
++//! change, and [`union_needs_dedup`] decides whether a relation's union of
++//! rule heads is deduplicated before an aggregate reads it.
+ 
+ use flowlog_common::ExecutionMode;
+ use flowlog_parser::AggregationOperator;
+@@ -46,6 +47,16 @@ pub(super) fn aggregation_empty_key(arity: usize) -> TokenStream {
+     }
+ }
+ 
++/// Returns `true` if a repeated row cannot change the aggregate, as for
++/// min and max. Must agree with the runtime's `Semiring::IDEMPOTENT`,
++/// which picks the operators a `Present` aggregate builds.
++pub(super) fn aggregation_is_idempotent(op: AggregationOperator) -> bool {
++    match op {
++        AggregationOperator::Min | AggregationOperator::Max => true,
++        AggregationOperator::Count | AggregationOperator::Sum | AggregationOperator::Avg => false,
++    }
++}
++
+ /// Returns `true` if a relation's union of rule heads goes through
+ /// `flowlog_dedup` before use.
+ ///
+@@ -62,12 +73,7 @@ pub(super) fn union_needs_dedup(
+     match (mode, aggregation) {
+         (_, None) => true,
+         (ExecutionMode::Inc, Some(_)) => false,
+-        (ExecutionMode::Batch, Some(op)) => match op {
+-            AggregationOperator::Min | AggregationOperator::Max => false,
+-            AggregationOperator::Count | AggregationOperator::Sum | AggregationOperator::Avg => {
+-                true
+-            }
+-        },
++        (ExecutionMode::Batch, Some(op)) => !aggregation_is_idempotent(op),
+     }
+ }
+ 
+diff --git a/flowlog-build/src/codegen/flow/non_recursive.rs b/flowlog-build/src/codegen/flow/non_recursive.rs
+index dee54fc..0292e06 100644
+--- a/flowlog-build/src/codegen/flow/non_recursive.rs
++++ b/flowlog-build/src/codegen/flow/non_recursive.rs
+@@ -24,6 +24,7 @@ use tracing::trace;
+ use crate::codegen::CodeGen;
+ use crate::codegen::CodegenError;
+ use crate::codegen::aggregation::aggregation_empty_key;
++use crate::codegen::aggregation::aggregation_is_idempotent;
+ use crate::codegen::aggregation::aggregation_kind;
+ use crate::codegen::aggregation::aggregation_merge;
+ use crate::codegen::aggregation::aggregation_split;
+@@ -135,10 +136,12 @@ impl CodeGen {
+                 };
+ 
+                 // The runtime picks its strategy from the ambient difference,
+-                // and the two build different operators, so the plan graph
++                // and a `Present` aggregate its operators from the semiring;
++                // each choice builds different operators, so the plan graph
+                 // has to predict the same way.
+                 let name = self.display_name(*idb_fp);
+                 let binding = output.to_string();
++                let idempotent = aggregation_is_idempotent(*agg_op);
+                 let seeded = *agg_arity == 1
+                     && match agg_op {
+                         AggregationOperator::Count | AggregationOperator::Sum => true,
+@@ -148,7 +151,12 @@ impl CodeGen {
+                     };
+                 with_plan_graph(plan_graph, |plan_graph| match self.config.mode() {
+                     ExecutionMode::Batch => {
+-                        plan_graph.present_aggregate_operator(name, binding.clone(), binding);
++                        plan_graph.present_aggregate_operator(
++                            name,
++                            binding.clone(),
++                            binding,
++                            idempotent,
++                        );
+                     }
+                     ExecutionMode::Inc => {
+                         plan_graph.i32_aggregate_operator(name, binding.clone(), binding, seeded);
+diff --git a/flowlog-build/src/codegen/flow/recursive.rs b/flowlog-build/src/codegen/flow/recursive.rs
+index b459133..f920462 100644
+--- a/flowlog-build/src/codegen/flow/recursive.rs
++++ b/flowlog-build/src/codegen/flow/recursive.rs
+@@ -19,6 +19,7 @@ use quote::quote;
+ use crate::codegen::CodeGen;
+ use crate::codegen::CodegenError;
+ use crate::codegen::aggregation::aggregation_empty_key;
++use crate::codegen::aggregation::aggregation_is_idempotent;
+ use crate::codegen::aggregation::aggregation_kind;
+ use crate::codegen::aggregation::aggregation_merge;
+ use crate::codegen::aggregation::aggregation_split;
+@@ -269,9 +270,11 @@ impl CodeGen {
+                 };
+ 
+                 // The runtime picks its strategy from the ambient difference,
+-                // and the two build different operators, so the plan graph
++                // and a `Present` aggregate its operators from the semiring;
++                // each choice builds different operators, so the plan graph
+                 // has to predict the same way.
+                 let binding = next_ident.to_string();
++                let idempotent = aggregation_is_idempotent(*agg_op);
+                 let seeded = *agg_arity == 1
+                     && match agg_op {
+                         AggregationOperator::Count | AggregationOperator::Sum => true,
+@@ -285,6 +288,7 @@ impl CodeGen {
+                             output_name,
+                             binding.clone(),
+                             aggregated.to_string(),
++                            idempotent,
+                         );
+                     }
+                     ExecutionMode::Inc => {
+@@ -351,11 +355,10 @@ impl CodeGen {
+                     // Count/sum/avg need original contributions. For example,
+                     // summing running answers 2 and 5 would give 7, although
+                     // the original inputs 2 and 3 sum to 5.
+-                    let input = match agg_op {
+-                        AggregationOperator::Min | AggregationOperator::Max => next_ident.clone(),
+-                        AggregationOperator::Count
+-                        | AggregationOperator::Sum
+-                        | AggregationOperator::Avg => format_ident!("next_{fp}"),
++                    let input = if aggregation_is_idempotent(*agg_op) {
++                        next_ident.clone()
++                    } else {
++                        format_ident!("next_{fp}")
+                     };
+                     let empty_key = aggregation_empty_key(*agg_arity);
+ 
+@@ -406,17 +409,19 @@ impl CodeGen {
+             _ => quote! { ( #(#leave_exprs),* ) },
+         };
+ 
+-        // The boundary fold's outer-scope operators (consolidate + map) are
+-        // built by `flowlog_reduce_leave` at the leave site; only their
+-        // addresses are recorded here, after the scope exit.
++        // The boundary fold's outer-scope operators (a hash fold, or
++        // consolidate + map) are built by `flowlog_reduce_leave` at the leave
++        // site; only their addresses are recorded here, after the scope exit.
+         for (fp, target) in leave_fps.iter().zip(targets.iter()) {
+-            if idb_to_aggregation_map.contains_key(fp) && self.config.mode() == ExecutionMode::Batch
++            if let Some((agg_op, ..)) = idb_to_aggregation_map.get(fp)
++                && self.config.mode() == ExecutionMode::Batch
+             {
+                 with_plan_graph(plan_graph, |plan_graph| {
+                     plan_graph.recursive_post_leave_present_aggregate_operator(
+                         self.display_name(*fp),
+                         target.to_string(),
+                         target.to_string(),
++                        aggregation_is_idempotent(*agg_op),
+                     );
+                 });
+             }
+diff --git a/flowlog-profiler/src/plan/builder.rs b/flowlog-profiler/src/plan/builder.rs
+index d999f4e..1025eeb 100644
+--- a/flowlog-profiler/src/plan/builder.rs
++++ b/flowlog-profiler/src/plan/builder.rs
+@@ -235,17 +235,23 @@ impl PlanGraph {
+         );
+     }
+ 
++    /// Registers the operator range of a `Present` aggregate.
++    ///
++    /// `idempotent` must match whether the runtime's semiring is idempotent,
++    /// which folds in a hash table instead of a threshold; otherwise every
++    /// following operator address is shifted.
+     pub fn present_aggregate_operator(
+         &mut self,
+         name: String,
+         input_variable_name: String,
+         output_variable_name: String,
++        idempotent: bool,
+     ) {
+         self.push_node(
+             format!("{}: opt aggregate", name),
+             vec![input_variable_name],
+             Some(output_variable_name),
+-            steps::PRESENT_AGGREGATE,
++            steps::present_aggregate(idempotent),
+             None,
+         );
+     }
+@@ -365,17 +371,21 @@ impl PlanGraph {
+         );
+     }
+ 
++    /// Registers the operator range of a recursive `Present` aggregate's
++    /// final fold, after the loop. `idempotent` follows the contract of
++    /// [`Self::present_aggregate_operator`].
+     pub fn recursive_post_leave_present_aggregate_operator(
+         &mut self,
+         name: String,
+         input_variable_name: String,
+         output_variable_name: String,
++        idempotent: bool,
+     ) {
+         self.push_node(
+             format!("{}: post-leave opt aggregate", name),
+             vec![input_variable_name],
+             Some(output_variable_name),
+-            steps::POST_LEAVE_PRESENT_AGGREGATE,
++            steps::post_leave_present_aggregate(idempotent),
+             None,
+         );
+     }
+diff --git a/flowlog-profiler/src/plan/steps.rs b/flowlog-profiler/src/plan/steps.rs
+index 061c797..1e75dfd 100644
+--- a/flowlog-profiler/src/plan/steps.rs
++++ b/flowlog-profiler/src/plan/steps.rs
+@@ -47,18 +47,25 @@ pub(crate) const I32_AGGREGATE: u32 = 4;
+ /// - ToStreamBuilder + Concatenate
+ pub(crate) const I32_AGGREGATE_SEED: u32 = 2;
+ 
+-/// Operators from the `Present` aggregate, carrying contributions as weights:
++/// Operators from the `Present` aggregate, carrying contributions as
++/// weights, by whether the runtime's semiring is idempotent (min and max):
+ ///
+-/// - Lift (1) + `.threshold_semigroup()` (3) + Lower (1)
++/// - idempotent (2): Lift + hash fold
++/// - otherwise (5): Lift + `.threshold_semigroup()` (3) + Lower
+ ///
+ /// Lift emits the optional empty-group contribution without extra operators.
+-pub(crate) const PRESENT_AGGREGATE: u32 = 5;
++pub(crate) fn present_aggregate(idempotent: bool) -> u32 {
++    if idempotent { 2 } else { 5 }
++}
+ 
+ /// Operators from the post-leave `Present` aggregate, merging semiring
+-/// weights collapsed across iterations (`.consolidate()` then convert back):
++/// weights collapsed across iterations, by the same split:
+ ///
+-/// - (4): `.consolidate()` (3) + Map
+-pub(crate) const POST_LEAVE_PRESENT_AGGREGATE: u32 = 4;
++/// - idempotent (1): hash fold
++/// - otherwise (4): `.consolidate()` (3) + Map
++pub(crate) fn post_leave_present_aggregate(idempotent: bool) -> u32 {
++    if idempotent { 1 } else { 4 }
++}
+ 
+ /// Operators from dedup at an outer scope (EDBs and rule outputs).
+ /// Both modes add three operators:
+diff --git a/flowlog-runtime/src/operators/reduce.rs b/flowlog-runtime/src/operators/reduce.rs
+index c499748..493a3ca 100644
+--- a/flowlog-runtime/src/operators/reduce.rs
++++ b/flowlog-runtime/src/operators/reduce.rs
+@@ -13,11 +13,12 @@ mod incremental;
+ mod present;
+ mod semiring;
+ 
++use std::hash::Hash;
++
+ use differential_dataflow::Data;
+ use differential_dataflow::ExchangeData;
+ use differential_dataflow::VecCollection;
+ use differential_dataflow::difference::Semigroup;
+-use differential_dataflow::hashable::Hashable;
+ use differential_dataflow::lattice::Lattice;
+ pub use present::flowlog_reduce_leave;
+ use semiring::Largest;
+@@ -66,7 +67,7 @@ where
+     T: Timestamp + Lattice,
+     R: ReduceStrategy<T>,
+     D: Data,
+-    K: ExchangeData + Hashable,
++    K: ExchangeData + Hash,
+     V: ExchangeData,
+     O: Data,
+ {
+@@ -110,7 +111,7 @@ pub trait ReduceStrategy<T: Timestamp + Lattice>: Semigroup + Sized {
+     ) -> VecCollection<'scope, T, O, Self>
+     where
+         D: Data,
+-        K: ExchangeData + Hashable,
++        K: ExchangeData + Hash,
+         V: ExchangeData,
+         S: Semiring + ExchangeData,
+         O: Data;
+@@ -193,6 +194,8 @@ impl<V, C: Scalar> Aggregation<V, C> for Count {
+ mod tests {
+     use std::cell::RefCell;
+     use std::rc::Rc;
++    use std::sync::Arc;
++    use std::sync::Mutex;
+ 
+     use differential_dataflow::consolidation::consolidate_updates;
+     use differential_dataflow::difference::Present;
+@@ -380,6 +383,77 @@ mod tests {
+         assert_eq!(actual, expected);
+     }
+ 
++    /// Every worker derives the same rows, which min and max may read
++    /// repeated: each group still reports one answer. Count reads distinct
++    /// rows, here spread over the workers, and a default appears once.
++    #[test]
++    fn present_groups_report_once_across_workers() {
++        let answers = Arc::new(Mutex::new(Vec::new()));
++        let outputs = Arc::clone(&answers);
++        let workers = timely::execute(timely::Config::process(4), move |worker| {
++            let index = worker.index() as i64;
++            let outputs = Arc::clone(&outputs);
++            let (mut derived, mut distinct, no_input) = worker.dataflow::<(), _, _>(|scope| {
++                let record = |aggregate: &'static str| {
++                    let outputs = Arc::clone(&outputs);
++                    move |((group, answer), ..): &((i64, i64), (), Present)| {
++                        outputs
++                            .lock()
++                            .expect("answers")
++                            .push((aggregate, *group, *answer));
++                    }
++                };
++                let (derived, rows) = scope.new_collection::<(i64, i64), Present>();
++                let (distinct, distinct_rows) = scope.new_collection::<(i64, i64), Present>();
++                let (no_input, no_rows) = scope.new_collection::<(i64, i64), Present>();
++                let whole = |row| ((), row);
++                let value = |(_, value)| ((), value);
++                let count = |(), n: u32| (0, i64::from(n));
++                flowlog_reduce(rows.clone(), "Min", Min, None, |row| row, |g, v| (g, v))
++                    .inspect(record("min"));
++                flowlog_reduce(rows.clone(), "Max", Max, None, |row| row, |g, v| (g, v))
++                    .inspect(record("max"));
++                flowlog_reduce(rows.clone(), "Min", Min, None, value, |(), v| (0, v))
++                    .inspect(record("global min"));
++                flowlog_reduce(rows, "Max", Max, None, value, |(), v| (0, v))
++                    .inspect(record("global max"));
++                flowlog_reduce(distinct_rows, "Count", Count, Some(()), whole, count)
++                    .inspect(record("count"));
++                flowlog_reduce(no_rows, "Count", Count, Some(()), whole, count)
++                    .inspect(record("empty count"));
++                (derived, distinct, no_input)
++            });
++            for row in [(1, 10), (1, 20), (2, 30), (2, 5), (1, 10)] {
++                derived.update(row, Present);
++            }
++            for value in 0..3 {
++                distinct.update((index, value), Present);
++            }
++            derived.close();
++            distinct.close();
++            no_input.close();
++            while worker.step() {}
++        });
++        for worker in workers.expect("workers start").join() {
++            worker.expect("worker finishes");
++        }
++        let mut answers = answers.lock().expect("answers").clone();
++        answers.sort();
++        assert_eq!(
++            answers,
++            vec![
++                ("count", 0, 12),
++                ("empty count", 0, 0),
++                ("global max", 0, 30),
++                ("global min", 0, 5),
++                ("max", 1, 20),
++                ("max", 2, 30),
++                ("min", 1, 10),
++                ("min", 2, 5),
++            ]
++        );
++    }
++
+     #[rstest]
+     #[case(Count, vec![
+         (0, 0, 1), (0, 1, -1), (0, 3, 1), (0, 4, -1), (0, 5, 1), (0, 6, -1),
+diff --git a/flowlog-runtime/src/operators/reduce/incremental.rs b/flowlog-runtime/src/operators/reduce/incremental.rs
+index 967106a..43e4a0a 100644
+--- a/flowlog-runtime/src/operators/reduce/incremental.rs
++++ b/flowlog-runtime/src/operators/reduce/incremental.rs
+@@ -1,10 +1,11 @@
+ //! Aggregation with insertions and retractions, including empty groups.
+ 
++use std::hash::Hash;
++
+ use differential_dataflow::AsCollection;
+ use differential_dataflow::Data;
+ use differential_dataflow::ExchangeData;
+ use differential_dataflow::VecCollection;
+-use differential_dataflow::hashable::Hashable;
+ use differential_dataflow::lattice::Lattice;
+ use differential_dataflow::trace::implementations::ValBuilder;
+ use differential_dataflow::trace::implementations::ValSpine;
+@@ -25,7 +26,7 @@ impl<T: Timestamp + Lattice> ReduceStrategy<T> for i32 {
+     ) -> VecCollection<'scope, T, O, Self>
+     where
+         D: Data,
+-        K: ExchangeData + Hashable,
++        K: ExchangeData + Hash,
+         V: ExchangeData,
+         S: Semiring + ExchangeData,
+         O: Data,
+diff --git a/flowlog-runtime/src/operators/reduce/present.rs b/flowlog-runtime/src/operators/reduce/present.rs
+index 2a751c8..5811843 100644
+--- a/flowlog-runtime/src/operators/reduce/present.rs
++++ b/flowlog-runtime/src/operators/reduce/present.rs
+@@ -1,7 +1,12 @@
+ //! Present aggregation through semiring weights.
+ //!
+-//! The in-loop reduction and final recursive fold share contribution lifting
+-//! and conversion back to rows.
++//! The in-loop reduction and final recursive fold share their two paths:
++//! min and max fold lifted contributions in a hash table and emit rows;
++//! count, sum, and average fold them through an arrangement, then convert
++//! back to rows.
++
++use std::collections::hash_map::Entry;
++use std::hash::Hash;
+ 
+ use differential_dataflow::AsCollection;
+ use differential_dataflow::Data;
+@@ -11,12 +16,17 @@ use differential_dataflow::difference::Present;
+ use differential_dataflow::hashable::Hashable;
+ use differential_dataflow::lattice::Lattice;
+ use differential_dataflow::operators::ThresholdTotal;
+-use timely::container::DrainContainer;
++use rustc_hash::FxHashMap;
++use timely::container::CapacityContainerBuilder;
+ use timely::dataflow::Scope;
++use timely::dataflow::channels::pact::Exchange;
+ use timely::dataflow::channels::pact::Pipeline;
++use timely::dataflow::operators::Capability;
++use timely::dataflow::operators::InputCapability;
+ use timely::dataflow::operators::generic::Operator;
+ use timely::order::TotalOrder;
+ use timely::progress::Timestamp;
++use timely::progress::frontier::MutableAntichain;
+ use timely::progress::timestamp::Refines;
+ 
+ use super::Aggregation;
+@@ -36,18 +46,26 @@ impl<T: Timestamp + TotalOrder + Lattice> ReduceStrategy<T> for Present {
+     ) -> VecCollection<'scope, T, O, Self>
+     where
+         D: Data,
+-        K: ExchangeData + Hashable,
++        K: ExchangeData + Hash,
+         V: ExchangeData,
+         S: Semiring + ExchangeData,
+         O: Data,
+     {
+         let lifted = lift(collection, name, empty_group, contribute, split);
++        // Min and max ignore repeated rows (see `flowlog_reduce`), so they
++        // skip the dedup, and a hash table folds their rows without the
++        // sort an arrangement needs. At 32 workers that measured 2.8-5x
++        // faster than dedup plus arrangement, in 66-96% of its memory, and
++        // 1.5-2.8x faster than an arrangement alone, in 87-101% of its
++        // memory. Count and sum need distinct rows; after the dedup, a hash
++        // table measured no faster and used up to 1.3x the memory.
++        if S::IDEMPOTENT {
++            return hash_fold(lifted, name, merge);
++        }
+         // Unchanged aggregate weights carry no new answer. Suppressing them
+         // avoids restating a contribution downstream at later timestamps.
+-        let thresholded = lifted.threshold_semigroup(|_key, new, current| match current {
+-            Some(current) => new.supersedes(current).then_some(*new),
+-            None => (!new.is_zero()).then_some(*new),
+-        });
++        let thresholded = lifted
++            .threshold_semigroup(|_key, new, current| is_new_answer(new, current).then_some(*new));
+         lower(thresholded, name, merge)
+     }
+ }
+@@ -72,16 +90,16 @@ where
+     A: Aggregation<V, C>,
+     C: Scalar,
+     TInner: Timestamp + Refines<TOuter>,
+-    TOuter: Timestamp + Lattice,
++    TOuter: Timestamp + TotalOrder + Lattice,
+     D: Data,
+-    K: ExchangeData + Hashable,
++    K: ExchangeData + Hash,
+     V: Data,
+     A::Semiring: ExchangeData,
+     O: Data,
+ {
+     // Collapse iteration timestamps before converting contributions to rows,
+-    // so consolidation produces one final answer. Count/sum's raw input
+-    // branch has no in-loop seed; its own neutral default covers empty input.
++    // so the fold produces one final answer. Count/sum's raw input branch
++    // has no in-loop seed; its own neutral default covers empty input.
+     let lifted = lift(
+         collection,
+         name,
+@@ -90,9 +108,22 @@ where
+         split,
+     )
+     .leave(outer);
++    // The same choice, for the same reason, as in `Present::reduce`.
++    if A::Semiring::IDEMPOTENT {
++        return hash_fold(lifted, name, merge);
++    }
+     lower(lifted.consolidate(), name, merge)
+ }
+ 
++/// Returns `true` if a group's accumulated `weight` is a new answer: the
++/// first one that is not zero, or one that supersedes the `current` answer.
++fn is_new_answer<S: Semiring>(weight: &S, current: Option<&S>) -> bool {
++    match current {
++        Some(current) => weight.supersedes(current),
++        None => !weight.is_zero(),
++    }
++}
++
+ /// Converts each row to a group key weighted by its contribution.
+ /// An optional empty-group contribution appears once, at the minimum
+ /// timestamp, across all workers.
+@@ -109,19 +140,18 @@ where
+     K: Data,
+     S: Semiring,
+ {
+-    let mut lift_row = move |row, time, _| {
++    let mut lift_row = move |row, time| {
+         let (key, value) = split(row);
+-        std::iter::once((key, time, contribute(&value)))
+-    };
+-    let Some((key, empty)) = empty_group else {
+-        return flowlog_map(collection, name, lift_row);
++        (key, time, contribute(&value))
+     };
+-
+     // Inject a contribution, not an input row: count(0) would contribute 1.
+     // For count/sum, the lifted 0 remains a live weight, so an empty group
+     // is observable without changing a nonempty answer.
+     // Only worker 0 emits it; the group has one default across all workers.
+     let first_worker = collection.inner.scope().index() == 0;
++    let seed = empty_group
++        .filter(|_| first_worker)
++        .map(|(key, empty)| (key, T::minimum(), S::lift(empty)));
+     collection
+         .inner
+         .unary(Pipeline, name, move |capability, _| {
+@@ -129,7 +159,8 @@ where
+             // and routing later batches through a concat. The remaining cost
+             // is one seed record and one Option check per activation; input
+             // rows do not gain an additional branch.
+-            let mut seed = first_worker.then(|| (capability, (key, T::minimum(), S::lift(empty))));
++            let mut seed = seed.map(|row| (capability, row));
++            let mut partials = Vec::new();
+             move |input, output| {
+                 // This closure survives all recursive iterations. Taking the
+                 // seed emits it once, not once per timestamp or iteration.
+@@ -138,17 +169,47 @@ where
+                 if let Some((capability, row)) = seed.take() {
+                     output.session(&capability).give(row);
+                 }
+-                input.for_each_time(|time, data| {
+-                    output.session(&time).give_iterator(
+-                        data.flat_map(DrainContainer::drain)
+-                            .flat_map(|(row, time, diff)| lift_row(row, time, diff)),
+-                    );
++                // Lifting batch by batch frees each input batch before the
++                // next. `for_each_time` would hold all of a timestamp's
++                // batches beside their lifted copy until the last is
++                // lifted; min and max measured up to 1.3x the time and
++                // memory that way.
++                input.for_each(|time, data| {
++                    let lifted = data.drain(..).map(|(row, time, _)| lift_row(row, time));
++                    // A global aggregate's key is `()`, whose one owner
++                    // would otherwise receive every row. Folding each
++                    // batch's weights per timestamp sends it one weight per
++                    // batch instead. At 32 workers that measured up to 2x
++                    // faster for min and max, and up to 1.08x for count and
++                    // sum, whose dedup dominates. A zero-sized key has only
++                    // one value, so no groups merge.
++                    if size_of::<K>() == 0 {
++                        fold_by_time(lifted, &mut partials);
++                        output.session(&time).give_iterator(partials.drain(..));
++                    } else {
++                        output.session(&time).give_iterator(lifted);
++                    }
+                 });
+             }
+         })
+         .as_collection()
+ }
+ 
++/// Accumulates `updates` into one weight per timestamp in `partials`, as
++/// consolidation would when every update has the same key.
++fn fold_by_time<K, T: Eq, S: Semiring>(
++    updates: impl Iterator<Item = (K, T, S)>,
++    partials: &mut Vec<(K, T, S)>,
++) {
++    for (key, time, weight) in updates {
++        // A batch rarely spans more than one timestamp, so a scan beats a map.
++        match partials.iter_mut().find(|(_, held, _)| *held == time) {
++            Some((_, _, partial)) => partial.plus_equals(&weight),
++            None => partials.push((key, time, weight)),
++        }
++    }
++}
++
+ /// Converts settled aggregate weights back into output rows with `Present`.
+ fn lower<'scope, T, K, S, O>(
+     collection: VecCollection<'scope, T, K, S>,
+@@ -165,3 +226,165 @@ where
+         std::iter::once((merge(key, aggregate.finish()), time, Present))
+     })
+ }
++
++// =============================================================================
++// Hash fold
++// =============================================================================
++
++/// Folds each group's weights in a hash table on the worker that owns its
++/// key, and emits the rows the threshold of `Present::reduce` would: at
++/// each completed time, in time order, the answer of every group whose
++/// accumulated weight [`is_new_answer`].
++fn hash_fold<'scope, T, K, S, O>(
++    lifted: VecCollection<'scope, T, K, S>,
++    name: &str,
++    mut merge: impl FnMut(K, S::Value) -> O + 'static,
++) -> VecCollection<'scope, T, O, Present>
++where
++    T: Timestamp + TotalOrder,
++    K: ExchangeData + Hash,
++    S: Semiring + ExchangeData,
++    O: Data,
++{
++    let by_key = Exchange::new(|(key, ..): &(K, T, S)| key.hashed());
++    lifted
++        .inner
++        .unary_frontier::<CapacityContainerBuilder<Vec<(O, T, Present)>>, _, _, _>(
++            by_key,
++            name,
++            |_, _| {
++                let mut pending = Pending::<T, FxHashMap<K, S>>::default();
++                let mut answers = FxHashMap::<K, S>::default();
++                move |(input, frontier), output| {
++                    input.for_each(|capability, data| {
++                        for (key, time, weight) in data.drain(..) {
++                            pending
++                                .at(&capability, &time)
++                                .entry(key)
++                                .and_modify(|folded| folded.plus_equals(&weight))
++                                .or_insert(weight);
++                        }
++                    });
++                    // Once the input is complete, no later time can
++                    // supersede an answer: the last time need not record
++                    // its answers, and the table is released.
++                    let complete = frontier.is_empty();
++                    let mut ready = pending.ready(frontier).into_iter().peekable();
++                    while let Some((capability, weights)) = ready.next() {
++                        let last = complete && ready.peek().is_none();
++                        let time = capability.time().clone();
++                        let mut session = output.session(&capability);
++                        for (key, weight) in absorb(&mut answers, weights, last) {
++                            session.give((merge(key, weight.finish()), time.clone(), Present));
++                        }
++                    }
++                    if complete {
++                        answers = FxHashMap::default();
++                    }
++                }
++            },
++        )
++        .as_collection()
++}
++
++/// Folds one completed time's `weights` into `answers`, returning each
++/// group whose accumulated weight [`is_new_answer`], in key order. After
++/// the `last` time nothing reads `answers`, so it is left as it is.
++fn absorb<K: Ord + Clone + Hash, S: Semiring>(
++    answers: &mut FxHashMap<K, S>,
++    weights: FxHashMap<K, S>,
++    last: bool,
++) -> Vec<(K, S)> {
++    let mut fresh = Vec::with_capacity(weights.len());
++    if last {
++        // Moving the groups out, rather than cloning their keys, frees the
++        // table before the answers are emitted: sorting then costs no
++        // memory beyond emitting in table order.
++        for (key, mut weight) in weights {
++            let current = answers.get(&key);
++            if let Some(current) = current {
++                weight.plus_equals(current);
++            }
++            if is_new_answer(&weight, current) {
++                fresh.push((key, weight));
++            }
++        }
++    } else if answers.is_empty() {
++        // A loop's first time moves its table in whole rather than
++        // rehashing every group into a second table.
++        *answers = weights;
++        let new = answers
++            .iter()
++            .filter(|(_, weight)| is_new_answer(*weight, None));
++        fresh.extend(new.map(|(key, weight)| (key.clone(), *weight)));
++    } else {
++        for (key, weight) in weights {
++            match answers.entry(key) {
++                Entry::Vacant(entry) => {
++                    if is_new_answer(&weight, None) {
++                        fresh.push((entry.key().clone(), weight));
++                    }
++                    entry.insert(weight);
++                }
++                Entry::Occupied(mut entry) => {
++                    let current = *entry.get();
++                    entry.get_mut().plus_equals(&weight);
++                    if is_new_answer(entry.get(), Some(&current)) {
++                        fresh.push((entry.key().clone(), *entry.get()));
++                    }
++                }
++            }
++        }
++    }
++    // The threshold emits a time's answers in key order, which fixes the
++    // output order of a single worker. Sorting the answers, not the rows,
++    // keeps that order: with one worker and a million groups it measured
++    // 1.2x the time of emitting in table order, and at 32 workers it was
++    // within noise.
++    fresh.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
++    fresh
++}
++
++/// One slot for each time the input frontier has not yet passed, holding
++/// the capability to emit at that time.
++struct Pending<T: Timestamp, W> {
++    slots: Vec<(Capability<T>, W)>,
++}
++
++impl<T: Timestamp, W> Default for Pending<T, W> {
++    fn default() -> Self {
++        Self { slots: Vec::new() }
++    }
++}
++
++impl<T: Timestamp + TotalOrder, W: Default> Pending<T, W> {
++    /// The slot of `time`, opened from `capability` if it is new.
++    #[inline]
++    fn at(&mut self, capability: &InputCapability<T>, time: &T) -> &mut W {
++        // Rows mostly arrive at the newest time, so search from the end.
++        let index = match self.slots.iter().rposition(|(held, _)| held.time() == time) {
++            Some(index) => index,
++            None => {
++                self.slots.push((capability.delayed(time, 0), W::default()));
++                self.slots.len() - 1
++            }
++        };
++        &mut self.slots[index].1
++    }
++
++    /// Removes the slots of the times the frontier has passed, in time
++    /// order, so each time's weights fold onto those of every earlier time.
++    fn ready(&mut self, frontier: &MutableAntichain<T>) -> Vec<(Capability<T>, W)> {
++        let mut ready = Vec::new();
++        let mut index = 0;
++        while index < self.slots.len() {
++            if frontier.less_equal(self.slots[index].0.time()) {
++                index += 1;
++            } else {
++                ready.push(self.slots.swap_remove(index));
++            }
++        }
++        ready.sort_by(|a, b| a.0.time().cmp(b.0.time()));
++        ready
++    }
++}
+diff --git a/flowlog-runtime/src/operators/reduce/semiring.rs b/flowlog-runtime/src/operators/reduce/semiring.rs
+index 9c69dc7..8b2616a 100644
+--- a/flowlog-runtime/src/operators/reduce/semiring.rs
++++ b/flowlog-runtime/src/operators/reduce/semiring.rs
+@@ -118,16 +118,21 @@ pub trait Semiring: Monoid + Copy + 'static {
+     /// Unwraps the accumulated aggregate.
+     ///
+     /// Never called on an empty accumulation, though each caller rules that
+-    /// out its own way: the threshold predicate drops what [`IsZero`] reports,
+-    /// `consolidate` drops it before the recursive path completes an
+-    /// aggregate, and `reduce_abelian` does not invoke its logic for an empty
+-    /// group. Only [`Mean`] has an empty state at all.
++    /// out its own way: the threshold predicate and the min/max hash fold
++    /// drop what [`IsZero`] reports, `consolidate` drops it before the
++    /// recursive path completes an aggregate, and `reduce_abelian` does not
++    /// invoke its logic for an empty group. Only [`Mean`] has an empty
++    /// state at all.
+     fn finish(self) -> Self::Value;
+ 
+     /// Returns `true` if this accumulation supersedes `current` and must be
+     /// re-emitted: a tightened bound for the extremes, any change at all for
+     /// the accumulating aggregates.
+     fn supersedes(&self, current: &Self) -> bool;
++
++    /// `true` if accumulating a contribution twice equals accumulating it
++    /// once, as for min and max: a repeated row cannot change the result.
++    const IDEMPOTENT: bool;
+ }
+ 
+ /// Declares a semiring whose accumulation is one binary operation over a
+@@ -146,7 +151,8 @@ macro_rules! value_semiring {
+         $accumulate:expr, |
+         $new:ident,
+         $current:ident |
+-        $supersedes:expr
++        $supersedes:expr,idempotent =
++        $idempotent:literal
+     ) => {
+         #[doc = $doc]
+         #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+@@ -195,6 +201,8 @@ macro_rules! value_semiring {
+                 let ($new, $current) = (self.value, current.value);
+                 $supersedes
+             }
++
++            const IDEMPOTENT: bool = $idempotent;
+         }
+     };
+ }
+@@ -204,7 +212,8 @@ value_semiring!(
+     "Running minimum, identity `V::MAX`.",
+     V::MAX,
+     |a, b| a.min(b),
+-    |new, current| new < current
++    |new, current| new < current,
++    idempotent = true
+ );
+ 
+ value_semiring!(
+@@ -212,7 +221,8 @@ value_semiring!(
+     "Running maximum, identity `V::MIN`.",
+     V::MIN,
+     |a, b| a.max(b),
+-    |new, current| new > current
++    |new, current| new > current,
++    idempotent = true
+ );
+ 
+ value_semiring!(
+@@ -221,7 +231,8 @@ value_semiring!(
+      contribute one.",
+     V::ZERO,
+     |a, b| a + b,
+-    |new, current| new != current
++    |new, current| new != current,
++    idempotent = false
+ );
+ 
+ // =========================================================================
+@@ -290,6 +301,8 @@ impl<V: Scalar> Semiring for Mean<V> {
+     fn supersedes(&self, current: &Self) -> bool {
+         self != current
+     }
++
++    const IDEMPOTENT: bool = false;
+ }
+ 
+ #[cfg(test)]
+@@ -376,7 +389,7 @@ mod tests {
+         assert!(!Smallest::<i64>::zero().is_zero());
+     }
+ 
+-    /// `supersedes` is what the threshold predicate re-emits on: bounds only
++    /// `supersedes` is what the `Present` reduce re-emits on: bounds only
+     /// tighten, while the accumulating aggregates re-emit on any change.
+     #[test]
+     fn supersedes_tightens_bounds_and_tracks_changes() {
+@@ -392,4 +405,23 @@ mod tests {
+         assert!(Total::lift(1i64).supersedes(&Total::lift(2i64)));
+         assert!(!Total::lift(2i64).supersedes(&Total::lift(2i64)));
+     }
++
++    /// Accumulates one contribution twice and compares with once.
++    fn repeat_is_absorbed<S: Semiring + PartialEq>(value: S::Value) -> bool {
++        let once = S::lift(value);
++        let mut twice = once;
++        twice.plus_equals(&once);
++        twice == once
++    }
++
++    /// `IDEMPOTENT` must match the accumulation it describes. An average
++    /// is not idempotent even though `{3, 3}` averages to 3: with a 6
++    /// added, the repeat gives 4 where the distinct values give 4.5.
++    #[test]
++    fn idempotence_matches_accumulation() {
++        assert!(Smallest::<i64>::IDEMPOTENT && repeat_is_absorbed::<Smallest<i64>>(3));
++        assert!(Largest::<i64>::IDEMPOTENT && repeat_is_absorbed::<Largest<i64>>(3));
++        assert!(!Total::<i64>::IDEMPOTENT && !repeat_is_absorbed::<Total<i64>>(3));
++        assert!(!Mean::<i64>::IDEMPOTENT && !repeat_is_absorbed::<Mean<i64>>(3));
++    }
+ }
+-- 
+2.34.1
+

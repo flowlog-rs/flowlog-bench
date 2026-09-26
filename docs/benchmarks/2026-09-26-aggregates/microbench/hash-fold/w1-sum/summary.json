@@ -1,0 +1,188 @@
+[
+  {
+    "shape": "small",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.840258602,
+      "final/b-main": 0.833205535,
+      "foreach/b-main": 0.83224035
+    },
+    "rss_kib": {
+      "old/b-main": 301840,
+      "final/b-main": 301836,
+      "foreach/b-main": 301832
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9916060758161689,
+        "time_lo": 0.986251568399433,
+        "time_hi": 1.0004480977031796,
+        "rss": 0.9999867479459316
+      },
+      "control": {
+        "time": 1.0012560067510838,
+        "time_lo": 0.9931857113152469,
+        "time_hi": 1.0077002226470309,
+        "rss": 1.0000132524053116
+      }
+    }
+  },
+  {
+    "shape": "large",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.79871432,
+      "final/b-main": 0.80484991,
+      "foreach/b-main": 0.79915217
+    },
+    "rss_kib": {
+      "old/b-main": 301836,
+      "final/b-main": 301832,
+      "foreach/b-main": 301836
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.009791266429849,
+        "time_lo": 0.9911657610276755,
+        "time_hi": 1.0178250012683148,
+        "rss": 0.9999867477703124
+      },
+      "control": {
+        "time": 1.0084845790483608,
+        "time_lo": 0.9921568344166705,
+        "time_hi": 1.0154133949232722,
+        "rss": 1.0
+      }
+    }
+  },
+  {
+    "shape": "small-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.618315215,
+      "final/b-main": 0.616744225,
+      "foreach/b-main": 0.613279962
+    },
+    "rss_kib": {
+      "old/b-main": 221964,
+      "final/b-main": 221960,
+      "foreach/b-main": 221960
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.0003869207714708,
+        "time_lo": 0.9921274611145837,
+        "time_hi": 1.0021831070501044,
+        "rss": 0.9999819790596673
+      },
+      "control": {
+        "time": 1.0070693840541152,
+        "time_lo": 1.0033236423878606,
+        "time_hi": 1.01139068042239,
+        "rss": 1.0
+      }
+    }
+  },
+  {
+    "shape": "large-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.640003413,
+      "final/b-main": 0.647400091,
+      "foreach/b-main": 0.639820745
+    },
+    "rss_kib": {
+      "old/b-main": 221964,
+      "final/b-main": 221960,
+      "foreach/b-main": 221960
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 1.012193746570039,
+        "time_lo": 1.0025339706618215,
+        "time_hi": 1.0148641883691438,
+        "rss": 0.9999819790596673
+      },
+      "control": {
+        "time": 1.0129381980159622,
+        "time_lo": 1.0021781102024734,
+        "time_hi": 1.0149873230137394,
+        "rss": 1.0
+      }
+    }
+  },
+  {
+    "shape": "global",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.749993212,
+      "final/b-main": 0.73646078,
+      "foreach/b-main": 0.728638931
+    },
+    "rss_kib": {
+      "old/b-main": 301840,
+      "final/b-main": 301832,
+      "foreach/b-main": 301836
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9852173063733113,
+        "time_lo": 0.9667128400623444,
+        "time_hi": 0.9986306403309194,
+        "rss": 0.9999734958918632
+      },
+      "control": {
+        "time": 1.0107348765859452,
+        "time_lo": 0.995435862988778,
+        "time_hi": 1.026061591563551,
+        "rss": 0.9999867477703124
+      }
+    }
+  },
+  {
+    "shape": "global-dup",
+    "kind": "sum",
+    "placement": "local",
+    "workers": 1,
+    "scale": 1,
+    "load_s": {
+      "old/b-main": 0.601309541,
+      "final/b-main": 0.601610837,
+      "foreach/b-main": 0.592766574
+    },
+    "rss_kib": {
+      "old/b-main": 221964,
+      "final/b-main": 221960,
+      "foreach/b-main": 221956
+    },
+    "ratios": {
+      "vs-main": {
+        "time": 0.9999660290266658,
+        "time_lo": 0.9942672742852133,
+        "time_hi": 1.0067605954757255,
+        "rss": 0.9999819790596673
+      },
+      "control": {
+        "time": 1.0140577476938062,
+        "time_lo": 1.0084775026437054,
+        "time_hi": 1.0239338530538598,
+        "rss": 1.0000180212650929
+      }
+    }
+  }
+]

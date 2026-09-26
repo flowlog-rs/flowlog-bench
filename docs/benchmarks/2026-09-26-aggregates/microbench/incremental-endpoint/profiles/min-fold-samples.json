@@ -1,0 +1,29 @@
+{
+  "samples": 29148,
+  "history_compute_samples": 3085,
+  "fold_region_samples": 209,
+  "fold_region_percent": 0.7170303279813366,
+  "fold_region_offsets": {
+    "0x1ab0": 3,
+    "0x1ab8": 4,
+    "0x1abd": 10,
+    "0x1ac1": 3,
+    "0x1ac4": 7,
+    "0x1ac7": 37,
+    "0x1acb": 14,
+    "0x1ace": 13,
+    "0x1ad1": 22,
+    "0x1ad6": 5,
+    "0x1ada": 6,
+    "0x1add": 10,
+    "0x1ae0": 16,
+    "0x1aff": 5,
+    "0x1b03": 2,
+    "0x1b06": 24,
+    "0x1b09": 25,
+    "0x1b0e": 1,
+    "0x1b27": 1,
+    "0x1b2a": 1
+  },
+  "note": "Baseline min compute routine at 0xf4840; offsets 0x1a50..0x1b37 cover the extrema fold setup and loops."
+}

@@ -1,0 +1,39 @@
+{
+  "started": "2026-09-24T23:27:50.486942+00:00",
+  "parameters": {
+    "variant": [
+      "original=results/extrema-investigation/in-place-base",
+      "specialized=results/extrema-investigation/in-place-candidate"
+    ],
+    "mode": [],
+    "output": "results/extrema-investigation/same-build-path",
+    "runs": 7,
+    "rounds": 128,
+    "groups": 128,
+    "values": 4096,
+    "workers": 1,
+    "kinds": [
+      "min",
+      "max",
+      "sum"
+    ]
+  },
+  "variants": {
+    "original": {
+      "path": "<bench>/results/extrema-investigation/in-place-base",
+      "sha256": "af8e0c7c79d3561d28362a0bb6e559cbf01bcc16ef4445e5206cebe3e9d668dc",
+      "mode": null
+    },
+    "specialized": {
+      "path": "<bench>/results/extrema-investigation/in-place-candidate",
+      "sha256": "58594c14f08348f396b9e76697dcc6668dca5f9000ded51bda434565a5a764e0",
+      "mode": null
+    }
+  },
+  "cpus": [
+    0
+  ],
+  "numa_node": 0,
+  "completed": "2026-09-24T23:30:45.570207+00:00",
+  "all_outputs_verified": true
+}

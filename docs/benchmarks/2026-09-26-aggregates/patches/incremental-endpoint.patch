@@ -1,0 +1,413 @@
+diff --git a/flowlog-runtime/src/operators/reduce.rs b/flowlog-runtime/src/operators/reduce.rs
+index 65e5bda..763a6f3 100644
+--- a/flowlog-runtime/src/operators/reduce.rs
++++ b/flowlog-runtime/src/operators/reduce.rs
+@@ -1,6 +1,6 @@
+ //! Group-by aggregation for generated FlowLog rules.
+ //!
+-//! [`Aggregation`] defines row contributions and optional empty results.
++//! [`Aggregation`] defines row contributions, sorted folds, and empty results.
+ //! [`ReduceStrategy`] selects the implementation: `present` accumulates
+ //! contributions as weights; `incremental` maintains retractable results.
+ //! The accumulators live in `semiring`.
+@@ -16,6 +16,7 @@ mod semiring;
+ use differential_dataflow::Data;
+ use differential_dataflow::ExchangeData;
+ use differential_dataflow::VecCollection;
++use differential_dataflow::difference::Monoid;
+ use differential_dataflow::difference::Semigroup;
+ use differential_dataflow::hashable::Hashable;
+ use differential_dataflow::lattice::Lattice;
+@@ -51,7 +52,7 @@ use timely::progress::Timestamp;
+ pub fn flowlog_reduce<'scope, A, T, D, K, V, C, O, R>(
+     collection: VecCollection<'scope, T, D, R>,
+     name: &str,
+-    _aggregation: A,
++    aggregation: A,
+     empty_key: Option<K>,
+     split: impl FnMut(D) -> (K, V) + 'static,
+     merge: impl FnMut(K, C) -> O + 'static,
+@@ -73,7 +74,7 @@ where
+         collection,
+         name,
+         empty_key.zip(A::EMPTY_RESULT),
+-        A::contribute,
++        aggregation,
+         split,
+         merge,
+     )
+@@ -97,19 +98,21 @@ pub trait ReduceStrategy<T: Timestamp + Lattice>: Semigroup + Sized {
+     ///
+     /// `empty_group` pairs a known key with a result whose lifted weight
+     /// must be neutral and remain visible to consolidation.
+-    fn reduce<'scope, D, K, V, S, O>(
++    fn reduce<'scope, A, D, K, V, C, O>(
+         collection: VecCollection<'scope, T, D, Self>,
+         name: &str,
+-        empty_group: Option<(K, S::Value)>,
+-        contribute: impl Fn(&V) -> S + 'static,
++        empty_group: Option<(K, C)>,
++        aggregation: A,
+         split: impl FnMut(D) -> (K, V) + 'static,
+-        merge: impl FnMut(K, S::Value) -> O + 'static,
++        merge: impl FnMut(K, C) -> O + 'static,
+     ) -> VecCollection<'scope, T, O, Self>
+     where
++        A: Aggregation<V, C>,
++        A::Semiring: ExchangeData,
++        C: Scalar,
+         D: Data,
+         K: ExchangeData + Hashable,
+         V: ExchangeData,
+-        S: Semiring + ExchangeData,
+         O: Data;
+ }
+ 
+@@ -134,11 +137,30 @@ pub trait Aggregation<V, C>: 'static {
+ 
+     /// Turns one row's column into that row's contribution.
+     fn contribute(value: &V) -> Self::Semiring;
++
++    /// Folds distinct values in ascending `Ord` order from the identity.
++    ///
++    /// Implementations may skip values only if the fold remains equivalent.
++    /// An empty iterator returns the accumulator's identity.
++    fn accumulate_sorted<'a>(values: impl DoubleEndedIterator<Item = &'a V>) -> Self::Semiring
++    where
++        V: 'a,
++    {
++        let mut accumulated = Self::Semiring::zero();
++        for value in values {
++            accumulated.plus_equals(&Self::contribute(value));
++        }
++        accumulated
++    }
+ }
+ 
+ /// Declares one aggregation over the column's own type.
+ macro_rules! aggregation {
+-    ($name:ident, $semiring:ident, $doc:literal $(, empty = $empty:ident)?) => {
++    (
++        $name:ident, $semiring:ident, $doc:literal
++        $(, empty = $empty:ident)?
++        $(, endpoint = $endpoint:ident)?
++    ) => {
+         #[doc = $doc]
+         #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+         pub struct $name;
+@@ -152,12 +174,39 @@ macro_rules! aggregation {
+             fn contribute(value: &V) -> Self::Semiring {
+                 $semiring::lift(*value)
+             }
++
++            $(
++                #[inline]
++                fn accumulate_sorted<'a>(
++                    mut values: impl DoubleEndedIterator<Item = &'a V>,
++                ) -> Self::Semiring
++                where
++                    V: 'a,
++                {
++                    // Retain identity-seeded semantics, including NaN handling.
++                    let mut accumulated = Self::Semiring::zero();
++                    if let Some(value) = values.$endpoint() {
++                        accumulated.plus_equals(&Self::contribute(value));
++                    }
++                    accumulated
++                }
++            )?
+         }
+     };
+ }
+ 
+-aggregation!(Min, Smallest, "Smallest value in the column.");
+-aggregation!(Max, Largest, "Largest value in the column.");
++aggregation!(
++    Min,
++    Smallest,
++    "Smallest value in the column; consumes only the first sorted value.",
++    endpoint = next
++);
++aggregation!(
++    Max,
++    Largest,
++    "Largest value in the column; consumes only the last sorted value.",
++    endpoint = next_back
++);
+ aggregation!(Sum, Total, "Total of the column.", empty = ZERO);
+ aggregation!(Avg, Mean, "Mean of the column.");
+ 
+@@ -188,17 +237,65 @@ impl<V, C: Scalar> Aggregation<V, C> for Count {
+ 
+ #[cfg(test)]
+ mod tests {
++    use std::cell::Cell;
+     use std::cell::RefCell;
+     use std::rc::Rc;
+ 
+     use differential_dataflow::consolidation::consolidate_updates;
+     use differential_dataflow::difference::Present;
+     use differential_dataflow::input::Input;
++    use ordered_float::OrderedFloat;
+     use rstest::rstest;
+     use timely::dataflow::operators::probe::Handle;
+ 
+     use super::*;
+ 
++    #[rstest]
++    #[case(Min, -5, 1)]
++    #[case(Max, 42, 1)]
++    #[case(Sum, 44, 4)]
++    #[case(Avg, 11, 4)]
++    #[case(Count, 4, 4)]
++    fn sorted_aggregates_consume_only_required_values<A>(
++        #[case] _aggregation: A,
++        #[case] expected: i64,
++        #[case] expected_reads: usize,
++    ) where
++        A: Aggregation<i64, i64>,
++    {
++        let reads = Cell::new(0);
++        let values = [-5, 0, 7, 42];
++        let result = A::accumulate_sorted(values.iter().inspect(|_| reads.set(reads.get() + 1)));
++        assert_eq!(result.finish(), expected);
++        assert_eq!(reads.get(), expected_reads);
++    }
++
++    #[rstest]
++    #[case(Min, vec![i64::MIN, 0, i64::MAX], i64::MIN)]
++    #[case(Max, vec![i64::MIN, 0, i64::MAX], i64::MAX)]
++    #[case(Min, vec![7_i64], 7_i64)]
++    #[case(Max, vec![7_i64], 7_i64)]
++    #[case(Min, vec![], i64::MAX)]
++    #[case(Max, vec![], i64::MIN)]
++    #[case(Min, vec![OrderedFloat(f64::NAN)], OrderedFloat(f64::INFINITY))]
++    #[case(Max, vec![OrderedFloat(f64::NAN)], OrderedFloat(f64::NAN))]
++    #[case(Min, vec![OrderedFloat(-2.0_f64), OrderedFloat(f64::NAN)], OrderedFloat(-2.0_f64))]
++    #[case(Max, vec![OrderedFloat(-2.0_f64), OrderedFloat(f64::NAN)], OrderedFloat(f64::NAN))]
++    #[case(Min, vec![OrderedFloat(f64::NEG_INFINITY), OrderedFloat(f64::INFINITY)], OrderedFloat(f64::NEG_INFINITY))]
++    #[case(Max, vec![OrderedFloat(f64::NEG_INFINITY), OrderedFloat(f64::INFINITY)], OrderedFloat(f64::INFINITY))]
++    #[case(Min, vec![OrderedFloat(f32::NAN)], OrderedFloat(f32::INFINITY))]
++    #[case(Max, vec![OrderedFloat(f32::NAN)], OrderedFloat(f32::NAN))]
++    fn sorted_extrema_preserve_identity_seeded_results<A, V>(
++        #[case] _aggregation: A,
++        #[case] values: Vec<V>,
++        #[case] expected: V,
++    ) where
++        A: Aggregation<V, V>,
++        V: Scalar,
++    {
++        assert_eq!(A::accumulate_sorted(values.iter()).finish(), expected);
++    }
++
+     #[rstest]
+     #[case(Count, Present, Some(()), vec![(0, (), Present)])]
+     #[case(Count, 1_i32, Some(()), vec![(0, (), 1)])]
+@@ -392,6 +489,90 @@ mod tests {
+ 
+     type GroupRow = (u8, i64);
+ 
++    #[rstest]
++    #[case(Min, vec![
++        ((0, -5), 2, 1), ((0, -5), 4, -1),
++        ((0, -3), 1, 1), ((0, -3), 2, -1),
++        ((0, -3), 4, 1), ((0, -3), 5, -1),
++        ((0, 6), 6, 1), ((0, 6), 7, -1),
++        ((1, 10), 1, 1), ((1, 10), 5, -1),
++        ((1, 20), 5, 1), ((1, 20), 6, -1),
++    ])]
++    #[case(Max, vec![
++        ((0, 6), 6, 1), ((0, 6), 7, -1),
++        ((0, 7), 1, 1), ((0, 7), 2, -1),
++        ((0, 7), 4, 1), ((0, 7), 5, -1),
++        ((0, 9), 2, 1), ((0, 9), 4, -1),
++        ((1, 20), 1, 1), ((1, 20), 6, -1),
++    ])]
++    fn incremental_extrema_replace_and_retract_group_results<A>(
++        #[case] aggregation: A,
++        #[case] expected: Vec<(GroupRow, u32, i32)>,
++        #[values(1, 4)] workers: usize,
++    ) where
++        A: Aggregation<i64, i64> + Copy + Send + Sync,
++        A::Semiring: ExchangeData,
++    {
++        let mut actual = timely::execute(timely::Config::process(workers), move |worker| {
++            let seen = Rc::new(RefCell::new(Vec::new()));
++            let probe = Handle::new();
++            let mut input = worker.dataflow::<u32, _, _>(|scope| {
++                let (input, rows) = scope.new_collection::<GroupRow, i32>();
++                let seen = Rc::clone(&seen);
++                flowlog_reduce(
++                    rows,
++                    "Reduce",
++                    aggregation,
++                    Some(0),
++                    |row| row,
++                    |key, value| (key, value),
++                )
++                .inspect(move |update| seen.borrow_mut().push(*update))
++                .probe_with(&probe);
++                input
++            });
++            for (epoch, updates) in [
++                vec![],
++                vec![
++                    ((0, 7), 1),
++                    ((0, -3), 1),
++                    ((0, 4), 1),
++                    ((1, 20), 1),
++                    ((1, 10), 1),
++                ],
++                vec![((0, -5), 1), ((0, 9), 1), ((0, -99), 1), ((0, -99), -1)],
++                vec![((0, 4), -1)],
++                vec![((0, -5), -1), ((0, 9), -1)],
++                vec![((0, -3), -1), ((0, 7), -1), ((1, 10), -1)],
++                vec![((0, 6), 1), ((1, 20), -1)],
++                vec![((0, 6), -1)],
++            ]
++            .into_iter()
++            .enumerate()
++            {
++                if worker.index() == 0 {
++                    for (row, diff) in updates {
++                        input.update(row, diff);
++                    }
++                }
++                let next = epoch as u32 + 1;
++                input.advance_to(next);
++                input.flush();
++                worker.step_while(|| probe.less_than(&next));
++            }
++            input.close();
++            while worker.step() {}
++            seen.take()
++        })
++        .unwrap()
++        .join()
++        .into_iter()
++        .flat_map(Result::unwrap)
++        .collect();
++        consolidate_updates(&mut actual);
++        assert_eq!(actual, expected);
++    }
++
+     #[rstest]
+     #[case(Count, vec![
+         ((0, 0), (0, 0), 1), ((0, 0), (0, 1), -1),
+@@ -406,7 +587,17 @@ mod tests {
+         ((0, 8), (1, 0), 1), ((0, 8), (1, 1), -1),
+         ((0, 15), (1, 1), 1), ((1, 9), (0, 0), 1),
+     ])]
+-    fn default_group_is_scoped_by_key_and_partial_time<A>(
++    #[case(Min, vec![
++        ((0, 7), (0, 1), 1),
++        ((0, 8), (1, 0), 1), ((0, 8), (1, 1), -1),
++        ((1, 9), (0, 0), 1),
++    ])]
++    #[case(Max, vec![
++        ((0, 7), (0, 1), 1), ((0, 7), (1, 1), -1),
++        ((0, 8), (1, 0), 1),
++        ((1, 9), (0, 0), 1),
++    ])]
++    fn aggregate_groups_are_scoped_by_key_and_partial_time<A>(
+         #[case] aggregation: A,
+         #[case] expected: Vec<(GroupRow, (u32, u32), i32)>,
+     ) where
+diff --git a/flowlog-runtime/src/operators/reduce/incremental.rs b/flowlog-runtime/src/operators/reduce/incremental.rs
+index df75cd2..ea39016 100644
+--- a/flowlog-runtime/src/operators/reduce/incremental.rs
++++ b/flowlog-runtime/src/operators/reduce/incremental.rs
+@@ -11,23 +11,27 @@ use differential_dataflow::trace::implementations::ValSpine;
+ use timely::dataflow::operators::core::ToStream;
+ use timely::progress::Timestamp;
+ 
++use super::Aggregation;
+ use super::ReduceStrategy;
++use super::semiring::Scalar;
+ use super::semiring::Semiring;
+ 
+ impl<T: Timestamp + Lattice> ReduceStrategy<T> for i32 {
+-    fn reduce<'scope, D, K, V, S, O>(
++    fn reduce<'scope, A, D, K, V, C, O>(
+         collection: VecCollection<'scope, T, D, Self>,
+         name: &str,
+-        empty_group: Option<(K, S::Value)>,
+-        contribute: impl Fn(&V) -> S + 'static,
++        empty_group: Option<(K, C)>,
++        _aggregation: A,
+         split: impl FnMut(D) -> (K, V) + 'static,
+-        mut merge: impl FnMut(K, S::Value) -> O + 'static,
++        mut merge: impl FnMut(K, C) -> O + 'static,
+     ) -> VecCollection<'scope, T, O, Self>
+     where
++        A: Aggregation<V, C>,
++        A::Semiring: ExchangeData,
++        C: Scalar,
+         D: Data,
+         K: ExchangeData + Hashable,
+         V: ExchangeData,
+-        S: Semiring + ExchangeData,
+         O: Data,
+     {
+         // Reduce does not call its logic for an empty input group. Keep one
+@@ -49,15 +53,12 @@ impl<T: Timestamp + Lattice> ReduceStrategy<T> for i32 {
+         let reduced = collection
+             .map(split)
+             .arrange_by_key()
+-            .reduce_abelian::<_, ValBuilder<K, S::Value, T, i32>, ValSpine<K, S::Value, T, i32>, _, _>(
++            .reduce_abelian::<_, ValBuilder<K, C, T, i32>, ValSpine<K, C, T, i32>, _, _>(
+                 name,
+                 move |key, input, output| {
+                     // This callback describes the desired current output.
+                     // reduce_abelian emits its difference from the old output.
+-                    let mut accumulated = S::zero();
+-                    for (value, _) in input {
+-                        accumulated.plus_equals(&contribute(value));
+-                    }
++                    let accumulated = A::accumulate_sorted(input.iter().map(|(value, _)| *value));
+                     output.push((accumulated.finish(), 1));
+ 
+                     // For default z, the permanent source contributes (z, +1).
+diff --git a/flowlog-runtime/src/operators/reduce/present.rs b/flowlog-runtime/src/operators/reduce/present.rs
+index 2a751c8..ef9c576 100644
+--- a/flowlog-runtime/src/operators/reduce/present.rs
++++ b/flowlog-runtime/src/operators/reduce/present.rs
+@@ -7,6 +7,7 @@ use differential_dataflow::AsCollection;
+ use differential_dataflow::Data;
+ use differential_dataflow::ExchangeData;
+ use differential_dataflow::VecCollection;
++use differential_dataflow::difference::IsZero;
+ use differential_dataflow::difference::Present;
+ use differential_dataflow::hashable::Hashable;
+ use differential_dataflow::lattice::Lattice;
+@@ -26,22 +27,24 @@ use super::semiring::Semiring;
+ use crate::operators::map::flowlog_map;
+ 
+ impl<T: Timestamp + TotalOrder + Lattice> ReduceStrategy<T> for Present {
+-    fn reduce<'scope, D, K, V, S, O>(
++    fn reduce<'scope, A, D, K, V, C, O>(
+         collection: VecCollection<'scope, T, D, Self>,
+         name: &str,
+-        empty_group: Option<(K, S::Value)>,
+-        contribute: impl Fn(&V) -> S + 'static,
++        empty_group: Option<(K, C)>,
++        _aggregation: A,
+         split: impl FnMut(D) -> (K, V) + 'static,
+-        merge: impl FnMut(K, S::Value) -> O + 'static,
++        merge: impl FnMut(K, C) -> O + 'static,
+     ) -> VecCollection<'scope, T, O, Self>
+     where
++        A: Aggregation<V, C>,
++        A::Semiring: ExchangeData,
++        C: Scalar,
+         D: Data,
+         K: ExchangeData + Hashable,
+         V: ExchangeData,
+-        S: Semiring + ExchangeData,
+         O: Data,
+     {
+-        let lifted = lift(collection, name, empty_group, contribute, split);
++        let lifted = lift(collection, name, empty_group, A::contribute, split);
+         // Unchanged aggregate weights carry no new answer. Suppressing them
+         // avoids restating a contribution downstream at later timestamps.
+         let thresholded = lifted.threshold_semigroup(|_key, new, current| match current {

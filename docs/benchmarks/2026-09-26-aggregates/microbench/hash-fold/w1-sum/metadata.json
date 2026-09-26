@@ -1,0 +1,52 @@
+{
+  "binaries": {
+    "old": {
+      "path": "<work>/agg-designs/build-v5-old/target/release/aggregate-designs",
+      "sha256": "796e7b04c4d1ffbfdcb3d44ebe2493cadca56ff05abb0c28a06d99a31c2c8495"
+    },
+    "final": {
+      "path": "<work>/agg-designs/build-v6-final/target/release/aggregate-designs",
+      "sha256": "e3144d23aa46225629b2daccb2c8d074dee8571c6dd2a83731d80fb19e20d0c1"
+    },
+    "foreach": {
+      "path": "<work>/agg-designs/build-v5-foreach/target/release/aggregate-designs",
+      "sha256": "37aea12fdf7c07a45030aa93ea898759fe49c27d85824a8d6ed79de10b6bcb23"
+    }
+  },
+  "pinned_cpus": "62",
+  "numa_node": 0,
+  "parameters": {
+    "binary": [
+      "old=<work>/agg-designs/build-v5-old/target/release/aggregate-designs",
+      "final=<work>/agg-designs/build-v6-final/target/release/aggregate-designs",
+      "foreach=<work>/agg-designs/build-v5-foreach/target/release/aggregate-designs"
+    ],
+    "output": "results/v7-w1-add",
+    "runs": 7,
+    "workers": 1,
+    "scale": 1,
+    "shapes": [
+      "small",
+      "large",
+      "small-dup",
+      "large-dup",
+      "global",
+      "global-dup"
+    ],
+    "kinds": [
+      "sum"
+    ],
+    "placements": [
+      "local"
+    ],
+    "variants": [
+      "old/b-main",
+      "final/b-main",
+      "foreach/b-main"
+    ],
+    "ratios": [
+      "final/b-main,old/b-main,vs-main",
+      "final/b-main,foreach/b-main,control"
+    ]
+  }
+}
