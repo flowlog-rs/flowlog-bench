@@ -71,7 +71,8 @@ selected() {
 # Idempotent .bashrc edits.
 # ---------------------------------------------------------------------
 add_to_path() {
-    local d="$1" line="export PATH=\"$d:\$PATH\""
+    local d="$1"
+    local line="export PATH=\"$d:\$PATH\""
     grep -Fq "$line" "$HOME/.bashrc" 2>/dev/null || echo "$line" >> "$HOME/.bashrc"
     export PATH="$d:$PATH"
 }
