@@ -169,8 +169,9 @@ engine_compiler_run() {
 
     # Cheap cross-validation: per-relation sizes from "[size][rel] t=() size=N"
     # log lines. cross_engine.sh diffs this against souffle's .sizes.
-    grep -oE '\[size\]\[[^]]+\] t=\(\) size=[0-9]+' "$median_log" 2>/dev/null \
-        | sed -E 's/^\[size\]\[([^]]+)\] t=\(\) size=([0-9]+)$/\1\t\2/' \
+    # The runtime pads fields with variable whitespace ("[size][Tc]  t=()  size=N").
+    grep -oE '\[size\]\[[^]]+\][[:space:]]+t=\(\)[[:space:]]+size=[0-9]+' "$median_log" 2>/dev/null \
+        | sed -E 's/^\[size\]\[([^]]+)\][[:space:]]+t=\(\)[[:space:]]+size=([0-9]+)$/\1\t\2/' \
         > "${best_log}.sizes" 2>/dev/null
 
     if (( n_succeeded < NUM_RUNS )); then
