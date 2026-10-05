@@ -1,0 +1,10 @@
+case,flowlog_main_s,souffle_compiled_s,souffle_interpreted_s,flowlog_main_status,souffle_compiled_status,souffle_interpreted_status
+JavaScript reachable XL,7129.00,7200.00,7200.00,complete,timeout,timeout
+SASY JavaScript,4894.00,6259.00,7200.00,complete,complete,timeout
+django,44.00,209.79,301.62,complete,complete,complete
+SASY Python,36.38,42.55,69.65,complete,complete,complete
+aiohttp,7.68,22.81,30.33,complete,complete,complete
+undici,5.20,21.71,21.93,complete,complete,complete
+fastify,7.64,20.97,27.92,complete,complete,complete
+fastapi,7.53,12.61,22.18,complete,complete,complete
+starlette,9.06,8.12,14.42,complete,complete,complete

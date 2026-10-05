@@ -2,6 +2,12 @@
 
 Performance benchmarks for the [FlowLog](https://github.com/flowlog-rs/flowlog) Datalog engine. 
 
+## Published results
+
+- [FlowLog vs Souffle on SASY and Sasty, September 24, 2026](docs/benchmarks/2026-09-24-sasy/README.md):
+  incremental agent policies, an 851-rule static taint analysis, release
+  comparisons, SIP ablation, correctness, memory, and incomplete-run bounds.
+
 ## Setup
 
 Ubuntu only. ~50 GB free for the FlowLog build cache + dataset cache.

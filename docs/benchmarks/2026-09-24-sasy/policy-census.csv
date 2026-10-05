@@ -1,0 +1,23 @@
+workload,shape,souffle_us,flowlog_us,speedup
+Airline,linear,86197,74460,1.1576
+Airline,fan-in,551833,30019,18.3828
+Copilot Security,linear,61320,74560,0.8224
+Copilot Security,fan-in,1295549,38761,33.4230
+DLP Guard,linear,205,17916,0.0114
+DLP Guard,fan-in,1231,7160,0.1719
+LLM Content,linear,74,17170,0.0043
+LLM Content,fan-in,1375,1667,0.8248
+MALADE,linear,14,936,0.0150
+MALADE,fan-in,3856,19159,0.2013
+MLS,linear,7,693,0.0101
+MLS,fan-in,8,1025,0.0078
+OpenClaw,linear,7,549,0.0128
+OpenClaw,fan-in,9,856,0.0105
+Policy Skill,linear,31053,47225,0.6575
+Policy Skill,fan-in,508190,21513,23.6236
+Retail,linear,971,33687,0.0288
+Retail,fan-in,1767,3688,0.4791
+Security,linear,10026,50492,0.1986
+Security,fan-in,45891,121418,0.3779
+Toxic Flow,linear,313,37145,0.0084
+Toxic Flow,fan-in,1030,8767,0.1175
