@@ -83,30 +83,16 @@
     "benchmark_exit_code": 0
   },
   "release_source_verification": {
-    "published_crate": "flowlog-runtime 0.7.0",
-    "crate_sha256": "b3b2507b0c985b4ce8ff6ab2d248df9184b482e97b36a70c664c7d6caac8164c",
-    "crate_git_commit": "350fa381706e7ce27b181db5f8b334ed7a8fe351",
-    "release_commit": "40ca7b979aa7b57e7f359203f80f569a7b799fc4",
-    "crates_io_0_7_1": "not published; publish fix pending flowlog-rs/flowlog#648",
-    "differing_rust_source_files": [
-      "src/intern.rs",
-      "src/intern/ordinal.rs",
-      "src/io/input/decode/sqlite.rs",
-      "src/io/input/decode/text.rs",
-      "src/io/input/decode/typed.rs",
-      "src/io/mod.rs",
-      "src/io/output/encode/sqlite.rs",
-      "src/io/output/encode/text.rs",
-      "src/io/output/encode/typed.rs",
-      "src/io/output/writer/sqlite.rs",
-      "src/lib.rs",
-      "src/operators/choice.rs",
-      "src/operators/join.rs",
-      "src/operators/reduce/semiring.rs",
-      "src/row.rs"
-    ],
-    "differing_files_equal_git_diff": true,
-    "matching_rust_source_files": 51
+    "published_crate": "flowlog-runtime 0.7.1",
+    "crate_sha256": "5de2861398bc7ceb9aeee6a703f9821d6328506e5504c111d28a24220d49e2ec",
+    "crate_git_commit": "625d1c1d74a047ca2468e52ac284625c9c8c46a0",
+    "benchmarked_commit": "40ca7b979aa7b57e7f359203f80f569a7b799fc4",
+    "identical_files": 70,
+    "identical_rust_source_files": 66,
+    "not_compared": "Cargo-generated files; the manifest differs only in [dev-dependencies]",
+    "commits_differ_in": [
+      "flowlog-runtime/Cargo.toml"
+    ]
   },
   "changes_from_2026_09_24": {
     "workers": [

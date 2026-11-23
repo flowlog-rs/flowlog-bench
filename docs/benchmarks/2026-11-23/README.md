@@ -65,12 +65,12 @@ tuple-by-tuple verification**.
 | Setting | Value |
 |---|---|
 | Measurement interval | November 23, 2026, 08:41:38–10:12:58 UTC |
-| FlowLog release commit | `40ca7b979aa7b57e7f359203f80f569a7b799fc4` |
+| FlowLog commit | `40ca7b979aa7b57e7f359203f80f569a7b799fc4` (release PR [flowlog-rs/flowlog#637](https://github.com/flowlog-rs/flowlog/pull/637)) |
 | Benchmark corpus commit | `0757767f4211d6fb6acbdb466d33d043d3c2443d` |
 | Prepared dataset revision | `da9e91b3ff75d94604f57ba2b21ef3aa97e241ec` |
 | Host | AMD EPYC 7V13; 24 physical cores / 24 logical CPUs; approximately 216 GiB RAM |
 | CPU placement | Same 16 physical cores (CPUs 0–15) for both engines; no SMT on this host; NUMA node 0 memory binding |
-| FlowLog compilation | Release build; `--str-intern`; batch; runtime source pinned to the release commit |
+| FlowLog compilation | Release build; `--str-intern`; batch; runtime source pinned to that commit |
 | FlowLog execution | `-w 16` |
 | Soufflé compilation | `souffle -o <binary> -j 16 -F <facts> <program>` |
 | Soufflé execution | `<binary> -j 16 -F <facts> -D <output>` |
@@ -86,11 +86,10 @@ tuple-by-tuple verification**.
 ### Changes from the 2026-09-24 run
 
 - **Threads:** 16 instead of 32, for both engines.
-- **FlowLog:** compiler 0.9.1 / runtime
-  0.7.1 instead of 0.7.0 / 0.5.0. This compiler has no
-  `--mode` flag; it builds batch whenever every input relation is static, as in
-  DOOP, so the run drops `--mode batch` from the FlowLog flags and keeps every
-  other flag.
+- **FlowLog:** compiler 0.9.1 / runtime 0.7.1 instead of 0.7.0 / 0.5.0.
+  This compiler has no `--mode` flag; it builds batch whenever every input
+  relation is static, as in DOOP, so the run drops `--mode batch` from the
+  FlowLog flags and keeps every other flag.
 - **Host:** AMD EPYC 7V13 VM instead of AMD EPYC 7763, and Rust 1.97.1
   instead of 1.95.0. Absolute times are therefore not comparable across the
   two snapshots.
@@ -104,14 +103,15 @@ tuple-by-tuple verification**.
 
 ### Source verification
 
-`flowlog-runtime` 0.7.1 is not yet on crates.io; its
-publish is pending
-[flowlog-rs/flowlog#648](https://github.com/flowlog-rs/flowlog/pull/648). The
-pinned runtime source was compared with the published 0.7.0 crate (built from
-commit `350fa38`): the
-15 differing Rust files, listed in
-`metadata.json`, are exactly those changed between that commit and the release
-commit. Each generated program's Cargo metadata was verified to resolve
+The release tags and the published runtime crate point to `625d1c1`
+([flowlog-rs/flowlog#648](https://github.com/flowlog-rs/flowlog/pull/648)), the
+commit after the benchmarked one. The two commits differ only in a
+dev-dependency in `flowlog-runtime/Cargo.toml`, which is not built into
+generated programs, so the compiler source matches the tagged release. Apart
+from `Cargo.toml`, all 70 files of the pinned runtime source, including its
+66 Rust files, are byte-identical to the published
+`flowlog-runtime` 0.7.1 crate, whose checksum was verified against
+crates.io. Each generated program's Cargo metadata was verified to resolve
 `flowlog-runtime` from the pinned source, and the Soufflé binary was verified
 to link OpenMP.
 
