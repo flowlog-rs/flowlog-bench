@@ -1,0 +1,19 @@
+{
+  "doop": {
+    "cases": 20,
+    "flowlog_faster": 19,
+    "souffle_faster": 1,
+    "geomean_souffle_over_flowlog": 3.87154081706746,
+    "min_souffle_over_flowlog": 0.9529698234629097,
+    "max_souffle_over_flowlog": 7.363013698630137,
+    "souffle_lower_peak_rss": 20,
+    "geomean_flowlog_over_souffle_peak_rss": 1.6497775335998373,
+    "geomean_souffle_over_flowlog_peak_rss": 0.6061423310923542
+  },
+  "coverage": {
+    "requested_comparisons": 20,
+    "completed_comparisons": 20,
+    "failed_or_incomplete": 0,
+    "successful_attempts": 120
+  }
+}

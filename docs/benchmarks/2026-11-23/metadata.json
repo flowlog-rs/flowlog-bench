@@ -1,0 +1,309 @@
+{
+  "started_utc": "2026-11-23T08:41:38Z",
+  "finished_utc": "2026-11-23T10:12:58Z",
+  "flowlog_compiler_version": "0.9.1",
+  "flowlog_runtime_version": "0.7.1",
+  "souffle_version": "2.5",
+  "flowlog_commit": "40ca7b979aa7b57e7f359203f80f569a7b799fc4",
+  "benchmark_corpus_commit": "0757767f4211d6fb6acbdb466d33d043d3c2443d",
+  "dataset_revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+  "cpu": "AMD EPYC 7V13",
+  "physical_cores": 24,
+  "logical_cpus": 24,
+  "ram_gib_approx": 216,
+  "bound_cpus": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "numa_memory_binding": 0,
+  "workers": 16,
+  "runs_per_engine_case": 3,
+  "program": "doop/default.dl (FlowLog), doop.dl (Soufflé)",
+  "flowlog_mode": "batch",
+  "flowlog_mode_selection": "automatic: compiler 0.9.1 has no --mode flag and builds batch when every input relation is static",
+  "flowlog_string_interning": true,
+  "flowlog_runtime_flags": [
+    "-w",
+    "16"
+  ],
+  "souffle_compile_flags": [
+    "-j",
+    "16"
+  ],
+  "souffle_runtime_flags": [
+    "-j",
+    "16"
+  ],
+  "profiling": false,
+  "primary_metric": "median process wall seconds, including load; excludes compilation",
+  "time_resolution_seconds": 0.01,
+  "memory_metric": "median per-execution peak RSS in MiB",
+  "max_map_count_during_run": 65530,
+  "peak_map_count_sampled": {
+    "flowlog": 154,
+    "souffle": 132,
+    "sampling_interval_seconds": 5,
+    "flowlog_samples": 399,
+    "souffle_samples": 507,
+    "souffle_sampling_started_utc": "2026-11-23T08:48:30Z"
+  },
+  "timeout_seconds": 1800,
+  "cache_policy": "no explicit warm-up or cache flush",
+  "toolchain": "Rust/Cargo 1.97.1; Soufflé 2.5 with OpenMP; g++ 11.4.0",
+  "souffle_package": {
+    "asset": "x86_64-ubuntu-2204-souffle-2.5-Linux.deb",
+    "sha512_verified_against": "souffle-lang/souffle 2.5 release sha512sum.txt",
+    "install": "unpacked without root; souffle-compile.py include and library paths point at the unpacked files",
+    "compile_flags": "-O3 -fopenmp -std=c++17 -DRAM_DOMAIN_SIZE=64 -DUSE_NCURSES -DUSE_LIBZ -DUSE_SQLITE"
+  },
+  "validation": {
+    "requested_comparisons": 20,
+    "successful_comparisons": 20,
+    "successful_attempts": 120,
+    "verified_generated_runtime_metadata": 20,
+    "verified_openmp_binaries": 1,
+    "all_timed_commands_use_16_workers": true,
+    "all_shared_relation_counts_agree": true,
+    "shared_relation_counts_per_case": 26,
+    "tuple_equality_checked": false,
+    "benchmark_exit_code": 0
+  },
+  "release_source_verification": {
+    "published_crate": "flowlog-runtime 0.7.0",
+    "crate_sha256": "b3b2507b0c985b4ce8ff6ab2d248df9184b482e97b36a70c664c7d6caac8164c",
+    "crate_git_commit": "350fa381706e7ce27b181db5f8b334ed7a8fe351",
+    "release_commit": "40ca7b979aa7b57e7f359203f80f569a7b799fc4",
+    "crates_io_0_7_1": "not published; publish fix pending flowlog-rs/flowlog#648",
+    "differing_rust_source_files": [
+      "src/intern.rs",
+      "src/intern/ordinal.rs",
+      "src/io/input/decode/sqlite.rs",
+      "src/io/input/decode/text.rs",
+      "src/io/input/decode/typed.rs",
+      "src/io/mod.rs",
+      "src/io/output/encode/sqlite.rs",
+      "src/io/output/encode/text.rs",
+      "src/io/output/encode/typed.rs",
+      "src/io/output/writer/sqlite.rs",
+      "src/lib.rs",
+      "src/operators/choice.rs",
+      "src/operators/join.rs",
+      "src/operators/reduce/semiring.rs",
+      "src/row.rs"
+    ],
+    "differing_files_equal_git_diff": true,
+    "matching_rust_source_files": 51
+  },
+  "changes_from_2026_09_24": {
+    "workers": [
+      32,
+      16
+    ],
+    "flowlog_compiler_runtime": [
+      "0.7.0/0.5.0",
+      "0.9.1/0.7.1"
+    ],
+    "flowlog_flags_removed": [
+      "--mode batch"
+    ],
+    "cpu": [
+      "AMD EPYC 7763",
+      "AMD EPYC 7V13"
+    ],
+    "rust": [
+      "1.95.0",
+      "1.97.1"
+    ],
+    "max_map_count_during_run": [
+      1048576,
+      65530
+    ],
+    "scope": [
+      "55 canonical cases",
+      "20 DOOP datasets"
+    ]
+  },
+  "plot_style": {
+    "flowlog": "#0087B9",
+    "souffle": "#F5A623",
+    "font_family": "Ubuntu",
+    "font_weights": [
+      400,
+      700
+    ],
+    "font_source": "https://github.com/flowlog-rs/flowlog-rs.github.io/blob/f6d409944f56595e12888b0e242c88fead14e6a8/src/css/custom.css",
+    "svg_text": "outlines",
+    "time_scale": "log",
+    "memory_scale": "linear"
+  },
+  "render_environment": {
+    "matplotlib": "3.5.1",
+    "numpy": "1.21.5",
+    "ubuntu_package": "fonts-ubuntu 0.83-6ubuntu1",
+    "ubuntu_regular_sha256": "52c1afa489ae7bfd893af6cdd9f1af258005703600449e70d338caabcff507e5",
+    "ubuntu_bold_sha256": "c90e629e932f768909bdce1481ccd259d8aff1490a4bc1cf94d5413492317336",
+    "packages": "Ubuntu 22.04: python3-matplotlib 3.5.1-2build1, python3-numpy 1:1.21.5-1ubuntu22.04.1, python3-pil 9.0.1-1ubuntu0.7, libfreetype6 2.11.1+dfsg-1ubuntu0.4",
+    "reproduces_2026_09_24_figures_byte_for_byte": true
+  },
+  "datasets": {
+    "avrora": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "5d9a466fe896c5e0a73e2f3fe352914c6403c2870f86c08713bc1e0bbc8e5229",
+      "archive_bytes": 74532238,
+      "unpacked_bytes": 1122760888,
+      "files": 125
+    },
+    "batik": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "0e66c095e6a65e765e0481bb1cc878f1d4d9845bbd11e744dea80be9470adda2",
+      "archive_bytes": 105982324,
+      "unpacked_bytes": 1742733440,
+      "files": 125
+    },
+    "biojava": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "6e81c27378dd151de6415ab49bb62ced9f8e70bfb69d9cd59df0a57c02091cde",
+      "archive_bytes": 173260481,
+      "unpacked_bytes": 2916921684,
+      "files": 125
+    },
+    "cassandra": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "d516a661e2f20e263a8e4933cbc94279314b0ba26609b0b459d88d56f9c6d08e",
+      "archive_bytes": 38551540,
+      "unpacked_bytes": 606383400,
+      "files": 125
+    },
+    "eclipse": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "bae047f6d5fe1dfaa3c171516922e66ba3d2f8dd7244b43059c2ec7e6677ffc3",
+      "archive_bytes": 44907723,
+      "unpacked_bytes": 717947369,
+      "files": 125
+    },
+    "fop": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "f88c3d58fa3b5216ad49402a593676e474dc5067e87af498ed3d8f8b64eb343c",
+      "archive_bytes": 108025042,
+      "unpacked_bytes": 1697260184,
+      "files": 125
+    },
+    "graphchi": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "8ae5b92cdd2dc74a65d25108daa45477d4d1bd4ed09fc8dafd818d4c30cb48f4",
+      "archive_bytes": 230949307,
+      "unpacked_bytes": 3736343674,
+      "files": 125
+    },
+    "h2": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "f9c4d90ce0868456e73bdb0b05aa6e1d9177f2feff5bd964f3dbb61c8d2c1fdf",
+      "archive_bytes": 83784448,
+      "unpacked_bytes": 1276943723,
+      "files": 125
+    },
+    "h2o": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "65dfd99a751a7de2d6181b6be0eaa7643e2b3303cd2b47c53187c51fa081d816",
+      "archive_bytes": 681540893,
+      "unpacked_bytes": 11523611440,
+      "files": 125
+    },
+    "jme": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "3d4007eada51f189fdcc5c38dab676d0a0016c01a3d91f1e40b1ade9b7b221bb",
+      "archive_bytes": 128084615,
+      "unpacked_bytes": 2093799403,
+      "files": 125
+    },
+    "jython": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "67c0f289eda34b05cd8226dc4e41e87d016b8ddd2ec2e0f8a8d888c555596008",
+      "archive_bytes": 121807572,
+      "unpacked_bytes": 1881897392,
+      "files": 125
+    },
+    "kafka": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "8f12a3db15234d3de2fea2344b3d0c62fa684fd0b76ffb3cd20b004170464c79",
+      "archive_bytes": 184421896,
+      "unpacked_bytes": 2959848828,
+      "files": 125
+    },
+    "luindex": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "fc6816a04c07f8b7538547c45b6adb831879cd82d636c431eb516c7ef04c614c",
+      "archive_bytes": 46688065,
+      "unpacked_bytes": 746777795,
+      "files": 125
+    },
+    "lusearch": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "29a3faf79408222ab164249689b4d12e3f3628e86f2e12ace6085fadd5f6cc84",
+      "archive_bytes": 47539975,
+      "unpacked_bytes": 762307250,
+      "files": 125
+    },
+    "pmd": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "8825defd6500c31ac1fbc2c5b82d8f46da6a7dbd3d395b1b7de245fef4d230c9",
+      "archive_bytes": 86623764,
+      "unpacked_bytes": 1319667309,
+      "files": 125
+    },
+    "spring": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "3ee424fb3b748c3b3f28a4841ae99d3506af37eefb6d3bb608c93e8f1519d5a8",
+      "archive_bytes": 84803735,
+      "unpacked_bytes": 1325312633,
+      "files": 125
+    },
+    "sunflow": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "18641d21a7267abf19616ba12d9a39c667f15c0cd1ea8fd2c611cbe9f01ab717",
+      "archive_bytes": 67542238,
+      "unpacked_bytes": 1050001274,
+      "files": 125
+    },
+    "tomcat": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "4756ac77f7e858df528d7707ff8dc238f85f4c3ab6870afdee7704dcab2185c5",
+      "archive_bytes": 36750964,
+      "unpacked_bytes": 582593035,
+      "files": 125
+    },
+    "xalan": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "fb80819fb66153b4370325cafb632ee5649917ff7e2d5b6645d6e360c61dd11f",
+      "archive_bytes": 105440689,
+      "unpacked_bytes": 1732667517,
+      "files": 125
+    },
+    "zxing": {
+      "revision": "da9e91b3ff75d94604f57ba2b21ef3aa97e241ec",
+      "sha256": "154593343fefd18306d4098ba9f6286947b134b56ebcf83d8e8eae368d5867e7",
+      "archive_bytes": 72025076,
+      "unpacked_bytes": 1130708761,
+      "files": 125
+    }
+  },
+  "data_sha256": {
+    "all_results.csv": "95a5fd2fc2d3ea6188811ca48291bb89bd43216f88e9d2a3ca75ea257d3ed7ee",
+    "attempts.csv": "e16c627980d95650570a3c3af32ce4bd31b8f5a55e404b3bd6e75d6c815befa1",
+    "summary.json": "d62c24af523905b442fb8e0c2e3243e67b03d18f8ac7996c24a0139d7f94f0a2"
+  }
+}
